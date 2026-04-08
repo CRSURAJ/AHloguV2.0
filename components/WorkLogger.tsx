@@ -41,14 +41,30 @@ export default function WorkLogger() {
 
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [bannerMessage, setBannerMessage] = useState("");
+  const [expandedLogId, setExpandedLogId] = useState<number | null>(null);
 
   useEffect(() => {
     const raw = localStorage.getItem("project_logu_logs");
     if (!raw) return;
 
     try {
-      const parsed = JSON.parse(raw) as LogItem[];
-      setLogs(parsed);
+      const parsed = JSON.parse(raw) as Partial<LogItem>[];
+      const safeLogs: LogItem[] = parsed.map((item, index) => ({
+        id: item.id ?? Date.now() + index,
+        ts: item.ts ?? Date.now(),
+        fullname: item.fullname ?? "",
+        jobId: item.jobId ?? "",
+        location: item.location ?? "",
+        role: item.role ?? "",
+        description: item.description ?? "",
+        startedAt: item.startedAt ?? "",
+        stoppedAt: item.stoppedAt ?? "",
+        breakMinutes: item.breakMinutes ?? 0,
+        workedMinutes: item.workedMinutes ?? 0,
+        syncStatus: item.syncStatus ?? "pending",
+        syncMessage: item.syncMessage ?? "Waiting to sync",
+      }));
+      setLogs(safeLogs);
     } catch {
       setLogs([]);
     }
@@ -57,14 +73,6 @@ export default function WorkLogger() {
   useEffect(() => {
     localStorage.setItem("project_logu_logs", JSON.stringify(logs));
   }, [logs]);
-
-  const pendingCount = useMemo(
-    () =>
-      logs.filter(
-        (item) => item.syncStatus === "pending" || item.syncStatus === "failed"
-      ).length,
-    [logs]
-  );
 
   const canStart =
     !isWorking &&
@@ -75,6 +83,24 @@ export default function WorkLogger() {
 
   const canBreak = isWorking;
   const canStop = isWorking && description.trim() !== "";
+
+  const unsyncedCount = useMemo(
+    () => logs.filter((item) => item.syncStatus !== "synced").length,
+    [logs]
+  );
+
+  const syncedCount = useMemo(
+    () => logs.filter((item) => item.syncStatus === "synced").length,
+    [logs]
+  );
+
+  const failedCount = useMemo(
+    () => logs.filter((item) => item.syncStatus === "failed").length,
+    [logs]
+  );
+
+  const canClearAll =
+    logs.length > 0 && logs.every((item) => item.syncStatus === "synced");
 
   function getWorkingStatusText() {
     if (isOnBreak) return "On break";
@@ -233,7 +259,7 @@ export default function WorkLogger() {
     }
 
     let successCount = 0;
-    let failedCount = 0;
+    let failCount = 0;
 
     for (const item of itemsToSync) {
       try {
@@ -268,17 +294,32 @@ export default function WorkLogger() {
           )
         );
 
-        failedCount += 1;
+        failCount += 1;
       }
     }
 
-    if (failedCount === 0) {
+    if (failCount === 0) {
       setBannerMessage(`${successCount} log(s) synced successfully.`);
     } else {
       setBannerMessage(
-        `${successCount} synced, ${failedCount} failed. Retry failed logs.`
+        `${successCount} synced, ${failCount} failed. Retry failed logs.`
       );
     }
+  }
+
+  function handleClearAll() {
+    if (!canClearAll) {
+      setBannerMessage("Clear All is available only when every log is synced.");
+      return;
+    }
+
+    const confirmed = window.confirm("Clear all saved logs?");
+    if (!confirmed) return;
+
+    setLogs([]);
+    setExpandedLogId(null);
+    localStorage.removeItem("project_logu_logs");
+    setBannerMessage("All saved logs cleared.");
   }
 
   function getSyncBadgeClass(status: SyncStatus) {
@@ -375,68 +416,140 @@ export default function WorkLogger() {
           >
             Sync
           </button>
+
+          <button
+            onClick={handleClearAll}
+            disabled={!canClearAll}
+            className={`${styles.button} ${styles.clearButton}`}
+          >
+            Clear All
+          </button>
         </div>
 
-<div className={styles.descriptionBlock}>
-  <label className={styles.label}>Description {isWorking ? "*" : ""}</label>
-  <textarea
-    value={description}
-    onChange={(e) => setDescription(e.target.value)}
-    disabled={!isWorking}
-    placeholder={
-      isWorking
-        ? "Enter work description before stopping"
-        : "Description becomes available after Start"
-    }
-    className={styles.textarea}
-  />
-</div>
+        <div className={styles.descriptionBlock}>
+          <label className={styles.label}>Description {isWorking ? "*" : ""}</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            disabled={!isWorking}
+            placeholder={
+              isWorking
+                ? "Enter work description before stopping"
+                : "Description becomes available after Start"
+            }
+            className={styles.textarea}
+          />
+        </div>
 
-<div className={styles.statusCard}>
-  <strong>Status:</strong> {getWorkingStatusText()}
-  <div className={styles.statusText}>Pending sync: {pendingCount}</div>
-  {bannerMessage && <div className={styles.banner}>{bannerMessage}</div>}
-</div>
+        <div className={styles.statusCard}>
+          <div className={styles.statusRow}>
+            <div>
+              <div className={styles.statusLabel}>Current status</div>
+              <div className={styles.statusValue}>{getWorkingStatusText()}</div>
+            </div>
+
+            <div className={styles.statusPill}>
+              {isWorking ? (isOnBreak ? "BREAK" : "LIVE") : "READY"}
+            </div>
+          </div>
+
+          <div className={styles.statusText}>Unsynced logs: {unsyncedCount}</div>
+
+          {bannerMessage && <div className={styles.banner}>{bannerMessage}</div>}
+        </div>
+
+        <div className={styles.summaryGrid}>
+          <div className={styles.summaryCard}>
+            <div className={styles.summaryLabel}>Total Logs</div>
+            <div className={styles.summaryValue}>{logs.length}</div>
+          </div>
+
+          <div className={styles.summaryCard}>
+            <div className={styles.summaryLabel}>Synced</div>
+            <div className={styles.summaryValue}>{syncedCount}</div>
+          </div>
+
+          <div className={styles.summaryCard}>
+            <div className={styles.summaryLabel}>Failed</div>
+            <div className={styles.summaryValue}>{failedCount}</div>
+          </div>
+        </div>
+
         <div className={styles.logsSection}>
-          <h2 className={styles.logsTitle}>Saved Logs</h2>
+          <div className={styles.logsHeader}>
+            <h2 className={styles.logsTitle}>Saved Logs</h2>
+            <span className={styles.logsCount}>{logs.length} total</span>
+          </div>
 
           {logs.length === 0 ? (
             <div className={styles.emptyState}>No logs yet.</div>
           ) : (
-            <div className={styles.logsGrid}>
-              {logs.map((item) => {
-                const safeStatus = item.syncStatus ?? "pending";
-                return (
-                  <div key={item.id} className={styles.logCard}>
-                    <div className={styles.logTop}>
-                      <div className={styles.logHeading}>
-                        {item.fullname} · {item.jobId}
+            <div className={styles.logsScroller}>
+              <div className={styles.logsGrid}>
+                {logs.map((item) => {
+                  const safeStatus = item.syncStatus ?? "pending";
+                  const isExpanded = expandedLogId === item.id;
+                  const canExpand = (item.description ?? "").length > 80;
+
+                  return (
+                    <div key={item.id} className={styles.logCard}>
+                      <div className={styles.logTop}>
+                        <div className={styles.logHeadingWrap}>
+                          <div className={styles.logHeading}>
+                            {item.fullname} · {item.jobId}
+                          </div>
+                          <div className={styles.logSubHeading}>
+                            {item.role} · {item.location}
+                          </div>
+                        </div>
+
+                        <span
+                          className={`${styles.badge} ${getSyncBadgeClass(
+                            safeStatus
+                          )}`}
+                        >
+                          {safeStatus.toUpperCase()}
+                        </span>
                       </div>
-                      <span
-                        className={`${styles.badge} ${getSyncBadgeClass(safeStatus)}`}
+
+                      <div className={styles.logMetaRow}>
+                        <span className={styles.metaTag}>
+                          Worked: {item.workedMinutes} min
+                        </span>
+                        <span className={styles.metaTag}>
+                          Break: {item.breakMinutes} min
+                        </span>
+                      </div>
+
+                      <div
+                        className={`${styles.logDescriptionText} ${
+                          isExpanded ? styles.expanded : ""
+                        }`}
                       >
-                        {safeStatus.toUpperCase()}
-                      </span>
-                    </div>
+                        {item.description || "No description"}
+                      </div>
 
-                    <div className={styles.logMeta}>
-                      {item.role} · {item.location}
-                    </div>
+                      {canExpand && (
+                        <button
+                          type="button"
+                          className={styles.linkButton}
+                          onClick={() =>
+                            setExpandedLogId(isExpanded ? null : item.id)
+                          }
+                        >
+                          {isExpanded ? "Show less" : "Show more"}
+                        </button>
+                      )}
 
-                    <div className={styles.logDescription}>
-                      <strong>Description:</strong> {item.description}
+                      <div className={styles.logFooter}>
+                        <div className={styles.logMessage}>
+                          {item.syncMessage ?? "Waiting to sync"}
+                        </div>
+                      </div>
                     </div>
-
-                    <div className={styles.logStats}>
-                      Worked: {item.workedMinutes} min · Break: {item.breakMinutes} min
-                    </div>
-
-                    <div className={styles.logMessage}>
-                      {item.syncMessage ?? "Waiting to sync"}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

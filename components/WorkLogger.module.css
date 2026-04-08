@@ -1,88 +1,113 @@
 .page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #102624 0%, #081110 100%);
+  background:
+    radial-gradient(circle at top left, rgba(83, 188, 123, 0.12), transparent 28%),
+    radial-gradient(circle at top right, rgba(178, 223, 220, 0.08), transparent 22%),
+    linear-gradient(180deg, #082221 0%, #061514 100%);
   padding: 32px 16px;
 }
 
 .card {
   width: 100%;
-  max-width: 780px;
+  max-width: 940px;
   margin: 0 auto;
-  background: rgba(255, 255, 255, 0.06);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.04)
+  );
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 24px;
-  padding: 24px;
+  padding: 28px;
   color: #ffffff;
   backdrop-filter: blur(14px);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
 }
 
 .title {
-  font-size: 28px;
-  margin: 0 0 8px 0;
+  font-size: 30px;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.02em;
 }
 
 .subtitle {
   margin: 0;
   color: #b7c7c4;
+  font-size: 14px;
 }
 
 .formGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-top: 20px;
+  gap: 18px;
+  margin-top: 24px;
 }
 
 .label {
   display: block;
-  margin-bottom: 6px;
-  font-size: 14px;
-  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #e6f0ee;
 }
 
 .input,
 .textarea {
   width: 100%;
-  border-radius: 12px;
-  border: 1px solid #2a403d;
-  background: #0d1817;
+  border-radius: 14px;
+  border: 1px solid #24413d;
+  background: rgba(2, 18, 17, 0.88);
   color: #ffffff;
   box-sizing: border-box;
   outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
 }
 
 .input {
-  height: 44px;
-  padding: 0 12px;
+  height: 46px;
+  padding: 0 14px;
 }
 
 .textarea {
-  min-height: 110px;
-  padding: 12px;
+  min-height: 120px;
+  padding: 14px;
   resize: vertical;
+}
+
+.input:focus,
+.textarea:focus {
+  border-color: #53bc7b;
+  box-shadow: 0 0 0 3px rgba(83, 188, 123, 0.12);
 }
 
 .input:disabled,
 .textarea:disabled {
-  opacity: 0.65;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
 .buttonRow {
   display: flex;
   gap: 12px;
-  margin-top: 20px;
+  margin-top: 22px;
   flex-wrap: wrap;
 }
 
 .button {
-  height: 48px;
+  height: 46px;
   padding: 0 18px;
-  border-radius: 12px;
+  border-radius: 14px;
   border: none;
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    transform 0.16s ease,
+    opacity 0.16s ease,
+    box-shadow 0.16s ease;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
 }
 
 .button:hover:not(:disabled) {
@@ -90,69 +115,180 @@
 }
 
 .button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .startButton {
-  background: #53bc7b;
+  background: linear-gradient(180deg, #61d18d 0%, #53bc7b 100%);
   color: #081110;
 }
 
 .breakButton {
-  background: #f2d7a1;
+  background: linear-gradient(180deg, #e8d7a8 0%, #d1ba80 100%);
   color: #081110;
 }
 
 .stopButton {
-  background: #ffffff;
+  background: linear-gradient(180deg, #f5f5f5 0%, #d7d7d7 100%);
   color: #081110;
 }
 
 .syncButton {
-  background: #0d1817;
+  background: linear-gradient(180deg, #12302d 0%, #0b1f1e 100%);
   color: #ffffff;
-  border: 1px solid #2a403d;
+  border: 1px solid #2d4a46;
+}
+
+.clearButton {
+  background: linear-gradient(180deg, #2b1212 0%, #1b0c0c 100%);
+  color: #ffd1d1;
+  border: 1px solid #5d2f2f;
+}
+
+.descriptionBlock {
+  margin-top: 18px;
 }
 
 .statusCard {
   margin-top: 18px;
   padding: 18px;
-  border-radius: 16px;
-  background: #0d1817;
-  border: 1px solid #2d4642;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  border-radius: 18px;
+  background: linear-gradient(
+    180deg,
+    rgba(8, 20, 19, 0.95),
+    rgba(5, 16, 15, 0.95)
+  );
+  border: 1px solid #284743;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.statusLabel {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9cb4af;
+}
+
+.statusValue {
+  margin-top: 4px;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.statusPill {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(83, 188, 123, 0.12);
+  border: 1px solid rgba(83, 188, 123, 0.3);
+  color: #8ee0ac;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
 }
 
 .statusText {
-  margin-top: 8px;
+  margin-top: 12px;
   color: #b7c7c4;
+  font-size: 14px;
 }
 
 .banner {
-  margin-top: 8px;
+  margin-top: 10px;
   color: #d9cdc7;
+  font-size: 14px;
 }
 
-.descriptionBlock {
-  margin-top: 16px;
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.summaryCard {
+  padding: 16px;
+  border-radius: 16px;
+  background: linear-gradient(
+    180deg,
+    rgba(9, 26, 25, 0.94),
+    rgba(5, 16, 15, 0.94)
+  );
+  border: 1px solid #223c39;
+}
+
+.summaryLabel {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #96afaa;
+}
+
+.summaryValue {
+  margin-top: 10px;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .logsSection {
-  margin-top: 28px;
+  margin-top: 24px;
+}
+
+.logsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 .logsTitle {
-  font-size: 20px;
-  margin: 0 0 12px 0;
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.logsCount {
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid #23413d;
+  color: #d5e0dd;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .emptyState {
-  padding: 16px;
-  border-radius: 14px;
-  background: #0d1817;
+  padding: 18px;
+  border-radius: 16px;
+  background: rgba(6, 17, 16, 0.9);
   border: 1px solid #223533;
   color: #b7c7c4;
+}
+
+.logsScroller {
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.logsScroller::-webkit-scrollbar {
+  width: 10px;
+}
+
+.logsScroller::-webkit-scrollbar-thumb {
+  background: #1a3935;
+  border-radius: 999px;
 }
 
 .logsGrid {
@@ -162,51 +298,102 @@
 
 .logCard {
   padding: 16px;
-  border-radius: 16px;
-  background: #0d1817;
-  border: 1px solid #223533;
+  border-radius: 18px;
+  background: linear-gradient(
+    180deg,
+    rgba(4, 18, 17, 0.98),
+    rgba(2, 13, 12, 0.98)
+  );
+  border: 1px solid #1f3a36;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
 }
 
 .logTop {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
+}
+
+.logHeadingWrap {
+  min-width: 0;
 }
 
 .logHeading {
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.logSubHeading {
+  margin-top: 6px;
+  color: #abc0bc;
+  font-size: 13px;
+}
+
+.logMetaRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.metaTag {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid #203a36;
+  color: #dce7e4;
+  font-size: 12px;
   font-weight: 700;
 }
 
-.logMeta {
-  margin-top: 8px;
-  color: #b7c7c4;
+.logDescriptionText {
+  margin-top: 12px;
+  color: #f1f4f3;
+  line-height: 1.45;
+  font-size: 14px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.logDescription {
-  margin-top: 8px;
+.expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
 }
 
-.logStats {
+.linkButton {
   margin-top: 8px;
-  color: #d9cdc7;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: #7fd39f;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.logFooter {
+  margin-top: 10px;
 }
 
 .logMessage {
-  margin-top: 8px;
-  color: #b7c7c4;
-  font-size: 13px;
+  color: #9eb4af;
+  font-size: 12px;
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 7px 11px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .badgePending {
@@ -221,25 +408,37 @@
 
 .badgeSynced {
   background: #163223;
-  color: #53bc7b;
+  color: #7fe0a0;
 }
 
 .badgeFailed {
   background: #381b1b;
-  color: #ff9b9b;
+  color: #ffabab;
 }
 
-@media (max-width: 700px) {
-  .formGrid {
+@media (max-width: 760px) {
+  .formGrid,
+  .summaryGrid {
     grid-template-columns: 1fr;
-  }
-
-  .card {
-    padding: 18px;
   }
 
   .buttonRow {
     display: grid;
     grid-template-columns: 1fr 1fr;
+  }
+
+  .card {
+    padding: 20px;
+  }
+
+  .statusRow,
+  .logsHeader,
+  .logTop {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .logsScroller {
+    max-height: none;
   }
 }
