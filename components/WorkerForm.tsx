@@ -31,9 +31,7 @@ export default function WorkerForm({
   isWorking,
 }: WorkerFormProps) {
   return (
-    <div className={styles.formCard}>
-      <h2 className={styles.sectionTitle}>Worker Details</h2>
-
+    <div className={styles.formFields}>
       <div className={styles.fieldGrid}>
         <div className={styles.field}>
           <label className={styles.label}>Full Name *</label>
@@ -72,7 +70,7 @@ export default function WorkerForm({
             onChange={(e) => setRole(e.target.value)}
             disabled={isWorking}
             className={styles.input}
-            placeholder="Plumber / Technician / Apprentice"
+            placeholder="Engineer / Technician"
           />
         </div>
 
@@ -83,26 +81,31 @@ export default function WorkerForm({
             onChange={(e) => setLocation(e.target.value)}
             disabled={isWorking}
             className={styles.input}
-            placeholder="Site location"
+            placeholder="Warehouse / Site"
           />
         </div>
-      </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>
-          Description {isWorking ? "*" : ""}
-        </label>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          disabled={!isWorking}
-          placeholder={
-            isWorking
-              ? "Enter work description before stopping"
-              : "Description becomes available after Start"
-          }
-          className={styles.textarea}
-        />
+        <div className={`${styles.field} ${styles.fieldFull}`}>
+          <label className={styles.label}>
+            Description {isWorking ? "*" : "(Optional)"}
+          </label>
+
+          <div className={styles.textareaWrap}>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={!isWorking}
+              maxLength={500}
+              placeholder={
+                isWorking
+                  ? "Enter a description for this entry"
+                  : "Description becomes available after Start"
+              }
+              className={styles.textarea}
+            />
+            <div className={styles.charCount}>{description.length} / 500</div>
+          </div>
+        </div>
       </div>
     </div>
   );

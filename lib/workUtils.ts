@@ -19,7 +19,7 @@ export function getWorkingStatusText(
   isWorking: boolean,
   isOnBreak: boolean
 ): string {
-  if (isOnBreak) return "On break";
+  if (isOnBreak) return "At Break";
   if (isWorking) return "Working";
-  return "Idle";
+  return "Ready to Start";
 }
