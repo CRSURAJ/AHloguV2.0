@@ -1,4 +1,4 @@
-import WorkLogger from "@/components/WorkLogger";
+import { WorkLogger } from "@/components";
 
 export default function Page() {
   return <WorkLogger />;

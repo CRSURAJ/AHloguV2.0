@@ -1,6 +1,6 @@
-import ActionButtons from "@/components/ActionButtons";
-import LogsList from "@/components/LogsList";
-import WorkerForm from "@/components/WorkerForm";
+import { ActionButtons, LogsList, WorkerForm } from "@/components";
+
+
 import type { WorkLoggerState } from "@/hooks/useWorkLogger";
 import styles from "./WorkLoggerView.module.css";
 

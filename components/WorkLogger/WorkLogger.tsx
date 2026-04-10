@@ -1,7 +1,7 @@
 "use client";
 
 import { useWorkLogger } from "@/hooks/useWorkLogger";
-import WorkLoggerView from "@/components/WorkLoggerView";
+import { WorkLoggerView } from "@/components";
 
 export default function WorkLogger() {
   const workLogger = useWorkLogger();
