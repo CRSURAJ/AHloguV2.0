@@ -40,7 +40,7 @@
 
 .startButton {
   background: linear-gradient(180deg, #4fb985 0%, #2e7e65 100%);
-  color: #082019;
+  color: #082019;;
 }
 
 .breakButton {
@@ -59,7 +59,7 @@
     rgba(158, 51, 51, 0.92),
     rgba(110, 31, 31, 0.92)
   );
-  color: #fff4f4;
+  color: #fff4f4;;
 }
 
 .utilityRow {

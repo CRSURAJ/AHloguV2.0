@@ -94,7 +94,7 @@ export default function WorkerForm({
               aria-expanded={isNameOpen}
             >
               <span className={styles.customSelectText}>
-                {fullname || "Select full name"}
+                {fullname || "Select your name"}
               </span>
               <span
                 className={`${styles.chevron} ${
@@ -150,7 +150,7 @@ export default function WorkerForm({
           <input
             className={styles.input}
             type="text"
-            placeholder="Engineer / Technician"
+            placeholder="Plumber / Electrician / Technician"
             value={role}
             onChange={(e) => setRole(e.target.value)}
             disabled={isWorking}
@@ -162,7 +162,7 @@ export default function WorkerForm({
           <input
             className={styles.input}
             type="text"
-            placeholder="Warehouse / Site"
+            placeholder="Warehouse / Site Address"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             disabled={isWorking}
@@ -177,17 +177,17 @@ export default function WorkerForm({
             className={styles.textarea}
             placeholder={
               !isWorking
-                ? "Description becomes available after Start"
+                ? "Description becomes available after you Start a job"
                 : isOnBreak
                   ? "Resume work to continue description"
-                  : "What are you working on?"
+                  : "What did you work on today?"
             }
             value={description}
-            onChange={(e) => setDescription(e.target.value.slice(0, 500))}
+            onChange={(e) => setDescription(e.target.value)}
             disabled={descriptionDisabled}
             rows={5}
           />
-          <div className={styles.charCount}>{description.length} / 500</div>
+          <div className={styles.charCount}>{description.length}</div>
         </div>
       </div>
     </div>

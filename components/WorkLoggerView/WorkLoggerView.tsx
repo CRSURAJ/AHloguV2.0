@@ -1,5 +1,5 @@
 import { ActionButtons, LogsList, WorkerForm } from "@/components";
-
+import Image from "next/image";
 
 import type { WorkLoggerState } from "@/hooks/useWorkLogger";
 import styles from "./WorkLoggerView.module.css";
@@ -16,13 +16,17 @@ export default function WorkLoggerView(props: WorkLoggerState) {
       <div className={styles.shell}>
         <div className={styles.outerFrame}>
           <header className={styles.topHeader}>
-            <div className={styles.brandWrap}>
-              <div className={styles.brandIcon}>AH</div>
-              <div className={styles.brandText}>
-                <h1 className={styles.pageTitle}>AHlogu</h1>
-              </div>
-            </div>
-          </header>
+  <div className={styles.brandWrap}>
+    <Image
+      src="/AHlogu.png"
+      alt="AHlogu"
+      className={styles.logoImage}
+      width={260}
+      height={70}
+      priority
+    />
+  </div>
+</header>
 
           <section className={styles.entryCard}>
             <div className={styles.cardHeader}>
