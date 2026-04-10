@@ -28,9 +28,6 @@ export default function WorkLoggerView(props: WorkLoggerState) {
             <div className={styles.cardHeader}>
               <div>
                 <h2 className={styles.cardTitle}>New Log Entry</h2>
-                <p className={styles.cardSubtitle}>
-                  Enter worker details and track progress
-                </p>
               </div>
 
               <div className={`${styles.statusPill} ${pillClass}`}>
