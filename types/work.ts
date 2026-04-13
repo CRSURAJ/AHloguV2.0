@@ -1,25 +1,74 @@
 export type SyncStatus = "pending" | "syncing" | "synced" | "failed";
+export type CredentialType = "pin" | "password";
+export type PermissionLevel = "admin" | "user";
 
-export type UserRole = "admin" | "user";
-export type CredentialType = "password" | "pin";
+export type WorkerRole =
+  | "plumber"
+  | "electrician"
+  | "gas_fitter"
+  | "hvac_technician"
+  | "refrigeration_technician"
+  | "apprentice"
+  | "supervisor"
+  | "other";
 
-export type LogItem = {
+export const PERMISSION_LEVEL_OPTIONS: ReadonlyArray<{
+  value: PermissionLevel;
+  label: string;
+}> = [
+  { value: "admin", label: "Admin" },
+  { value: "user", label: "User" },
+];
+
+export const WORKER_ROLE_OPTIONS: ReadonlyArray<{
+  value: WorkerRole;
+  label: string;
+}> = [
+  { value: "plumber", label: "Plumber" },
+  { value: "electrician", label: "Electrician" },
+  { value: "gas_fitter", label: "Gas Fitter" },
+  { value: "hvac_technician", label: "HVAC Technician" },
+  { value: "refrigeration_technician", label: "Refrigeration Technician" },
+  { value: "apprentice", label: "Apprentice" },
+  { value: "supervisor", label: "Supervisor" },
+  { value: "other", label: "Other" },
+];
+
+export type AuthActionResult = {
+  ok: boolean;
+  message: string;
+};
+
+export type CreateLocalUserInput = {
+  username: string;
+  fullName: string;
+  permissionLevel: PermissionLevel;
+  role: WorkerRole;
+  credentialType: CredentialType;
+  secret: string;
+};
+
+export type LocalAuthSession = {
+  userId: string;
+  signedInAt: string;
+};
+
+export type CurrentUser = {
   id: string;
-  loguId: string;
-  ts: number;
-  syncedAt?: number;
-  fullname: string;
-  jobId: string;
-  location: string;
-  role: string;
-  jobDocs?: string;
-  description: string;
-  startedAt: string;
-  stoppedAt: string;
-  breakMinutes: number;
-  workedMinutes: number;
-  syncStatus: SyncStatus;
-  syncMessage: string;
+  username: string;
+  fullName: string;
+  permissionLevel: PermissionLevel;
+  role: WorkerRole;
+  credentialType: CredentialType;
+  mustChangeCredential: boolean;
+};
+
+export type OfflineUser = CurrentUser & {
+  credentialHash: string;
+  credentialSalt: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type ActiveSession = {
@@ -43,38 +92,21 @@ export type DraftState = {
   description: string;
 };
 
-export type CurrentUser = {
+export type LogItem = {
   id: string;
-  username: string;
-  fullName: string;
-  role: UserRole;
-  credentialType: CredentialType;
-  mustChangeCredential: boolean;
-};
-
-export type OfflineUser = {
-  id: string;
-  username: string;
-  fullName: string;
-  role: UserRole;
-  credentialType: CredentialType;
-  credentialHash: string;
-  credentialSalt: string;
-  mustChangeCredential: boolean;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type LocalAuthSession = {
-  userId: string;
-  signedInAt: string;
-};
-
-export type CreateLocalUserInput = {
-  username: string;
-  fullName: string;
-  role: UserRole;
-  credentialType: CredentialType;
-  secret: string;
+  loguId: string;
+  ts: number;
+  fullname: string;
+  jobId: string;
+  location: string;
+  role: string;
+  jobDocs: string;
+  description: string;
+  startedAt: string;
+  stoppedAt: string;
+  breakMinutes: number;
+  workedMinutes: number;
+  syncStatus: SyncStatus;
+  syncMessage: string;
+  syncedAt?: number;
 };

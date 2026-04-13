@@ -1,34 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  clearLocalAuthSession,
-  createOfflineUser,
-  ensureSeedUsers,
-  findUserByUsername,
-  hasAnotherActiveAdmin,
-  loadLocalAuthSession,
-  loadOfflineUsers,
-  restoreCurrentUserFromSession,
-  sanitizeUsernameInput,
-  saveLocalAuthSession,
-  saveOfflineUsers,
-  toCurrentUser,
-  validateSecret,
-  verifyCredential,
-  buildCredential,
-} from "@/lib/localAuth";
+import { authProvider } from "@/lib/auth/provider";
 import type {
+  AuthActionResult,
   CreateLocalUserInput,
-  CredentialType,
   CurrentUser,
   OfflineUser,
 } from "@/types/work";
-
-type ActionResult = {
-  ok: boolean;
-  message: string;
-};
 
 type UseLocalAuthReturn = {
   isReady: boolean;
@@ -46,16 +25,16 @@ type UseLocalAuthReturn = {
     currentSecret: string,
     nextSecret: string,
     confirmSecret: string
-  ) => Promise<ActionResult>;
+  ) => Promise<AuthActionResult>;
   handleCreateUser: (
     input: CreateLocalUserInput & { confirmSecret: string }
-  ) => Promise<ActionResult>;
+  ) => Promise<AuthActionResult>;
   handleAdminResetCredential: (
     userId: string,
     nextSecret: string,
     confirmSecret: string
-  ) => Promise<ActionResult>;
-  handleToggleUserActive: (userId: string) => ActionResult;
+  ) => Promise<AuthActionResult>;
+  handleToggleUserActive: (userId: string) => AuthActionResult;
   securityLabel: string;
 };
 
@@ -71,18 +50,12 @@ export function useLocalAuth(): UseLocalAuthReturn {
     let cancelled = false;
 
     async function init() {
-      await ensureSeedUsers();
-
-      const loadedUsers = loadOfflineUsers();
-      const restored = restoreCurrentUserFromSession(
-        loadedUsers,
-        loadLocalAuthSession()
-      );
+      const result = await authProvider.init();
 
       if (cancelled) return;
 
-      setUsers(loadedUsers);
-      setCurrentUser(restored);
+      setUsers(result.users);
+      setCurrentUser(result.currentUser);
       setIsReady(true);
     }
 
@@ -93,51 +66,33 @@ export function useLocalAuth(): UseLocalAuthReturn {
     };
   }, []);
 
-  const canManageUsers = currentUser?.role === "admin";
+  const canManageUsers = currentUser?.permissionLevel === "admin";
 
   const securityLabel = useMemo(() => {
     if (!currentUser) return "Change Credential";
     return currentUser.credentialType === "pin" ? "Change PIN" : "Change Password";
   }, [currentUser]);
 
-  async function handleLogin() {
-    const username = sanitizeUsernameInput(loginUsername);
-    const secret = loginSecret;
+  async function handleLogin(): Promise<void> {
+    const result = await authProvider.signIn(users, loginUsername, loginSecret);
 
-    if (!username || !secret) {
-      setAuthMessage("Enter username and PIN/password.");
+    if (!result.ok || !result.currentUser) {
+      setAuthMessage(result.message);
       return;
     }
 
-    const matchedUser = findUserByUsername(users, username);
-
-    if (!matchedUser) {
-      setAuthMessage("Invalid username or credential.");
-      return;
+    if (result.users) {
+      setUsers(result.users);
     }
 
-    const valid = await verifyCredential(matchedUser, secret);
-
-    if (!valid) {
-      setAuthMessage("Invalid username or credential.");
-      return;
-    }
-
-    saveLocalAuthSession({
-      userId: matchedUser.id,
-      signedInAt: new Date().toISOString(),
-    });
-
-    const nextCurrentUser = toCurrentUser(matchedUser);
-
-    setCurrentUser(nextCurrentUser);
+    setCurrentUser(result.currentUser);
     setLoginUsername("");
     setLoginSecret("");
     setAuthMessage("");
   }
 
-  function handleSignOut() {
-    clearLocalAuthSession();
+  function handleSignOut(): void {
+    authProvider.signOut();
     setCurrentUser(null);
     setLoginUsername("");
     setLoginSecret("");
@@ -148,213 +103,85 @@ export function useLocalAuth(): UseLocalAuthReturn {
     currentSecret: string,
     nextSecret: string,
     confirmSecret: string
-  ): Promise<ActionResult> {
-    if (!currentUser) {
-      return { ok: false, message: "No signed-in user." };
-    }
-
-    const targetUser = users.find((user) => user.id === currentUser.id);
-
-    if (!targetUser) {
-      return { ok: false, message: "Current user was not found." };
-    }
-
-    const currentValid = await verifyCredential(targetUser, currentSecret);
-
-    if (!currentValid) {
-      return { ok: false, message: "Current credential is incorrect." };
-    }
-
-    if (nextSecret !== confirmSecret) {
-      return { ok: false, message: "New credential and confirm credential do not match." };
-    }
-
-    const validation = validateSecret(targetUser.credentialType, nextSecret);
-
-    if (validation) {
-      return { ok: false, message: validation };
-    }
-
-    const { credentialHash, credentialSalt } = await buildCredential(nextSecret);
-
-    const updatedUsers = users.map((user) =>
-      user.id === targetUser.id
-        ? {
-            ...user,
-            credentialHash,
-            credentialSalt,
-            mustChangeCredential: false,
-            updatedAt: new Date().toISOString(),
-          }
-        : user
+  ): Promise<AuthActionResult> {
+    const result = await authProvider.changeOwnCredential(
+      users,
+      currentUser,
+      currentSecret,
+      nextSecret,
+      confirmSecret
     );
 
-    saveOfflineUsers(updatedUsers);
-    setUsers(updatedUsers);
+    if (result.users) {
+      setUsers(result.users);
+    }
 
-    const refreshedUser = updatedUsers.find((user) => user.id === targetUser.id)!;
-    setCurrentUser(toCurrentUser(refreshedUser));
+    if (result.currentUser !== undefined) {
+      setCurrentUser(result.currentUser);
+    }
 
     return {
-      ok: true,
-      message:
-        targetUser.credentialType === "pin"
-          ? "PIN changed successfully."
-          : "Password changed successfully.",
+      ok: result.ok,
+      message: result.message,
     };
   }
 
   async function handleCreateUser(
     input: CreateLocalUserInput & { confirmSecret: string }
-  ): Promise<ActionResult> {
-    if (!currentUser || currentUser.role !== "admin") {
-      return { ok: false, message: "Only admin can create users." };
+  ): Promise<AuthActionResult> {
+    const result = await authProvider.createUser(users, currentUser, input);
+
+    if (result.users) {
+      setUsers(result.users);
     }
 
-    const username = sanitizeUsernameInput(input.username);
-    const fullName = input.fullName.trim();
-    const role = input.role;
-    const credentialType = role === "admin" ? "password" : input.credentialType;
-
-    if (!username) {
-      return { ok: false, message: "Username is required." };
-    }
-
-    if (!/^[a-z0-9._-]{3,32}$/i.test(username)) {
-      return {
-        ok: false,
-        message:
-          "Username must be 3 to 32 characters and use letters, numbers, dot, underscore, or dash.",
-      };
-    }
-
-    if (!fullName) {
-      return { ok: false, message: "Full name is required." };
-    }
-
-    if (findUserByUsername(users, username)) {
-      return { ok: false, message: "That username already exists." };
-    }
-
-    if (input.secret !== input.confirmSecret) {
-      return { ok: false, message: "Credential and confirm credential do not match." };
-    }
-
-    const validation = validateSecret(credentialType, input.secret);
-
-    if (validation) {
-      return { ok: false, message: validation };
-    }
-
-    const newUser = await createOfflineUser({
-      username,
-      fullName,
-      role,
-      credentialType,
-      secret: input.secret,
-    });
-
-    const updatedUsers = [...users, newUser];
-    saveOfflineUsers(updatedUsers);
-    setUsers(updatedUsers);
-
-    return { ok: true, message: "User created successfully." };
+    return {
+      ok: result.ok,
+      message: result.message,
+    };
   }
 
   async function handleAdminResetCredential(
     userId: string,
     nextSecret: string,
     confirmSecret: string
-  ): Promise<ActionResult> {
-    if (!currentUser || currentUser.role !== "admin") {
-      return { ok: false, message: "Only admin can reset user credentials." };
-    }
-
-    const targetUser = users.find((user) => user.id === userId);
-
-    if (!targetUser) {
-      return { ok: false, message: "User not found." };
-    }
-
-    if (nextSecret !== confirmSecret) {
-      return { ok: false, message: "Credential and confirm credential do not match." };
-    }
-
-    const validation = validateSecret(targetUser.credentialType, nextSecret);
-
-    if (validation) {
-      return { ok: false, message: validation };
-    }
-
-    const { credentialHash, credentialSalt } = await buildCredential(nextSecret);
-
-    const updatedUsers = users.map((user) =>
-      user.id === userId
-        ? {
-            ...user,
-            credentialHash,
-            credentialSalt,
-            mustChangeCredential: true,
-            updatedAt: new Date().toISOString(),
-          }
-        : user
+  ): Promise<AuthActionResult> {
+    const result = await authProvider.adminResetCredential(
+      users,
+      currentUser,
+      userId,
+      nextSecret,
+      confirmSecret
     );
 
-    saveOfflineUsers(updatedUsers);
-    setUsers(updatedUsers);
+    if (result.users) {
+      setUsers(result.users);
+    }
 
-    if (currentUser.id === userId) {
-      const refreshedUser = updatedUsers.find((user) => user.id === userId)!;
-      setCurrentUser(toCurrentUser(refreshedUser));
+    if (result.currentUser !== undefined) {
+      setCurrentUser(result.currentUser);
     }
 
     return {
-      ok: true,
-      message: "Credential reset successfully. User must change it at next sign-in.",
+      ok: result.ok,
+      message: result.message,
     };
   }
 
-  function handleToggleUserActive(userId: string): ActionResult {
-    if (!currentUser || currentUser.role !== "admin") {
-      return { ok: false, message: "Only admin can change active status." };
+  function handleToggleUserActive(userId: string): AuthActionResult {
+    const result = authProvider.toggleUserActive(users, currentUser, userId);
+
+    if (result.users) {
+      setUsers(result.users);
     }
 
-    const targetUser = users.find((user) => user.id === userId);
-
-    if (!targetUser) {
-      return { ok: false, message: "User not found." };
-    }
-
-    if (
-      targetUser.role === "admin" &&
-      targetUser.isActive &&
-      !hasAnotherActiveAdmin(users, targetUser.id)
-    ) {
-      return { ok: false, message: "You must keep at least one active admin." };
-    }
-
-    const updatedUsers = users.map((user) =>
-      user.id === userId
-        ? {
-            ...user,
-            isActive: !user.isActive,
-            updatedAt: new Date().toISOString(),
-          }
-        : user
-    );
-
-    saveOfflineUsers(updatedUsers);
-    setUsers(updatedUsers);
-
-    if (currentUser.id === userId && targetUser.isActive) {
-      clearLocalAuthSession();
-      setCurrentUser(null);
-      return { ok: true, message: "You were signed out because this account was deactivated." };
+    if (result.currentUser !== undefined) {
+      setCurrentUser(result.currentUser);
     }
 
     return {
-      ok: true,
-      message: targetUser.isActive ? "User deactivated." : "User activated.",
+      ok: result.ok,
+      message: result.message,
     };
   }
 

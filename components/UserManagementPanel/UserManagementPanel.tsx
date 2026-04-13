@@ -1,8 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { CredentialType, OfflineUser, UserRole } from "@/types/work";
 import styles from "./UserManagementPanel.module.css";
+import {
+  PERMISSION_LEVEL_OPTIONS,
+  WORKER_ROLE_OPTIONS,
+} from "@/types/work";
+import type {
+  AuthActionResult,
+  CredentialType,
+  OfflineUser,
+  PermissionLevel,
+  WorkerRole,
+} from "@/types/work";
 
 type UserManagementPanelProps = {
   users: OfflineUser[];
@@ -10,18 +20,32 @@ type UserManagementPanelProps = {
   onCreateUser: (input: {
     username: string;
     fullName: string;
-    role: UserRole;
+    permissionLevel: PermissionLevel;
+    role: WorkerRole;
     credentialType: CredentialType;
     secret: string;
     confirmSecret: string;
-  }) => Promise<{ ok: boolean; message: string }>;
+  }) => Promise<AuthActionResult>;
   onResetCredential: (
     userId: string,
     nextSecret: string,
     confirmSecret: string
-  ) => Promise<{ ok: boolean; message: string }>;
-  onToggleActive: (userId: string) => { ok: boolean; message: string };
+  ) => Promise<AuthActionResult>;
+  onToggleActive: (userId: string) => AuthActionResult;
 };
+
+function getRoleLabel(role: WorkerRole): string {
+  return (
+    WORKER_ROLE_OPTIONS.find((item) => item.value === role)?.label ?? role
+  );
+}
+
+function getPermissionLabel(permissionLevel: PermissionLevel): string {
+  return (
+    PERMISSION_LEVEL_OPTIONS.find((item) => item.value === permissionLevel)?.label ??
+    permissionLevel
+  );
+}
 
 export default function UserManagementPanel({
   users,
@@ -31,14 +55,15 @@ export default function UserManagementPanel({
   onToggleActive,
 }: UserManagementPanelProps) {
   const [message, setMessage] = useState("");
-
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
-  const [role, setRole] = useState<UserRole>("user");
-  const [credentialType, setCredentialType] = useState<CredentialType>("pin");
+  const [permissionLevel, setPermissionLevel] =
+    useState<PermissionLevel>("user");
+  const [role, setRole] = useState<WorkerRole>("plumber");
+  const [credentialType, setCredentialType] =
+    useState<CredentialType>("pin");
   const [secret, setSecret] = useState("");
   const [confirmSecret, setConfirmSecret] = useState("");
-
   const [resetUserId, setResetUserId] = useState<string | null>(null);
   const [resetSecret, setResetSecret] = useState("");
   const [resetConfirmSecret, setResetConfirmSecret] = useState("");
@@ -46,18 +71,21 @@ export default function UserManagementPanel({
   const sortedUsers = useMemo(
     () =>
       [...users].sort((a, b) => {
-        if (a.role !== b.role) return a.role === "admin" ? -1 : 1;
+        if (a.permissionLevel !== b.permissionLevel) {
+          return a.permissionLevel === "admin" ? -1 : 1;
+        }
         return a.username.localeCompare(b.username);
       }),
     [users]
   );
 
-  async function handleCreate() {
+  async function handleCreate(): Promise<void> {
     const result = await onCreateUser({
       username,
       fullName,
+      permissionLevel,
       role,
-      credentialType: role === "admin" ? "password" : credentialType,
+      credentialType: permissionLevel === "admin" ? "password" : credentialType,
       secret,
       confirmSecret,
     });
@@ -67,14 +95,15 @@ export default function UserManagementPanel({
     if (result.ok) {
       setFullName("");
       setUsername("");
-      setRole("user");
+      setPermissionLevel("user");
+      setRole("plumber");
       setCredentialType("pin");
       setSecret("");
       setConfirmSecret("");
     }
   }
 
-  async function handleReset() {
+  async function handleReset(): Promise<void> {
     if (!resetUserId) return;
 
     const result = await onResetCredential(
@@ -99,7 +128,8 @@ export default function UserManagementPanel({
           <div>
             <h3 className={styles.title}>User Management</h3>
             <p className={styles.subtitle}>
-              Create users, reset PIN/password, and activate or deactivate accounts.
+              Create users, assign permission level and trade role, reset
+              PIN/password, and activate or deactivate accounts.
             </p>
           </div>
 
@@ -110,13 +140,16 @@ export default function UserManagementPanel({
 
         {message ? <div className={styles.message}>{message}</div> : null}
 
-        <div className={styles.section}>
+        <section className={styles.section}>
           <div className={styles.sectionTitle}>Add User</div>
 
           <div className={styles.grid}>
             <div className={styles.field}>
-              <label className={styles.label}>Full Name</label>
+              <label className={styles.label} htmlFor="user-full-name">
+                Full Name
+              </label>
               <input
+                id="user-full-name"
                 className={styles.input}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -124,8 +157,11 @@ export default function UserManagementPanel({
             </div>
 
             <div className={styles.field}>
-              <label className={styles.label}>Username</label>
+              <label className={styles.label} htmlFor="user-username">
+                Username
+              </label>
               <input
+                id="user-username"
                 className={styles.input}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -133,30 +169,60 @@ export default function UserManagementPanel({
             </div>
 
             <div className={styles.field}>
-              <label className={styles.label}>Role</label>
+              <label className={styles.label} htmlFor="user-permission-level">
+                Permission Level
+              </label>
               <select
+                id="user-permission-level"
                 className={styles.select}
-                value={role}
+                value={permissionLevel}
                 onChange={(e) => {
-                  const nextRole = e.target.value as UserRole;
-                  setRole(nextRole);
-                  if (nextRole === "admin") {
+                  const nextLevel = e.target.value as PermissionLevel;
+                  setPermissionLevel(nextLevel);
+
+                  if (nextLevel === "admin") {
                     setCredentialType("password");
                   }
                 }}
               >
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
+                {PERMISSION_LEVEL_OPTIONS.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div className={styles.field}>
-              <label className={styles.label}>Credential Type</label>
+              <label className={styles.label} htmlFor="user-role">
+                Role
+              </label>
               <select
+                id="user-role"
                 className={styles.select}
-                value={role === "admin" ? "password" : credentialType}
-                onChange={(e) => setCredentialType(e.target.value as CredentialType)}
-                disabled={role === "admin"}
+                value={role}
+                onChange={(e) => setRole(e.target.value as WorkerRole)}
+              >
+                {WORKER_ROLE_OPTIONS.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="user-credential-type">
+                Credential Type
+              </label>
+              <select
+                id="user-credential-type"
+                className={styles.select}
+                value={permissionLevel === "admin" ? "password" : credentialType}
+                onChange={(e) =>
+                  setCredentialType(e.target.value as CredentialType)
+                }
+                disabled={permissionLevel === "admin"}
               >
                 <option value="pin">PIN</option>
                 <option value="password">Password</option>
@@ -164,12 +230,14 @@ export default function UserManagementPanel({
             </div>
 
             <div className={styles.field}>
-              <label className={styles.label}>
-                {role === "admin" || credentialType === "password"
+              <label className={styles.label} htmlFor="user-secret">
+                {permissionLevel === "admin" ||
+                credentialType === "password"
                   ? "Password"
                   : "PIN"}
               </label>
               <input
+                id="user-secret"
                 className={styles.input}
                 type="password"
                 value={secret}
@@ -178,8 +246,15 @@ export default function UserManagementPanel({
             </div>
 
             <div className={styles.field}>
-              <label className={styles.label}>Confirm</label>
+              <label className={styles.label} htmlFor="user-secret-confirm">
+                Confirm{" "}
+                {permissionLevel === "admin" ||
+                credentialType === "password"
+                  ? "Password"
+                  : "PIN"}
+              </label>
               <input
+                id="user-secret-confirm"
                 className={styles.input}
                 type="password"
                 value={confirmSecret}
@@ -188,12 +263,16 @@ export default function UserManagementPanel({
             </div>
           </div>
 
-          <button type="button" className={styles.primaryButton} onClick={() => void handleCreate()}>
+          <button
+            type="button"
+            className={styles.primaryButton}
+            onClick={() => void handleCreate()}
+          >
             Create User
           </button>
-        </div>
+        </section>
 
-        <div className={styles.section}>
+        <section className={styles.section}>
           <div className={styles.sectionTitle}>Existing Users</div>
 
           <div className={styles.userList}>
@@ -203,7 +282,8 @@ export default function UserManagementPanel({
                   <div>
                     <div className={styles.userName}>{user.fullName}</div>
                     <div className={styles.userMeta}>
-                      @{user.username} · {user.role} · {user.credentialType}
+                      @{user.username} · {getPermissionLabel(user.permissionLevel)} ·{" "}
+                      {getRoleLabel(user.role)} · {user.credentialType}
                     </div>
                   </div>
 
@@ -257,10 +337,11 @@ export default function UserManagementPanel({
 
                     <div className={styles.grid}>
                       <div className={styles.field}>
-                        <label className={styles.label}>
+                        <label className={styles.label} htmlFor={`reset-${user.id}`}>
                           New {user.credentialType === "pin" ? "PIN" : "Password"}
                         </label>
                         <input
+                          id={`reset-${user.id}`}
                           className={styles.input}
                           type="password"
                           value={resetSecret}
@@ -269,8 +350,15 @@ export default function UserManagementPanel({
                       </div>
 
                       <div className={styles.field}>
-                        <label className={styles.label}>Confirm</label>
+                        <label
+                          className={styles.label}
+                          htmlFor={`reset-confirm-${user.id}`}
+                        >
+                          Confirm{" "}
+                          {user.credentialType === "pin" ? "PIN" : "Password"}
+                        </label>
                         <input
+                          id={`reset-confirm-${user.id}`}
                           className={styles.input}
                           type="password"
                           value={resetConfirmSecret}
@@ -291,7 +379,7 @@ export default function UserManagementPanel({
               </div>
             ))}
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );

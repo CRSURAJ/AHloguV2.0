@@ -4,6 +4,8 @@ import type {
   CurrentUser,
   LocalAuthSession,
   OfflineUser,
+  PermissionLevel,
+  WorkerRole,
 } from "@/types/work";
 
 const USERS_KEY = "project_logu:local_auth:users";
@@ -14,7 +16,8 @@ const DEFAULT_USERS = [
     id: "local-admin",
     username: "admin",
     fullName: "Local Admin",
-    role: "admin" as const,
+    permissionLevel: "admin" as const,
+    role: "supervisor" as const,
     credentialType: "password" as const,
     secret: "Admin1234!",
   },
@@ -22,13 +25,14 @@ const DEFAULT_USERS = [
     id: "suraj-dhungana",
     username: "suraj",
     fullName: "Suraj Dhungana",
-    role: "user" as const,
+    permissionLevel: "user" as const,
+    role: "plumber" as const,
     credentialType: "pin" as const,
     secret: "1234",
   },
 ];
 
-function isBrowser() {
+function isBrowser(): boolean {
   return typeof window !== "undefined";
 }
 
@@ -72,11 +76,41 @@ function makeUuid(): string {
   return `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function isPermissionLevel(value: unknown): value is PermissionLevel {
+  return value === "admin" || value === "user";
+}
+
+function isWorkerRole(value: unknown): value is WorkerRole {
+  return (
+    value === "plumber" ||
+    value === "electrician" ||
+    value === "gas_fitter" ||
+    value === "hvac_technician" ||
+    value === "refrigeration_technician" ||
+    value === "apprentice" ||
+    value === "supervisor" ||
+    value === "other"
+  );
+}
+
+function normalizePermissionLevel(value: unknown): PermissionLevel {
+  return value === "admin" ? "admin" : "user";
+}
+
+function normalizeWorkerRole(
+  value: unknown,
+  permissionLevel: PermissionLevel
+): WorkerRole {
+  if (isWorkerRole(value)) return value;
+  return permissionLevel === "admin" ? "supervisor" : "plumber";
+}
+
 async function deriveCredentialHash(
   secret: string,
   saltBase64: string
 ): Promise<string> {
   const encoder = new TextEncoder();
+
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
     encoder.encode(secret),
@@ -85,16 +119,16 @@ async function deriveCredentialHash(
     ["deriveBits"]
   );
 
- const derivedBits = await crypto.subtle.deriveBits(
-  {
-    name: "PBKDF2",
-    salt: base64ToArrayBuffer(saltBase64),
-    iterations: 250000,
-    hash: "SHA-256",
-  },
-  keyMaterial,
-  256
-);
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: base64ToArrayBuffer(saltBase64),
+      iterations: 250000,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    256
+  );
 
   return bufferToHex(derivedBits);
 }
@@ -109,10 +143,7 @@ export async function buildCredential(secret: string): Promise<{
   const credentialSalt = bytesToBase64(saltBytes);
   const credentialHash = await deriveCredentialHash(secret, credentialSalt);
 
-  return {
-    credentialSalt,
-    credentialHash,
-  };
+  return { credentialSalt, credentialHash };
 }
 
 export async function verifyCredential(
@@ -133,7 +164,6 @@ export function validateSecret(
     if (!/^\d{4,8}$/.test(trimmed)) {
       return "PIN must be 4 to 8 digits.";
     }
-
     return "";
   }
 
@@ -144,6 +174,59 @@ export function validateSecret(
   return "";
 }
 
+function migrateStoredUser(item: unknown): OfflineUser | null {
+  if (!item || typeof item !== "object") return null;
+
+  const raw = item as Record<string, unknown>;
+
+  const id = typeof raw.id === "string" ? raw.id : makeUuid();
+  const username =
+    typeof raw.username === "string" ? normalizeUsername(raw.username) : "";
+  const fullName =
+    typeof raw.fullName === "string" ? raw.fullName.trim() : "";
+  const credentialType =
+    raw.credentialType === "password" ? "password" : "pin";
+  const credentialHash =
+    typeof raw.credentialHash === "string" ? raw.credentialHash : "";
+  const credentialSalt =
+    typeof raw.credentialSalt === "string" ? raw.credentialSalt : "";
+
+  // Old schema used `role` for admin/user.
+  // New schema uses:
+  // - permissionLevel => admin/user
+  // - role => plumber/electrician/etc
+  const permissionLevel = normalizePermissionLevel(
+    raw.permissionLevel ?? raw.role
+  );
+
+  const role = normalizeWorkerRole(raw.role, permissionLevel);
+
+  if (!username || !fullName || !credentialHash || !credentialSalt) {
+    return null;
+  }
+
+  return {
+    id,
+    username,
+    fullName,
+    permissionLevel,
+    role,
+    credentialType,
+    credentialHash,
+    credentialSalt,
+    mustChangeCredential: Boolean(raw.mustChangeCredential),
+    isActive: raw.isActive !== false,
+    createdAt:
+      typeof raw.createdAt === "string"
+        ? raw.createdAt
+        : new Date().toISOString(),
+    updatedAt:
+      typeof raw.updatedAt === "string"
+        ? raw.updatedAt
+        : new Date().toISOString(),
+  };
+}
+
 export function loadOfflineUsers(): OfflineUser[] {
   if (!isBrowser()) return [];
 
@@ -151,19 +234,38 @@ export function loadOfflineUsers(): OfflineUser[] {
   if (!raw) return [];
 
   try {
-    const parsed = JSON.parse(raw) as OfflineUser[];
+    const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
 
-    return parsed.filter(
-      (item) =>
-        typeof item?.id === "string" &&
-        typeof item?.username === "string" &&
-        typeof item?.fullName === "string" &&
-        typeof item?.role === "string" &&
-        typeof item?.credentialType === "string" &&
-        typeof item?.credentialHash === "string" &&
-        typeof item?.credentialSalt === "string"
-    );
+    let needsRewrite = false;
+
+    const users = parsed
+      .map((item) => {
+        const migrated = migrateStoredUser(item);
+
+        if (!migrated) {
+          needsRewrite = true;
+          return null;
+        }
+
+        const legacy = item as Record<string, unknown>;
+
+        if (
+          !isPermissionLevel(legacy.permissionLevel) ||
+          !isWorkerRole(legacy.role)
+        ) {
+          needsRewrite = true;
+        }
+
+        return migrated;
+      })
+      .filter((item): item is OfflineUser => item !== null);
+
+    if (needsRewrite) {
+      saveOfflineUsers(users);
+    }
+
+    return users;
   } catch {
     return [];
   }
@@ -189,11 +291,12 @@ export async function ensureSeedUsers(): Promise<void> {
       id: item.id,
       username: normalizeUsername(item.username),
       fullName: item.fullName,
+      permissionLevel: item.permissionLevel,
       role: item.role,
       credentialType: item.credentialType,
       credentialHash,
       credentialSalt,
-      mustChangeCredential: item.role === "admin",
+      mustChangeCredential: item.permissionLevel === "admin",
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -213,8 +316,10 @@ export async function createOfflineUser(
     id: makeUuid(),
     username: normalizeUsername(input.username),
     fullName: input.fullName.trim(),
+    permissionLevel: input.permissionLevel,
     role: input.role,
-    credentialType: input.role === "admin" ? "password" : input.credentialType,
+    credentialType:
+      input.permissionLevel === "admin" ? "password" : input.credentialType,
     credentialHash,
     credentialSalt,
     mustChangeCredential: false,
@@ -261,6 +366,7 @@ export function toCurrentUser(user: OfflineUser): CurrentUser {
     id: user.id,
     username: user.username,
     fullName: user.fullName,
+    permissionLevel: user.permissionLevel,
     role: user.role,
     credentialType: user.credentialType,
     mustChangeCredential: user.mustChangeCredential,
@@ -298,7 +404,10 @@ export function hasAnotherActiveAdmin(
   userIdToExclude: string
 ): boolean {
   return users.some(
-    (user) => user.id !== userIdToExclude && user.role === "admin" && user.isActive
+    (user) =>
+      user.id !== userIdToExclude &&
+      user.permissionLevel === "admin" &&
+      user.isActive
   );
 }
 

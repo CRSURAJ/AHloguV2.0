@@ -21,14 +21,14 @@ export default function LoginScreen({
   handleLogin,
 }: LoginScreenProps) {
   return (
-    <main className={styles.page}>
+    <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.header}>
           <Image
             src="/AHlogu.png"
             alt="AH LOGU"
-            width={220}
-            height={66}
+            width={160}
+            height={48}
             className={styles.logo}
             priority
           />
@@ -47,14 +47,12 @@ export default function LoginScreen({
           }}
         >
           <div className={styles.field}>
-            <label htmlFor="username" className={styles.label}>
+            <label className={styles.label} htmlFor="login-username">
               Username
             </label>
-
             <input
-              id="username"
+              id="login-username"
               className={styles.input}
-              type="text"
               value={loginUsername}
               onChange={(e) => setLoginUsername(e.target.value)}
               placeholder="Enter username"
@@ -63,12 +61,11 @@ export default function LoginScreen({
           </div>
 
           <div className={styles.field}>
-            <label htmlFor="secret" className={styles.label}>
+            <label className={styles.label} htmlFor="login-secret">
               PIN / Password
             </label>
-
             <input
-              id="secret"
+              id="login-secret"
               className={styles.input}
               type="password"
               value={loginSecret}
@@ -91,9 +88,9 @@ export default function LoginScreen({
         </div>
 
         <p className={styles.note}>
-          Default first-time admin login: <code>admin</code> / <code>Admin1234!</code>
+          Local offline sign-in is enabled on this device.
         </p>
       </div>
-    </main>
+    </div>
   );
 }
