@@ -268,7 +268,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     setStartTime(now);
     setBreakStartTime(null);
     setBreakMinutes(0);
-    setBannerMessage("Work started. Add description before finishing.");
+    setBannerMessage("");
   }
 
   function handleBreak() {

@@ -32,12 +32,11 @@ type UserManagementPanelProps = {
     confirmSecret: string
   ) => Promise<AuthActionResult>;
   onToggleActive: (userId: string) => AuthActionResult;
+  onDeleteUser: (userId: string) => AuthActionResult;
 };
 
 function getRoleLabel(role: WorkerRole): string {
-  return (
-    WORKER_ROLE_OPTIONS.find((item) => item.value === role)?.label ?? role
-  );
+  return WORKER_ROLE_OPTIONS.find((item) => item.value === role)?.label ?? role;
 }
 
 function getPermissionLabel(permissionLevel: PermissionLevel): string {
@@ -47,12 +46,34 @@ function getPermissionLabel(permissionLevel: PermissionLevel): string {
   );
 }
 
+function TrashIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={styles.iconSvg}
+      aria-hidden="true"
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4.8c0-.9.7-1.6 1.6-1.6h4.8c.9 0 1.6.7 1.6 1.6V6" />
+      <path d="M6.8 6l.8 12.1c.1 1.4 1.2 2.5 2.6 2.5h3.6c1.4 0 2.5-1.1 2.6-2.5L17.2 6" />
+      <path d="M10 10.2v6.2" />
+      <path d="M14 10.2v6.2" />
+    </svg>
+  );
+}
+
 export default function UserManagementPanel({
   users,
   onClose,
   onCreateUser,
   onResetCredential,
   onToggleActive,
+  onDeleteUser,
 }: UserManagementPanelProps) {
   const [message, setMessage] = useState("");
   const [fullName, setFullName] = useState("");
@@ -121,6 +142,23 @@ export default function UserManagementPanel({
     }
   }
 
+  function handleDelete(user: OfflineUser): void {
+    const confirmed = window.confirm(
+      `Delete ${user.fullName}? This cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    const result = onDeleteUser(user.id);
+    setMessage(result.message);
+
+    if (result.ok && resetUserId === user.id) {
+      setResetUserId(null);
+      setResetSecret("");
+      setResetConfirmSecret("");
+    }
+  }
+
   return (
     <div className={styles.backdrop}>
       <div className={styles.panel}>
@@ -129,7 +167,7 @@ export default function UserManagementPanel({
             <h3 className={styles.title}>User Management</h3>
             <p className={styles.subtitle}>
               Create users, assign permission level and trade role, reset
-              PIN/password, and activate or deactivate accounts.
+              PIN/password, activate, deactivate, or delete accounts.
             </p>
           </div>
 
@@ -287,20 +325,32 @@ export default function UserManagementPanel({
                     </div>
                   </div>
 
-                  <div className={styles.badges}>
-                    <span
-                      className={`${styles.badge} ${
-                        user.isActive ? styles.badgeActive : styles.badgeInactive
-                      }`}
+                  <div className={styles.topRight}>
+                    <button
+                      type="button"
+                      className={styles.iconDangerButton}
+                      onClick={() => handleDelete(user)}
+                      aria-label={`Delete user ${user.fullName}`}
+                      title="Delete user"
                     >
-                      {user.isActive ? "ACTIVE" : "INACTIVE"}
-                    </span>
+                      <TrashIcon />
+                    </button>
 
-                    {user.mustChangeCredential ? (
-                      <span className={`${styles.badge} ${styles.badgeWarn}`}>
-                        MUST CHANGE
+                    <div className={styles.badges}>
+                      <span
+                        className={`${styles.badge} ${
+                          user.isActive ? styles.badgeActive : styles.badgeInactive
+                        }`}
+                      >
+                        {user.isActive ? "ACTIVE" : "INACTIVE"}
                       </span>
-                    ) : null}
+
+                      {user.mustChangeCredential ? (
+                        <span className={`${styles.badge} ${styles.badgeWarn}`}>
+                          MUST CHANGE
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 

@@ -35,6 +35,7 @@ type UseLocalAuthReturn = {
     confirmSecret: string
   ) => Promise<AuthActionResult>;
   handleToggleUserActive: (userId: string) => AuthActionResult;
+  handleDeleteUser: (userId: string) => AuthActionResult;
   securityLabel: string;
 };
 
@@ -185,6 +186,23 @@ export function useLocalAuth(): UseLocalAuthReturn {
     };
   }
 
+  function handleDeleteUser(userId: string): AuthActionResult {
+    const result = authProvider.deleteUser(users, currentUser, userId);
+
+    if (result.users) {
+      setUsers(result.users);
+    }
+
+    if (result.currentUser !== undefined) {
+      setCurrentUser(result.currentUser);
+    }
+
+    return {
+      ok: result.ok,
+      message: result.message,
+    };
+  }
+
   return {
     isReady,
     currentUser,
@@ -201,6 +219,7 @@ export function useLocalAuth(): UseLocalAuthReturn {
     handleCreateUser,
     handleAdminResetCredential,
     handleToggleUserActive,
+    handleDeleteUser,
     securityLabel,
   };
 }

@@ -1,11 +1,7 @@
 import Image from "next/image";
 import { ActionButtons, LogsList, WorkerForm } from "@/components";
 import type { WorkLoggerState } from "@/hooks/useWorkLogger";
-import {
-  PERMISSION_LEVEL_OPTIONS,
-  WORKER_ROLE_OPTIONS,
-  type CurrentUser,
-} from "@/types/work";
+import type { CurrentUser } from "@/types/work";
 import styles from "./WorkLoggerView.module.css";
 
 type WorkLoggerViewProps = WorkLoggerState & {
@@ -21,17 +17,8 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
   const pillClass = props.isOnBreak
     ? styles.statusBreak
     : props.isWorking
-    ? styles.statusWorking
-    : styles.statusReady;
-
-  const permissionLabel =
-    PERMISSION_LEVEL_OPTIONS.find(
-      (item) => item.value === props.currentUser.permissionLevel
-    )?.label ?? props.currentUser.permissionLevel;
-
-  const roleLabel =
-    WORKER_ROLE_OPTIONS.find((item) => item.value === props.currentUser.role)
-      ?.label ?? props.currentUser.role;
+      ? styles.statusWorking
+      : styles.statusReady;
 
   return (
     <div className={styles.page}>
@@ -59,8 +46,6 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
                   <span className={`${styles.statusPill} ${pillClass}`}>
                     {props.workingStatusText}
                   </span>
-                  <span className={styles.secondaryButton}>{permissionLabel}</span>
-                  <span className={styles.secondaryButton}>{roleLabel}</span>
                 </div>
               </div>
 

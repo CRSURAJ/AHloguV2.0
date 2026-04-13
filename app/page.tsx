@@ -72,6 +72,7 @@ export default function Page() {
           onCreateUser={auth.handleCreateUser}
           onResetCredential={auth.handleAdminResetCredential}
           onToggleActive={auth.handleToggleUserActive}
+          onDeleteUser={auth.handleDeleteUser}
         />
       ) : null}
     </>

@@ -92,11 +92,9 @@ export default function WorkerForm({
             value={jobDocs}
             onChange={(e) => setJobDocs(e.target.value)}
             disabled
-            placeholder="Future use"
+            readOnly
+            placeholder=""
           />
-          <div className={styles.helperText}>
-            Future use: this will later link drawings from the selected Job ID.
-          </div>
         </div>
       </div>
 

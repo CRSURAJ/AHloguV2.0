@@ -64,6 +64,11 @@ export type AuthProvider = {
     actor: CurrentUser | null,
     userId: string
   ) => AuthProviderResult;
+  deleteUser: (
+    users: OfflineUser[],
+    actor: CurrentUser | null,
+    userId: string
+  ) => AuthProviderResult;
 };
 
 export const authProvider: AuthProvider = {
@@ -359,6 +364,46 @@ export const authProvider: AuthProvider = {
       message: updatedTarget?.isActive
         ? "User activated successfully."
         : "User deactivated successfully.",
+      users: updatedUsers,
+      currentUser: actor,
+    };
+  },
+
+  deleteUser(users, actor, userId) {
+    if (!actor || actor.permissionLevel !== "admin") {
+      return { ok: false, message: "Only admin can delete users." };
+    }
+
+    if (actor.id === userId) {
+      return {
+        ok: false,
+        message: "You cannot delete your own account from this screen.",
+      };
+    }
+
+    const targetUser = users.find((user) => user.id === userId);
+
+    if (!targetUser) {
+      return { ok: false, message: "User not found." };
+    }
+
+    if (
+      targetUser.permissionLevel === "admin" &&
+      targetUser.isActive &&
+      !hasAnotherActiveAdmin(users, userId)
+    ) {
+      return {
+        ok: false,
+        message: "At least one active admin must remain on this device.",
+      };
+    }
+
+    const updatedUsers = users.filter((user) => user.id !== userId);
+    saveOfflineUsers(updatedUsers);
+
+    return {
+      ok: true,
+      message: "User deleted successfully.",
       users: updatedUsers,
       currentUser: actor,
     };

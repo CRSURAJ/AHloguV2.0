@@ -13,6 +13,27 @@ type LogsListProps = {
   onDelete: (id: string) => void;
 };
 
+function TrashIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={styles.deleteIcon}
+      aria-hidden="true"
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4.8c0-.9.7-1.6 1.6-1.6h4.8c.9 0 1.6.7 1.6 1.6V6" />
+      <path d="M6.8 6l.8 12.1c.1 1.4 1.2 2.5 2.6 2.5h3.6c1.4 0 2.5-1.1 2.6-2.5L17.2 6" />
+      <path d="M10 10.2v6.2" />
+      <path d="M14 10.2v6.2" />
+    </svg>
+  );
+}
+
 export default function LogsList({
   logs,
   expandedLogId,
@@ -126,8 +147,9 @@ export default function LogsList({
                             }
                           }}
                           aria-label={`Delete log ${item.jobId}`}
+                          title="Delete log"
                         >
-                          ✕
+                          <TrashIcon />
                         </button>
                       </div>
                     </div>
