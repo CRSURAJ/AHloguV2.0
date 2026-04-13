@@ -109,7 +109,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
         setStartTime(activeSession.startTime);
         setBreakStartTime(activeSession.breakStartTime);
         setBreakMinutes(activeSession.breakMinutes);
-        setBannerMessage("Restored your active session from this device.");
+        setBannerMessage("");
       } else if (draft) {
         setJobId(draft.jobId);
         setLocation(draft.location);
@@ -256,7 +256,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     const validationError = validateBeforeStart();
 
     if (validationError) {
-      setBannerMessage(validationError);
+      setBannerMessage("");
       return;
     }
 
@@ -279,7 +279,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     if (!isOnBreak) {
       setIsOnBreak(true);
       setBreakStartTime(now);
-      setBannerMessage("Break started. Resume work before finishing the log.");
+      setBannerMessage("");
       return;
     }
 
@@ -290,19 +290,19 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
 
     setIsOnBreak(false);
     setBreakStartTime(null);
-    setBannerMessage("Break ended. Add description, then finish the log.");
+    setBannerMessage("");
   }
 
   function handleStop() {
     if (!isWorking || !startTime) return;
 
     if (isOnBreak) {
-      setBannerMessage("Resume work before finishing the log.");
+      setBannerMessage("");
       return;
     }
 
     if (description.trim() === "") {
-      setBannerMessage("Description is required before finishing.");
+      setBannerMessage("");
       return;
     }
 
@@ -336,7 +336,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     setBreakMinutes(0);
     resetEntryFields();
     void clearSession(currentUser.id);
-    setBannerMessage("Work finished. Log saved as pending.");
+    setBannerMessage("");
   }
 
   async function syncOneItem(item: LogItem): Promise<number> {
@@ -390,12 +390,9 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     );
 
     if (itemsToSync.length === 0) {
-      setBannerMessage("Nothing to sync.");
+      setBannerMessage("");
       return;
     }
-
-    let successCount = 0;
-    let failCount = 0;
 
     for (const item of itemsToSync) {
       try {
@@ -413,8 +410,6 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
               : log
           )
         );
-
-        successCount += 1;
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Unknown sync error";
@@ -430,21 +425,15 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
               : log
           )
         );
-
-        failCount += 1;
       }
     }
 
-    if (failCount === 0) {
-      setBannerMessage(`${successCount} log(s) synced successfully.`);
-    } else {
-      setBannerMessage(`${successCount} synced, ${failCount} failed. Retry failed logs.`);
-    }
+    setBannerMessage("");
   }
 
   function handleClearAll() {
     if (!canClearAll) {
-      setBannerMessage("Clear All is available only when every log is synced.");
+      setBannerMessage("");
       return;
     }
 
@@ -454,7 +443,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     setLogs([]);
     setExpandedLogId(null);
     void clearLogs(currentUser.id);
-    setBannerMessage("All saved logs cleared.");
+    setBannerMessage("");
   }
 
   function toggleExpandedLog(id: string) {

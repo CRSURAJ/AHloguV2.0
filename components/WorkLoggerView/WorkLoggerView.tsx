@@ -78,10 +78,6 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
               </div>
             </div>
 
-            {props.bannerMessage ? (
-              <div className={styles.banner}>{props.bannerMessage}</div>
-            ) : null}
-
             <WorkerForm
               jobId={props.jobId}
               setJobId={props.setJobId}
