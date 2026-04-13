@@ -45,6 +45,17 @@ export default function Page() {
     );
   }
 
+  if (securityForced) {
+    return (
+      <SecurityPanel
+        credentialType={auth.currentUser.credentialType}
+        forced={true}
+        onClose={() => {}}
+        onSubmit={auth.handleChangeOwnCredential}
+      />
+    );
+  }
+
   return (
     <>
       <WorkLogger
@@ -56,10 +67,10 @@ export default function Page() {
         securityLabel={auth.securityLabel}
       />
 
-      {securityOpen ? (
+      {securityRequested ? (
         <SecurityPanel
           credentialType={auth.currentUser.credentialType}
-          forced={securityForced}
+          forced={false}
           onClose={() => setSecurityRequested(false)}
           onSubmit={auth.handleChangeOwnCredential}
         />

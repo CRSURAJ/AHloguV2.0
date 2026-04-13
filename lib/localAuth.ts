@@ -314,11 +314,10 @@ export async function createOfflineUser(
     fullName: input.fullName.trim(),
     permissionLevel: input.permissionLevel,
     role: input.role,
-    credentialType:
-      input.permissionLevel === "admin" ? "password" : input.credentialType,
+    credentialType: input.permissionLevel === "admin" ? "password" : input.credentialType,
     credentialHash,
     credentialSalt,
-    mustChangeCredential: false,
+    mustChangeCredential: true,
     isActive: true,
     createdAt: now,
     updatedAt: now,
