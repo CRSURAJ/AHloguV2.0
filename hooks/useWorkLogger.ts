@@ -69,56 +69,70 @@ function makeUuid(): string {
 }
 
 export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
-  const [jobId, setJobId] = useState<string>("");
-  const [location, setLocation] = useState<string>("");
+  const [jobId, setJobId] = useState("");
+  const [location, setLocation] = useState("");
   const [role, setRole] = useState<string>(currentUser.role);
-  const [jobDocs, setJobDocs] = useState<string>("");
-  const [description, setDescription] = useState<string>("");
-
-  const [isWorking, setIsWorking] = useState<boolean>(false);
-  const [isOnBreak, setIsOnBreak] = useState<boolean>(false);
+  const [jobDocs, setJobDocs] = useState("");
+  const [description, setDescription] = useState("");
+  const [isWorking, setIsWorking] = useState(false);
+  const [isOnBreak, setIsOnBreak] = useState(false);
   const [startTime, setStartTime] = useState<string | null>(null);
   const [breakStartTime, setBreakStartTime] = useState<string | null>(null);
-  const [breakMinutes, setBreakMinutes] = useState<number>(0);
-
+  const [breakMinutes, setBreakMinutes] = useState(0);
   const [logs, setLogs] = useState<LogItem[]>([]);
-  const [bannerMessage, setBannerMessage] = useState<string>("");
+  const [bannerMessage, setBannerMessage] = useState("");
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
-  const [isHydrated, setIsHydrated] = useState<boolean>(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    const loadedLogs = loadLogs(currentUser.id);
-    const activeSession = loadSession(currentUser.id);
-    const draft = loadDraft(currentUser.id);
+    let cancelled = false;
 
-    setLogs(loadedLogs);
+    async function hydrate() {
+      const [loadedLogs, activeSession, draft] = await Promise.all([
+        loadLogs(currentUser.id),
+        loadSession(currentUser.id),
+        loadDraft(currentUser.id),
+      ]);
 
-    if (activeSession?.isWorking) {
-      setJobId(activeSession.jobId);
-      setLocation(activeSession.location);
-      setRole(activeSession.role || currentUser.role);
-      setJobDocs(activeSession.jobDocs);
-      setDescription(activeSession.description);
-      setIsWorking(true);
-      setIsOnBreak(activeSession.isOnBreak);
-      setStartTime(activeSession.startTime);
-      setBreakStartTime(activeSession.breakStartTime);
-      setBreakMinutes(activeSession.breakMinutes);
-      setBannerMessage("Restored your active session from this device.");
-    } else if (draft) {
-      setJobId(draft.jobId);
-      setLocation(draft.location);
-      setRole(draft.role || currentUser.role);
-      setJobDocs(draft.jobDocs);
-      setDescription(draft.description);
+      if (cancelled) return;
+
+      setLogs(loadedLogs);
+
+      if (activeSession?.isWorking) {
+        setJobId(activeSession.jobId);
+        setLocation(activeSession.location);
+        setRole(activeSession.role || currentUser.role);
+        setJobDocs(activeSession.jobDocs);
+        setDescription(activeSession.description);
+        setIsWorking(true);
+        setIsOnBreak(activeSession.isOnBreak);
+        setStartTime(activeSession.startTime);
+        setBreakStartTime(activeSession.breakStartTime);
+        setBreakMinutes(activeSession.breakMinutes);
+        setBannerMessage("Restored your active session from this device.");
+      } else if (draft) {
+        setJobId(draft.jobId);
+        setLocation(draft.location);
+        setRole(draft.role || currentUser.role);
+        setJobDocs(draft.jobDocs);
+        setDescription(draft.description);
+      } else {
+        setRole(currentUser.role);
+      }
+
+      setIsHydrated(true);
     }
 
-    setIsHydrated(true);
+    void hydrate();
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentUser.id, currentUser.role]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    saveLogs(currentUser.id, logs);
+    void saveLogs(currentUser.id, logs);
   }, [currentUser.id, isHydrated, logs]);
 
   useEffect(() => {
@@ -138,11 +152,11 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
         description,
       };
 
-      saveSession(currentUser.id, session);
+      void saveSession(currentUser.id, session);
       return;
     }
 
-    clearSession(currentUser.id);
+    void clearSession(currentUser.id);
   }, [
     breakMinutes,
     breakStartTime,
@@ -178,9 +192,9 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       draft.description.trim() !== "";
 
     if (hasMeaningfulDraft) {
-      saveDraft(currentUser.id, draft);
+      void saveDraft(currentUser.id, draft);
     } else {
-      clearDraft(currentUser.id);
+      void clearDraft(currentUser.id);
     }
   }, [
     currentUser.id,
@@ -192,10 +206,6 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     location,
     role,
   ]);
-
-  useEffect(() => {
-    setRole(currentUser.role);
-  }, [currentUser.role]);
 
   const canStart =
     !isWorking &&
@@ -239,7 +249,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     setRole(currentUser.role);
     setJobDocs("");
     setDescription("");
-    clearDraft(currentUser.id);
+    void clearDraft(currentUser.id);
   }
 
   function handleStart() {
@@ -325,7 +335,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     setBreakStartTime(null);
     setBreakMinutes(0);
     resetEntryFields();
-    clearSession(currentUser.id);
+    void clearSession(currentUser.id);
     setBannerMessage("Work finished. Log saved as pending.");
   }
 
@@ -443,7 +453,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
 
     setLogs([]);
     setExpandedLogId(null);
-    clearLogs(currentUser.id);
+    void clearLogs(currentUser.id);
     setBannerMessage("All saved logs cleared.");
   }
 

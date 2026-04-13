@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import LoginScreen from "@/components/LoginScreen/LoginScreen";
 import SecurityPanel from "@/components/SecurityPanel/SecurityPanel";
 import UserManagementPanel from "@/components/UserManagementPanel/UserManagementPanel";
@@ -9,30 +9,26 @@ import { useLocalAuth } from "@/hooks/useLocalAuth";
 
 export default function Page() {
   const auth = useLocalAuth();
-  const [securityOpen, setSecurityOpen] = useState(false);
+  const [securityRequested, setSecurityRequested] = useState(false);
   const [userManagementOpen, setUserManagementOpen] = useState(false);
 
-  useEffect(() => {
-    if (auth.currentUser?.mustChangeCredential) {
-      setSecurityOpen(true);
-    }
-  }, [auth.currentUser?.mustChangeCredential]);
+  const securityForced = auth.currentUser?.mustChangeCredential === true;
+  const securityOpen = securityForced || securityRequested;
 
   if (!auth.isReady) {
     return (
-      <main
+      <div
         style={{
           minHeight: "100vh",
           display: "grid",
           placeItems: "center",
           background: "#085153",
           color: "#eef7f3",
-          fontSize: "16px",
-          fontWeight: 600,
+          fontWeight: 700,
         }}
       >
-        Loading...
-      </main>
+        Loading…
+      </div>
     );
   }
 
@@ -54,7 +50,7 @@ export default function Page() {
       <WorkLogger
         currentUser={auth.currentUser}
         onSignOut={auth.handleSignOut}
-        onOpenSecurity={() => setSecurityOpen(true)}
+        onOpenSecurity={() => setSecurityRequested(true)}
         onOpenUserManagement={() => setUserManagementOpen(true)}
         canManageUsers={auth.canManageUsers}
         securityLabel={auth.securityLabel}
@@ -63,8 +59,8 @@ export default function Page() {
       {securityOpen ? (
         <SecurityPanel
           credentialType={auth.currentUser.credentialType}
-          forced={auth.currentUser.mustChangeCredential}
-          onClose={() => setSecurityOpen(false)}
+          forced={securityForced}
+          onClose={() => setSecurityRequested(false)}
           onSubmit={auth.handleChangeOwnCredential}
         />
       ) : null}
