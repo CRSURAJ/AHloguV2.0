@@ -33,7 +33,7 @@ export default function LoginScreen({
             priority
           />
           <p className={styles.subtitle}>
-            Offline local login. No internet required.
+            Offline local sign-in for this device.
           </p>
         </div>
 
@@ -81,14 +81,15 @@ export default function LoginScreen({
         </form>
 
         <div className={styles.helpCard}>
-          <div className={styles.helpTitle}>Forgot PIN or password?</div>
+          <div className={styles.helpTitle}>Forgot your credential?</div>
           <div className={styles.helpText}>
-            Ask the admin to reset your credential on this device.
+            Ask the device admin to reset your PIN or password.
           </div>
         </div>
 
         <p className={styles.note}>
-          Local offline sign-in is enabled on this device.
+          Logs, active sessions, and drafts are stored for offline use on this
+          device.
         </p>
       </div>
     </div>

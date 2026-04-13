@@ -304,7 +304,7 @@ export const authProvider: AuthProvider = {
 
     return {
       ok: true,
-      message: "Credential reset successfully.",
+      message: "Credential reset successfully. User must change it at next sign-in.",
       users: updatedUsers,
       currentUser:
         actor.id === userId && refreshedUser ? toCurrentUser(refreshedUser) : actor,

@@ -1,9 +1,15 @@
-import { ActionButtons, LogsList, WorkerForm } from "@/components";
 import Image from "next/image";
+import { ActionButtons, LogsList, WorkerForm } from "@/components";
 import type { WorkLoggerState } from "@/hooks/useWorkLogger";
+import {
+  PERMISSION_LEVEL_OPTIONS,
+  WORKER_ROLE_OPTIONS,
+  type CurrentUser,
+} from "@/types/work";
 import styles from "./WorkLoggerView.module.css";
 
 type WorkLoggerViewProps = WorkLoggerState & {
+  currentUser: CurrentUser;
   onSignOut: () => void;
   onOpenSecurity: () => void;
   onOpenUserManagement: () => void;
@@ -15,8 +21,17 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
   const pillClass = props.isOnBreak
     ? styles.statusBreak
     : props.isWorking
-      ? styles.statusWorking
-      : styles.statusReady;
+    ? styles.statusWorking
+    : styles.statusReady;
+
+  const permissionLabel =
+    PERMISSION_LEVEL_OPTIONS.find(
+      (item) => item.value === props.currentUser.permissionLevel
+    )?.label ?? props.currentUser.permissionLevel;
+
+  const roleLabel =
+    WORKER_ROLE_OPTIONS.find((item) => item.value === props.currentUser.role)
+      ?.label ?? props.currentUser.role;
 
   return (
     <div className={styles.page}>
@@ -27,52 +42,54 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
               <Image
                 src="/AHlogu.png"
                 alt="AH LOGU"
-                width={180}
-                height={54}
+                width={160}
+                height={48}
                 className={styles.logoImage}
                 priority
               />
             </div>
           </div>
 
-          <div className={styles.entryCard}>
+          <section className={styles.entryCard}>
             <div className={styles.cardHeader}>
               <div className={styles.headerText}>
-                <h2 className={styles.cardTitle}>
-                  Hi, {props.currentUserFullName}!
-                </h2>
+                <h1 className={styles.cardTitle}>Hi, {props.currentUserFullName}!</h1>
 
                 <div className={styles.headerMetaRow}>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={props.onOpenSecurity}
-                  >
-                    {props.securityLabel}
-                  </button>
-
-                  {props.canManageUsers ? (
-                    <button
-                      type="button"
-                      className={styles.secondaryButton}
-                      onClick={props.onOpenUserManagement}
-                    >
-                      Manage Users
-                    </button>
-                  ) : null}
-
-                  <button
-                    type="button"
-                    className={styles.signOutButton}
-                    onClick={props.onSignOut}
-                  >
-                    Sign out
-                  </button>
+                  <span className={`${styles.statusPill} ${pillClass}`}>
+                    {props.workingStatusText}
+                  </span>
+                  <span className={styles.secondaryButton}>{permissionLabel}</span>
+                  <span className={styles.secondaryButton}>{roleLabel}</span>
                 </div>
               </div>
 
-              <div className={`${styles.statusPill} ${pillClass}`}>
-                {props.workingStatusText}
+              <div className={styles.headerMetaRow}>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={props.onOpenSecurity}
+                >
+                  {props.securityLabel}
+                </button>
+
+                {props.canManageUsers ? (
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={props.onOpenUserManagement}
+                  >
+                    User Management
+                  </button>
+                ) : null}
+
+                <button
+                  type="button"
+                  className={styles.signOutButton}
+                  onClick={props.onSignOut}
+                >
+                  Sign out
+                </button>
               </div>
             </div>
 
@@ -109,15 +126,15 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
               handleSync={props.handleSync}
               handleClearAll={props.handleClearAll}
             />
-          </div>
 
-          <LogsList
-            logs={props.logs}
-            expandedLogId={props.expandedLogId}
-            toggleExpandedLog={props.toggleExpandedLog}
-            getSyncBadgeClass={props.getSyncBadgeClass}
-            onDelete={props.handleDeleteLog}
-          />
+            <LogsList
+              logs={props.logs}
+              expandedLogId={props.expandedLogId}
+              toggleExpandedLog={props.toggleExpandedLog}
+              getSyncBadgeClass={props.getSyncBadgeClass}
+              onDelete={props.handleDeleteLog}
+            />
+          </section>
         </div>
       </div>
     </div>

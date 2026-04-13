@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AHlogu
 
-## Getting Started
+AHlogu is an offline-first work logging web app for field teams. It is built for shared devices and supports local offline sign-in, active job sessions, breaks, saved drafts, and manual sync to a remote endpoint.
 
-First, run the development server:
+## What this version includes
+
+- local offline authentication per device
+- clear separation between:
+  - `permissionLevel` for access control (`admin` / `user`)
+  - `role` for worker trade or job type (`plumber`, `electrician`, etc.)
+- per-user work logs, drafts, and active sessions
+- IndexedDB-backed offline storage for logs, drafts, and sessions
+- localStorage fallback where IndexedDB is unavailable
+- basic service worker for offline app-shell caching
+- admin user management on the device
+- PIN/password reset flow
+- manual sync to `NEXT_PUBLIC_PROJECT_LOGU_SYNC_URL`
+
+## Current auth model
+
+This version still uses device-local offline auth.
+
+That means:
+
+- users are stored locally on the device
+- credentials are stored as salted PBKDF2 hashes
+- sign-in works without internet
+- admin/user lifecycle is device-local for now
+
+This is intentional so the app can keep working offline. The auth layer is now abstracted so cloud auth can replace it later with less UI churn.
+
+## Local data storage
+
+Work logs, active sessions, and drafts are stored in IndexedDB first.
+
+Fallback behavior:
+
+- if IndexedDB is not available, localStorage is used
+- old localStorage log/session/draft data is migrated into IndexedDB on load
+
+## Environment variable
+
+Create a `.env.local` file with:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+NEXT_PUBLIC_PROJECT_LOGU_SYNC_URL=https://your-endpoint.example.com

@@ -1,7 +1,7 @@
 "use client";
 
+import { WorkLoggerView } from "@/components";
 import { useWorkLogger } from "@/hooks/useWorkLogger";
-import WorkLoggerView from "@/components/WorkLoggerView/WorkLoggerView";
 import type { CurrentUser } from "@/types/work";
 
 type WorkLoggerProps = {
@@ -26,6 +26,7 @@ export default function WorkLogger({
   return (
     <WorkLoggerView
       {...workLogger}
+      currentUser={currentUser}
       onSignOut={onSignOut}
       onOpenSecurity={onOpenSecurity}
       onOpenUserManagement={onOpenUserManagement}

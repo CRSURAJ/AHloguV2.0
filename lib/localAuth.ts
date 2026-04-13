@@ -191,10 +191,6 @@ function migrateStoredUser(item: unknown): OfflineUser | null {
   const credentialSalt =
     typeof raw.credentialSalt === "string" ? raw.credentialSalt : "";
 
-  // Old schema used `role` for admin/user.
-  // New schema uses:
-  // - permissionLevel => admin/user
-  // - role => plumber/electrician/etc
   const permissionLevel = normalizePermissionLevel(
     raw.permissionLevel ?? raw.role
   );
