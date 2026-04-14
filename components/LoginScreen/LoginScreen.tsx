@@ -33,7 +33,7 @@ export default function LoginScreen({
             priority
           />
           <p className={styles.subtitle}>
-            Offline local sign-in for this device.
+            Please Login to continue.
           </p>
         </div>
 
@@ -87,10 +87,7 @@ export default function LoginScreen({
           </div>
         </div>
 
-        <p className={styles.note}>
-          Logs, active sessions, and drafts are stored for offline use on this
-          device.
-        </p>
+        
       </div>
     </div>
   );
