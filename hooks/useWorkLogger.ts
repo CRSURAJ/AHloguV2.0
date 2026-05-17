@@ -57,6 +57,7 @@ export type WorkLoggerState = {
   handleClearAll: () => void;
   handleDeleteLog: (id: string) => void;
   toggleExpandedLog: (id: string) => void;
+  handleStickyNoteChange: (id: string, value: string) => void;
   getSyncBadgeClass: (status: SyncStatus) => string;
 };
 
@@ -235,7 +236,23 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     logs.length > 0 && logs.every((item) => item.syncStatus === "synced");
 
   const workingStatusText = getWorkingStatusText(isWorking, isOnBreak);
+ 
+ function handleStickyNoteChange(id: string, value: string) {
+  setLogs((prev) =>
+    prev.map((log) => {
+      if (log.id !== id) return log;
 
+      if (log.syncStatus === "synced" || log.syncStatus === "syncing") {
+        return log;
+      }
+
+      return {
+        ...log,
+        stickyNote: value,
+      };
+    })
+  );
+}
   function validateBeforeStart(): string {
     if (jobId.trim() === "") return "Job ID is required.";
     if (role.trim() === "") return "Role is required.";
@@ -326,7 +343,8 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       workedMinutes,
       syncStatus: "pending",
       syncMessage: "Waiting to sync",
-    };
+      stickNote: "",
+   };
 
     setLogs((prev) => [logItem, ...prev]);
     setIsWorking(false);
@@ -360,6 +378,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       loguId: item.loguId,
       fullname: item.fullname,
       jobId: item.jobId,
+      stickyNote: item.stickyNote ??"",
       location: item.location,
       role: item.role,
       description: item.description,
@@ -501,6 +520,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     handleSync,
     handleClearAll,
     handleDeleteLog,
+    handleStickyNoteChange,
     toggleExpandedLog,
     getSyncBadgeClass,
   };

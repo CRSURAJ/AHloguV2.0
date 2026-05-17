@@ -11,6 +11,7 @@ type LogsListProps = {
   toggleExpandedLog: (id: string) => void;
   getSyncBadgeClass: (status: SyncStatus) => string;
   onDelete: (id: string) => void;
+  onStickyNoteChange: (id: string, value: string) => void;
 };
 
 function TrashIcon() {
@@ -40,9 +41,17 @@ export default function LogsList({
   toggleExpandedLog,
   getSyncBadgeClass,
   onDelete,
+  onStickyNoteChange,
 }: LogsListProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [openStickyEditors, setOpenStickyEditors] = useState<Record<string, boolean>>({});
 
+function toggleStickyEditor(id: string) {
+  setOpenStickyEditors((prev) => ({
+    ...prev,
+    [id]: !prev[id],
+  }));
+}
   return (
     <section className={styles.logsCard}>
       <button
@@ -80,7 +89,11 @@ export default function LogsList({
                 const badgeClassKey = getSyncBadgeClass(item.syncStatus);
                 const badgeClass =
                   styles[badgeClassKey as keyof typeof styles] ?? "";
-
+                const stickyLocked =
+                  item.syncStatus === "synced" || item.syncStatus === "syncing";
+                const stickyValue = item.stickyNote ?? "";  
+                const stickyOpen = openStickyEditors[item.id] ?? false;
+                const hasStickyNote = stickyValue.trim().length > 0;
                 return (
                   <article key={item.id} className={styles.logItem}>
                     <div className={styles.logTop}>
@@ -130,7 +143,38 @@ export default function LogsList({
                         {isExpanded ? "Show less" : "Show more"}
                       </button>
                     ) : null}
+                    <div className={styles.stickyNoteSection}>
+  <button
+    type="button"
+    className={`${styles.stickyToggleButton} ${hasStickyNote ? styles.stickyToggleButtonFilled : ""}`}
+    onClick={() => toggleStickyEditor(item.id)}
+  >
+    <span className={styles.stickyToggleLabel}>Sticky Note</span>
+    <span className={styles.stickyToggleStatus}>
+      {hasStickyNote ? "↑" : "+"}
+    </span>
+  </button>
 
+  {stickyOpen ? (
+    <div className={styles.stickyNoteCard}>
+      <div className={styles.stickyNoteHeader}>
+        <span className={styles.stickyNoteTitle}>Sticky note</span>
+        <span className={styles.stickyNoteState}>
+          {stickyLocked ? "Read only after sync" : ""}
+        </span>
+      </div>
+
+      <textarea
+        className={styles.stickyNoteInput}
+        value={stickyValue}
+        onChange={(e) => onStickyNoteChange(item.id, e.target.value)}
+        placeholder="Add anything you forgot before syncing..."
+        rows={3}
+        disabled={stickyLocked}
+      />
+    </div>
+  ) : null}
+</div>
                     <div className={styles.logFooter}>
                       <div className={styles.logMessage}>{item.syncMessage}</div>
 

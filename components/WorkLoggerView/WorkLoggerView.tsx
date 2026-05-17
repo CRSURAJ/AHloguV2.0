@@ -114,6 +114,7 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
               toggleExpandedLog={props.toggleExpandedLog}
               getSyncBadgeClass={props.getSyncBadgeClass}
               onDelete={props.handleDeleteLog}
+              onStickyNoteChange={props.handleStickyNoteChange}
             />
           </section>
         </div>

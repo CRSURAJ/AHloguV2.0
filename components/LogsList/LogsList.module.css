@@ -252,3 +252,101 @@
     padding-right: 18px;
   }
 }
+
+.stickyNoteSection {
+  margin-top: 14px;
+}
+
+.stickyToggleButton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(16, 31, 29, 0.55);
+  color: #eef7f3;
+  cursor: pointer;
+  font: inherit;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.stickyToggleButton:hover {
+  transform: translateY(-1px);
+  border-color: rgba(226, 173, 63, 0.45);
+}
+
+.stickyToggleButtonFilled {
+  border-color: rgba(83, 188, 123, 0.5);
+  background: rgba(83, 188, 123, 0.12);
+}
+
+.stickyToggleLabel {
+  font-weight: 700;
+}
+
+.stickyToggleStatus {
+  font-size: 0.85rem;
+  opacity: 0.88;
+}
+
+.stickyNoteCard {
+  margin-top: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(226, 173, 63, 0.28);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 236, 179, 0.12),
+    rgba(226, 173, 63, 0.08)
+  );
+}
+
+.stickyNoteHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.stickyNoteTitle {
+  font-weight: 700;
+  color: #ffe29b;
+}
+
+.stickyNoteState {
+  font-size: 0.8rem;
+  color: rgba(255, 236, 179, 0.78);
+}
+
+.stickyNoteInput {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(16, 31, 29, 0.55);
+  color: #eef7f3;
+  padding: 12px 14px;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.stickyNoteInput::placeholder {
+  color: rgba(238, 247, 243, 0.48);
+}
+
+.stickyNoteInput:focus {
+  outline: none;
+  border-color: rgba(226, 173, 63, 0.55);
+  box-shadow: 0 0 0 3px rgba(226, 173, 63, 0.12);
+}
+
+.stickyNoteInput:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}

@@ -93,7 +93,7 @@ export default function WorkerForm({
             onChange={(e) => setJobDocs(e.target.value)}
             disabled
             readOnly
-            placeholder=""
+            placeholder="Please contact your manager"
           />
         </div>
       </div>

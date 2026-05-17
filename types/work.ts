@@ -108,5 +108,6 @@ export type LogItem = {
   workedMinutes: number;
   syncStatus: SyncStatus;
   syncMessage: string;
+  stickyNote?: string;
   syncedAt?: number;
 };
