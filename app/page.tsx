@@ -91,6 +91,10 @@ export default function Page() {
             onDeleteUser={auth.handleDeleteUser}
           />
         ) : null}
+
+        {jobManagementOpen ? (
+          <JobManagementPanel onClose={() => setJobManagementOpen(false)} />
+        ) : null}
       </>
     );
   }
@@ -114,11 +118,6 @@ export default function Page() {
           onSubmit={auth.handleChangeOwnCredential}
         />
       ) : null}
-
-      {jobManagementOpen ? (
-        <JobManagementPanel onClose={() => setJobManagementOpen(false)} />
-      ) : null}
-
     </>
   );
 }
