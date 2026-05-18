@@ -113,3 +113,237 @@ select.input {
 select.input:disabled {
   cursor: not-allowed;
 }
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(1, 10, 9, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.modalCard {
+  width: min(420px, 100%);
+  border-radius: 24px;
+  padding: 18px;
+  background: rgba(17, 48, 45, 0.98);
+  border: 1px solid rgba(178, 223, 220, 0.16);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  color: #eef7f3;
+}
+
+.modalHeader {
+  margin-bottom: 14px;
+}
+
+.modalHeader h3 {
+  margin: 0;
+  color: #d9cdc7;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.modalHeader p {
+  margin: 8px 0 0;
+  color: rgba(238, 247, 243, 0.68);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.modalPrimaryButton,
+.modalSecondaryButton {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 0;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.modalPrimaryButton {
+  background: #53bc7b;
+  color: #072c29;
+}
+
+.modalSecondaryButton {
+  background: rgba(8, 34, 32, 0.8);
+  color: #eef7f3;
+  border: 1px solid rgba(178, 223, 220, 0.16);
+}
+
+.modalPrimaryButton:hover {
+  filter: brightness(1.04);
+}
+
+.modalSecondaryButton:hover {
+  border-color: rgba(83, 188, 123, 0.34);
+  background: rgba(8, 34, 32, 0.95);
+}
+
+@media (max-width: 520px) {
+  .modalActions {
+    flex-direction: column-reverse;
+  }
+
+  .modalPrimaryButton,
+  .modalSecondaryButton {
+    width: 100%;
+  }
+}
+
+.locationActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.locationChip {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(83, 188, 123, 0.22);
+  background: rgba(83, 188, 123, 0.1);
+  color: #d4fbe3;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.locationChip:hover {
+  background: rgba(83, 188, 123, 0.16);
+  border-color: rgba(83, 188, 123, 0.36);
+}
+
+.locationChip:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.fieldGrid {
+  align-items: start;
+}
+
+.fieldGrid > .field:nth-child(3) {
+  grid-column: 1 / -1;
+}
+
+.locationHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.locationActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 0;
+}
+
+.locationChip {
+  min-height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(83, 188, 123, 0.22);
+  background: rgba(83, 188, 123, 0.1);
+  color: #d4fbe3;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.locationChip:hover {
+  background: rgba(83, 188, 123, 0.16);
+  border-color: rgba(83, 188, 123, 0.36);
+}
+
+.locationChip:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+@media (max-width: 620px) {
+  .locationHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .fieldGrid > .field:nth-child(3) {
+    grid-column: auto;
+  }
+}
+
+/* Final worker form layout: Job ID + Job Docs top row, Location full width below */
+.fieldGrid {
+  grid-template-columns: 1fr 1fr !important;
+  gap: 18px !important;
+  align-items: start !important;
+}
+
+.fieldGrid > .field:nth-child(3) {
+  grid-column: 1 / -1 !important;
+}
+
+.locationHeader {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+}
+
+.locationActions {
+  display: flex !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+  margin: 0 !important;
+}
+
+.locationChip {
+  min-height: 36px !important;
+  padding: 0 13px !important;
+  border-radius: 999px !important;
+}
+
+#jobDocs {
+  min-height: 58px;
+}
+
+#location {
+  min-height: 58px;
+}
+
+@media (max-width: 620px) {
+  .fieldGrid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .fieldGrid > .field:nth-child(3) {
+    grid-column: auto !important;
+  }
+
+  .locationHeader {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+
+  .locationActions {
+    width: 100%;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+  }
+}

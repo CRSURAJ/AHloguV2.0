@@ -7,8 +7,6 @@ type WorkerFormProps = {
   jobId: string;
   setJobId: (value: string) => void;
   availableJobs: Job[];
-  role: string;
-  setRole: (value: string) => void;
   location: string;
   setLocation: (value: string) => void;
   jobDocs: string;
@@ -19,12 +17,12 @@ type WorkerFormProps = {
   isOnBreak: boolean;
 };
 
+const SITE_ADDRESS_PREFIX = "Site Address: ";
+
 function getJobOptionLabel(job: Job): string {
-  const parts = [
-    job.jobId,
-    job.jobName,
-    job.customerName,
-  ].filter((part) => part.trim() !== "");
+  const parts = [job.jobId, job.jobName, job.customerName].filter(
+    (part) => part.trim() !== ""
+  );
 
   return parts.length > 0 ? parts.join(" · ") : "Untitled job";
 }
@@ -33,8 +31,6 @@ export default function WorkerForm({
   jobId,
   setJobId,
   availableJobs,
-  role,
-  setRole,
   location,
   setLocation,
   jobDocs,
@@ -49,56 +45,40 @@ export default function WorkerForm({
   const selectedJobMissing =
     jobId.trim() !== "" && !availableJobs.some((job) => job.jobId === jobId);
 
+  function handleSiteAddressClick(): void {
+    if (location.startsWith(SITE_ADDRESS_PREFIX)) return;
+
+    setLocation(SITE_ADDRESS_PREFIX);
+  }
+
   return (
     <div className={styles.formWrap}>
       <div className={styles.fieldGrid}>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="role">
-            Role *
-          </label>
-
-          <input
-            id="role"
-            className={styles.input}
-            type="text"
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            disabled
-            readOnly
-          />
-        </div>
-
         <div className={styles.field}>
           <label className={styles.label} htmlFor="jobId">
             Job ID *
           </label>
 
           {hasAvailableJobs ? (
-            <>
-              <select
-                id="jobId"
-                className={styles.input}
-                value={jobId}
-                onChange={(e) => setJobId(e.target.value)}
-                disabled={isWorking}
-              >
-                <option value="">Select active job</option>
+            <select
+              id="jobId"
+              className={styles.input}
+              value={jobId}
+              onChange={(event) => setJobId(event.target.value)}
+              disabled={isWorking}
+            >
+              <option value="">Select active job</option>
 
-                {selectedJobMissing ? (
-                  <option value={jobId}>{jobId} (saved draft)</option>
-                ) : null}
+              {selectedJobMissing ? (
+                <option value={jobId}>{jobId} (saved draft)</option>
+              ) : null}
 
-                {availableJobs.map((job) => (
-                  <option key={job.id} value={job.jobId}>
-                    {getJobOptionLabel(job)}
-                  </option>
-                ))}
-              </select>
-
-              <div className={styles.helperText}>
-                Showing active jobs assigned to your role.
-              </div>
-            </>
+              {availableJobs.map((job) => (
+                <option key={job.id} value={job.jobId}>
+                  {getJobOptionLabel(job)}
+                </option>
+              ))}
+            </select>
           ) : (
             <>
               <input
@@ -106,7 +86,7 @@ export default function WorkerForm({
                 className={styles.input}
                 type="text"
                 value={jobId}
-                onChange={(e) => setJobId(e.target.value)}
+                onChange={(event) => setJobId(event.target.value)}
                 disabled={isWorking}
                 placeholder="Enter job ID"
               />
@@ -119,22 +99,6 @@ export default function WorkerForm({
         </div>
 
         <div className={styles.field}>
-          <label className={styles.label} htmlFor="location">
-            Location *
-          </label>
-
-          <input
-            id="location"
-            className={styles.input}
-            type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            disabled={isWorking}
-            placeholder="Enter location"
-          />
-        </div>
-
-        <div className={styles.field}>
           <label className={styles.label} htmlFor="jobDocs">
             Job Docs
           </label>
@@ -144,12 +108,51 @@ export default function WorkerForm({
             className={styles.input}
             type="text"
             value={jobDocs}
-            onChange={(e) => setJobDocs(e.target.value)}
+            onChange={(event) => setJobDocs(event.target.value)}
             disabled
             readOnly
             placeholder="Please contact your manager"
           />
         </div>
+
+        <div className={styles.field}>
+          <div className={styles.locationHeader}>
+            <label className={styles.label} htmlFor="location">
+              Location *
+            </label>
+
+            <div className={styles.locationActions}>
+              <button
+                className={styles.locationChip}
+                type="button"
+                onClick={() => setLocation("Warehouse")}
+                disabled={isWorking}
+              >
+                Warehouse
+              </button>
+
+              <button
+                className={styles.locationChip}
+                type="button"
+                onClick={handleSiteAddressClick}
+                disabled={isWorking}
+              >
+                Site Address
+              </button>
+            </div>
+          </div>
+
+          <input
+            id="location"
+            className={styles.input}
+            type="text"
+            value={location}
+            onChange={(event) => setLocation(event.target.value)}
+            disabled={isWorking}
+            placeholder="Warehouse or Site Address"
+          />
+        </div>
+
       </div>
 
       <div className={styles.field}>
@@ -162,7 +165,7 @@ export default function WorkerForm({
             id="description"
             className={styles.textarea}
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(event) => setDescription(event.target.value)}
             disabled={descriptionDisabled}
             rows={5}
             placeholder={
