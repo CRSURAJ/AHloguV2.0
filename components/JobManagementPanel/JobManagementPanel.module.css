@@ -392,3 +392,150 @@
   cursor: not-allowed;
   color: rgba(238, 247, 243, 0.62);
 }
+
+.docsField {
+  display: grid;
+  gap: 8px;
+}
+
+.docsLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: #eef7f3;
+}
+
+.fileUploadBox {
+  min-height: 46px;
+  border-radius: 14px;
+  border: 1px dashed rgba(83, 188, 123, 0.36);
+  background: rgba(1, 18, 17, 0.58);
+  color: #d4fbe3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.fileUploadBox:hover {
+  background: rgba(4, 24, 22, 0.96);
+  border-color: rgba(83, 188, 123, 0.5);
+}
+
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.docsHelp {
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(238, 247, 243, 0.58);
+}
+
+.docList {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.docItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(1, 18, 17, 0.42);
+  border: 1px solid rgba(178, 223, 220, 0.1);
+}
+
+.docInfo {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.docName {
+  color: #eef7f3;
+  font-size: 13px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.docSize {
+  color: rgba(238, 247, 243, 0.58);
+  font-size: 12px;
+}
+
+.removeDocButton {
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(229, 57, 53, 0.2);
+  background: rgba(229, 57, 53, 0.08);
+  color: #ffb9b9;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.removeDocButton:hover {
+  background: rgba(229, 57, 53, 0.16);
+  border-color: rgba(229, 57, 53, 0.34);
+}
+
+.savedDocs {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(178, 223, 220, 0.1);
+}
+
+.savedDocsTitle {
+  margin: 0 0 8px;
+  color: #eef7f3;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.savedDocsList {
+  display: grid;
+  gap: 8px;
+}
+
+.savedDocLink {
+  border-radius: 12px;
+  padding: 9px 10px;
+  background: rgba(83, 188, 123, 0.1);
+  border: 1px solid rgba(83, 188, 123, 0.18);
+  color: #d4fbe3;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.savedDocLink:hover {
+  border-color: rgba(83, 188, 123, 0.34);
+  background: rgba(83, 188, 123, 0.16);
+}
+
+@media (max-width: 520px) {
+  .docItem {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .removeDocButton {
+    width: 100%;
+  }
+}
