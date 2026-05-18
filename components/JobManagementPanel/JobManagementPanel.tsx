@@ -21,6 +21,7 @@ type JobFormState = {
   location: string;
   description: string;
   assignedRoles: WorkerRole[];
+  jobDocs: Job["jobDocs"];
   isActive: boolean;
 };
 
@@ -33,6 +34,7 @@ const EMPTY_FORM: JobFormState = {
   location: "",
   description: "",
   assignedRoles: [],
+  jobDocs: [],
   isActive: true,
 };
 
@@ -120,6 +122,7 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
       location: job.location,
       description: job.description,
       assignedRoles: job.assignedRoles,
+      jobDocs: job.jobDocs,
       isActive: job.isActive,
     });
 
@@ -157,7 +160,6 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
       <section className={styles.panel}>
         <div className={styles.header}>
           <div>
-            <p className={styles.eyebrow}>Admin Only</p>
             <h2>Job Management</h2>
             <p className={styles.subtitle}>
               Create local jobs and assign them to worker roles. Admin users can
@@ -248,10 +250,15 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
             </label>
 
             <label>
-              Location
+              Job Docs
               <input
-                value={form.location}
-                onChange={(event) => updateField("location", event.target.value)}
+                value={
+                  form.jobDocs.length === 0
+                    ? "No documents attached yet"
+                    : `${form.jobDocs.length} document(s) attached`
+                }
+                disabled
+                readOnly
               />
             </label>
           </div>
@@ -341,7 +348,9 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
 
                 <p className={styles.jobMeta}>
                   {job.customerName || "No customer / site"} ·{" "}
-                  {job.location || "No location"}
+                  {job.jobDocs.length === 0
+                    ? "No job docs"
+                    : `${job.jobDocs.length} job doc(s)`}
                 </p>
 
                 <p className={styles.jobRoles}>

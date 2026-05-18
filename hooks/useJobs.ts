@@ -37,7 +37,6 @@ function validateCreateJob(input: CreateJobInput): string {
   if (input.jobId.trim() === "") return "Job ID is required.";
   if (input.jobName.trim() === "") return "Job name is required.";
   if (input.customerName.trim() === "") return "Customer / site is required.";
-  if (input.location.trim() === "") return "Location is required.";
   if (input.assignedRoles.length === 0) {
     return "Assign this job to at least one worker role.";
   }
@@ -59,10 +58,6 @@ function validateUpdateJob(updates: UpdateJobInput): string {
     updates.customerName.trim() === ""
   ) {
     return "Customer / site is required.";
-  }
-
-  if (updates.location !== undefined && updates.location.trim() === "") {
-    return "Location is required.";
   }
 
   if (updates.assignedRoles !== undefined && updates.assignedRoles.length === 0) {

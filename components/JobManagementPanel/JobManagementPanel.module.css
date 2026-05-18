@@ -386,3 +386,9 @@
     width: 100%;
   }
 }
+
+.formGrid input:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+  color: rgba(238, 247, 243, 0.62);
+}
