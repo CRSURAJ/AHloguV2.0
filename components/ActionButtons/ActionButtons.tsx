@@ -2,20 +2,24 @@ import styles from "./ActionButtons.module.css";
 
 type ActionButtonsProps = {
   canStop: boolean;
+  canSaveAndSwitch: boolean;
   canClearAll: boolean;
   unsyncedCount: number;
   failedCount: number;
   handleStop: () => void;
+  onOpenSaveAndSwitch: () => void;
   handleSync: () => void | Promise<void>;
   handleClearAll: () => void;
 };
 
 export default function ActionButtons({
   canStop,
+  canSaveAndSwitch,
   canClearAll,
   unsyncedCount,
   failedCount,
   handleStop,
+  onOpenSaveAndSwitch,
   handleSync,
   handleClearAll,
 }: ActionButtonsProps) {
@@ -45,6 +49,15 @@ export default function ActionButtons({
           disabled={!canStop}
         >
           Finish Job
+        </button>
+
+        <button
+          type="button"
+          className={`${styles.actionButton} ${styles.switchButton}`}
+          onClick={onOpenSaveAndSwitch}
+          disabled={!canSaveAndSwitch}
+        >
+          Save & Switch Job
         </button>
       </div>
 

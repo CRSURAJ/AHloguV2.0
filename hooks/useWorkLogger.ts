@@ -17,6 +17,7 @@ import { getJobsForRole } from "@/lib/jobStorage";
 import { getWorkingStatusText, minutesBetween } from "@/lib/workUtils";
 import type {
   ActiveSession,
+  AuthActionResult,
   CurrentUser,
   DraftState,
   Job,
@@ -48,6 +49,7 @@ export type WorkLoggerState = {
   canStart: boolean;
   canBreak: boolean;
   canStop: boolean;
+  canSaveAndSwitch: boolean;
   canClearAll: boolean;
   unsyncedCount: number;
   syncedCount: number;
@@ -56,6 +58,10 @@ export type WorkLoggerState = {
   handleStart: () => void;
   handleBreak: () => void;
   handleStop: () => void;
+  handleSaveAndSwitch: (
+    nextJobId: string,
+    nextLocation: string
+  ) => AuthActionResult;
   handleSync: () => Promise<void>;
   handleClearAll: () => void;
   handleDeleteLog: (id: string) => void;
@@ -238,6 +244,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
 
   const canBreak = isWorking;
   const canStop = isWorking && !isOnBreak && description.trim() !== "";
+  const canSaveAndSwitch = canStop;
 
   const unsyncedCount = useMemo(
     () => logs.filter((item) => item.syncStatus !== "synced").length,
@@ -377,6 +384,74 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     resetEntryFields();
     void clearSession(currentUser.id);
     setBannerMessage("");
+  }
+
+  function handleSaveAndSwitch(
+    nextJobId: string,
+    nextLocation: string
+  ): AuthActionResult {
+    if (!isWorking || !startTime) {
+      return { ok: false, message: "No active job to save." };
+    }
+
+    if (isOnBreak) {
+      return { ok: false, message: "Resume work before switching jobs." };
+    }
+
+    if (description.trim() === "") {
+      return {
+        ok: false,
+        message: "Add a description before switching jobs.",
+      };
+    }
+
+    if (nextJobId.trim() === "") {
+      return { ok: false, message: "Select the next Job ID." };
+    }
+
+    if (nextLocation.trim() === "") {
+      return { ok: false, message: "Select or enter the next location." };
+    }
+
+    const stopTime = new Date().toISOString();
+    const totalMinutes = minutesBetween(startTime, stopTime);
+    const workedMinutes = Math.max(0, totalMinutes - breakMinutes);
+
+    const logItem: LogItem = {
+      id: makeUuid(),
+      loguId: makeUuid(),
+      ts: new Date(stopTime).getTime(),
+      fullname: currentUser.fullName,
+      jobId,
+      location,
+      role,
+      jobDocs,
+      description,
+      startedAt: startTime,
+      stoppedAt: stopTime,
+      breakMinutes,
+      workedMinutes,
+      syncStatus: "pending",
+      syncMessage: "Waiting to sync",
+      stickyNote: "",
+    };
+
+    const newStartTime = new Date().toISOString();
+
+    setLogs((prev) => [logItem, ...prev]);
+    setJobId(nextJobId.trim());
+    setLocation(nextLocation.trim());
+    setRole(currentUser.role);
+    setJobDocs("");
+    setDescription("");
+    setIsWorking(true);
+    setIsOnBreak(false);
+    setStartTime(newStartTime);
+    setBreakStartTime(null);
+    setBreakMinutes(0);
+    setBannerMessage("");
+
+    return { ok: true, message: "Saved current job and started new job." };
   }
 
   async function syncOneItem(item: LogItem): Promise<number> {
@@ -532,6 +607,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     canStart,
     canBreak,
     canStop,
+    canSaveAndSwitch,
     canClearAll,
     unsyncedCount,
     syncedCount,
@@ -540,6 +616,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     handleStart,
     handleBreak,
     handleStop,
+    handleSaveAndSwitch,
     handleSync,
     handleClearAll,
     handleDeleteLog,

@@ -181,3 +181,144 @@
     font-size: 22px;
   }
 }
+
+.switchBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(1, 10, 9, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.switchModal {
+  width: min(560px, 100%);
+  border-radius: 26px;
+  padding: 20px;
+  background: rgba(17, 48, 45, 0.98);
+  border: 1px solid rgba(178, 223, 220, 0.16);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  color: #eef7f3;
+}
+
+.switchHeader h2 {
+  margin: 0;
+  color: #d9cdc7;
+  font-size: 22px;
+}
+
+.switchHeader p {
+  margin: 8px 0 0;
+  color: rgba(238, 247, 243, 0.68);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.switchMessage {
+  margin-top: 14px;
+  border-radius: 14px;
+  padding: 11px 12px;
+  background: rgba(226, 173, 63, 0.12);
+  border: 1px solid rgba(226, 173, 63, 0.24);
+  color: #fff0c9;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.switchGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.switchField {
+  display: grid;
+  gap: 9px;
+  color: #eef7f3;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.switchInput {
+  width: 100%;
+  min-height: 50px;
+  border-radius: 16px;
+  border: 1px solid rgba(83, 188, 123, 0.16);
+  background: rgba(1, 18, 17, 0.58);
+  color: #eef7f3;
+  outline: none;
+  padding: 0 14px;
+  font: inherit;
+}
+
+.switchInput:focus {
+  border-color: rgba(83, 188, 123, 0.45);
+  box-shadow: 0 0 0 3px rgba(83, 188, 123, 0.14);
+}
+
+.switchLocationButtons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.switchChip {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(178, 223, 220, 0.16);
+  background: rgba(8, 34, 32, 0.82);
+  color: rgba(238, 247, 243, 0.82);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.switchChip:hover {
+  border-color: rgba(83, 188, 123, 0.34);
+  background: rgba(8, 34, 32, 0.96);
+}
+
+.switchActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.switchCancelButton,
+.switchPrimaryButton {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 0;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.switchCancelButton {
+  background: rgba(8, 34, 32, 0.8);
+  color: #eef7f3;
+  border: 1px solid rgba(178, 223, 220, 0.16);
+}
+
+.switchPrimaryButton {
+  background: #53bc7b;
+  color: #072c29;
+}
+
+@media (max-width: 620px) {
+  .switchActions {
+    flex-direction: column-reverse;
+  }
+
+  .switchCancelButton,
+  .switchPrimaryButton {
+    width: 100%;
+  }
+}

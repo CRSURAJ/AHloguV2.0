@@ -136,3 +136,21 @@
 .primaryActions {
   grid-template-columns: 1fr !important;
 }
+
+/* Bottom primary actions: Finish + Save & Switch */
+.primaryActions {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 12px !important;
+}
+
+.switchButton {
+  background: linear-gradient(180deg, #4c8f84 0%, #28665d 100%);
+  color: #eef7f3;
+}
+
+@media (max-width: 620px) {
+  .primaryActions {
+    grid-template-columns: 1fr !important;
+  }
+}

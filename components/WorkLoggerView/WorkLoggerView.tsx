@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import { useState } from "react";
 import { ActionButtons, LogsList, WorkerForm } from "@/components";
 import type { WorkLoggerState } from "@/hooks/useWorkLogger";
 import type { CurrentUser } from "@/types/work";
@@ -19,6 +22,42 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
     : props.isWorking
       ? styles.statusWorking
       : styles.statusReady;
+
+  const [switchOpen, setSwitchOpen] = useState(false);
+  const [switchJobId, setSwitchJobId] = useState("");
+  const [switchLocation, setSwitchLocation] = useState("");
+  const [switchLocationPlaceholder, setSwitchLocationPlaceholder] =
+    useState("Warehouse or Site Address");
+  const [switchMessage, setSwitchMessage] = useState("");
+
+  const selectedSwitchJobMissing =
+    switchJobId.trim() !== "" &&
+    !props.availableJobs.some((job) => job.jobId === switchJobId);
+
+  function openSwitchModal() {
+    setSwitchJobId("");
+    setSwitchLocation("");
+    setSwitchLocationPlaceholder("Warehouse or Site Address");
+    setSwitchMessage("");
+    setSwitchOpen(true);
+  }
+
+  function handleSwitchSiteAddress() {
+    setSwitchLocation("");
+    setSwitchLocationPlaceholder("Enter Site Address Here");
+  }
+
+  function handleSaveAndSwitch() {
+    const result = props.handleSaveAndSwitch(switchJobId, switchLocation);
+
+    if (!result.ok) {
+      setSwitchMessage(result.message);
+      return;
+    }
+
+    setSwitchOpen(false);
+    setSwitchMessage("");
+  }
 
   return (
     <div className={styles.page}>
@@ -98,13 +137,127 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
 
             <ActionButtons
               canStop={props.canStop}
+              canSaveAndSwitch={props.canSaveAndSwitch}
               canClearAll={props.canClearAll}
               unsyncedCount={props.unsyncedCount}
               failedCount={props.failedCount}
               handleStop={props.handleStop}
+              onOpenSaveAndSwitch={openSwitchModal}
               handleSync={props.handleSync}
               handleClearAll={props.handleClearAll}
             />
+
+
+            {switchOpen ? (
+              <div className={styles.switchBackdrop}>
+                <div className={styles.switchModal}>
+                  <div className={styles.switchHeader}>
+                    <h2>Save & Switch Job</h2>
+                    <p>
+                      Save the current job log and immediately start the next job.
+                    </p>
+                  </div>
+
+                  {switchMessage ? (
+                    <div className={styles.switchMessage}>{switchMessage}</div>
+                  ) : null}
+
+                  <div className={styles.switchGrid}>
+                    <label className={styles.switchField}>
+                      Job ID
+
+                      {props.availableJobs.length > 0 ? (
+                        <select
+                          className={styles.switchInput}
+                          value={switchJobId}
+                          onChange={(event) =>
+                            setSwitchJobId(event.target.value)
+                          }
+                        >
+                          <option value="">Select next active job</option>
+
+                          {selectedSwitchJobMissing ? (
+                            <option value={switchJobId}>{switchJobId}</option>
+                          ) : null}
+
+                          {props.availableJobs.map((job) => (
+                            <option key={job.id} value={job.jobId}>
+                              {[job.jobId, job.jobName, job.customerName]
+                                .filter((item) => item.trim() !== "")
+                                .join(" · ")}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          className={styles.switchInput}
+                          value={switchJobId}
+                          onChange={(event) =>
+                            setSwitchJobId(event.target.value)
+                          }
+                          placeholder="Enter next Job ID"
+                        />
+                      )}
+                    </label>
+
+                    <label className={styles.switchField}>
+                      Location
+
+                      <div className={styles.switchLocationButtons}>
+                        <button
+                          type="button"
+                          className={styles.switchChip}
+                          onClick={() => {
+                            setSwitchLocation("Warehouse");
+                            setSwitchLocationPlaceholder(
+                              "Warehouse or Site Address"
+                            );
+                          }}
+                        >
+                          Warehouse
+                        </button>
+
+                        <button
+                          type="button"
+                          className={styles.switchChip}
+                          onClick={handleSwitchSiteAddress}
+                        >
+                          Site Address
+                        </button>
+                      </div>
+
+                      <input
+                        className={styles.switchInput}
+                        value={switchLocation}
+                        onChange={(event) =>
+                          setSwitchLocation(event.target.value)
+                        }
+                        readOnly={switchLocation === "Warehouse"}
+                        placeholder={switchLocationPlaceholder}
+                      />
+                    </label>
+                  </div>
+
+                  <div className={styles.switchActions}>
+                    <button
+                      type="button"
+                      className={styles.switchCancelButton}
+                      onClick={() => setSwitchOpen(false)}
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      className={styles.switchPrimaryButton}
+                      onClick={handleSaveAndSwitch}
+                    >
+                      Start New Job
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             <LogsList
               logs={props.logs}
