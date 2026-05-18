@@ -539,3 +539,17 @@
     width: 100%;
   }
 }
+
+.formGrid {
+  align-items: start;
+}
+
+.formGrid label,
+.drawingsField,
+.docsField {
+  align-self: start;
+}
+
+.formGrid input {
+  height: 46px;
+}
