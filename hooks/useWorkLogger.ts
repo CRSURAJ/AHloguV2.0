@@ -343,7 +343,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       workedMinutes,
       syncStatus: "pending",
       syncMessage: "Waiting to sync",
-      stickNote: "",
+      stickyNote: "",
    };
 
     setLogs((prev) => [logItem, ...prev]);
