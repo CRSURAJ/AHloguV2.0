@@ -182,8 +182,6 @@ export default function WorkerForm({
         </div>
 
         <div className={styles.quickWorkControl}>
-          <div className={styles.quickControlLabel}>Work Control</div>
-
           <div className={styles.quickWorkButtons}>
             <button
               className={`${styles.quickWorkButton} ${styles.quickStartButton}`}

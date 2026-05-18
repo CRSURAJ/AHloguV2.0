@@ -463,3 +463,190 @@ select.input:disabled {
     align-self: stretch;
   }
 }
+
+/* Make quick Start/Break controls cleaner */
+.quickWorkControl {
+  align-self: end !important;
+}
+
+.quickControlLabel {
+  display: none !important;
+}
+
+.quickWorkButtons {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px !important;
+}
+
+.quickWorkButton {
+  min-height: 50px !important;
+  border-radius: 16px !important;
+  font-size: 0.95rem !important;
+}
+
+.fieldGrid {
+  row-gap: 16px !important;
+}
+
+/* More breathing room between worker form fields */
+.fieldGrid {
+  column-gap: 22px !important;
+  row-gap: 26px !important;
+  margin-top: 8px;
+  margin-bottom: 22px;
+}
+
+.field {
+  gap: 12px !important;
+}
+
+.label {
+  margin-bottom: 2px;
+}
+
+.locationHeader {
+  margin-bottom: 4px;
+}
+
+.locationActions {
+  gap: 10px !important;
+}
+
+.quickWorkControl {
+  padding-top: 24px;
+}
+
+.quickWorkButtons {
+  gap: 12px !important;
+}
+
+.textareaWrap {
+  margin-top: 4px;
+}
+
+@media (max-width: 620px) {
+  .fieldGrid {
+    row-gap: 22px !important;
+  }
+
+  .quickWorkControl {
+    padding-top: 0;
+  }
+}
+
+/* Make Start / Break fit cleanly in the right-side field space */
+.quickWorkControl {
+  width: 100% !important;
+  align-self: end !important;
+  padding-top: 0 !important;
+}
+
+.quickWorkButtons {
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: 12px !important;
+}
+
+.quickWorkButton {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 50px !important;
+  height: 50px !important;
+  padding: 0 12px !important;
+  border-radius: 16px !important;
+  display: grid !important;
+  place-items: center !important;
+  font-size: 0.95rem !important;
+  line-height: 1 !important;
+}
+
+/* Keep the Location input and action buttons visually aligned */
+#location {
+  min-height: 50px !important;
+  height: 50px !important;
+}
+
+@media (max-width: 620px) {
+  .quickWorkButtons {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+/* Make Start / Break fill the Location row height */
+.quickWorkControl {
+  align-self: stretch !important;
+  display: flex !important;
+  align-items: stretch !important;
+  padding-top: 0 !important;
+}
+
+.quickWorkButtons {
+  width: 100% !important;
+  height: 100% !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 12px !important;
+  align-items: stretch !important;
+}
+
+.quickWorkButton {
+  height: 100% !important;
+  min-height: 102px !important;
+  border-radius: 18px !important;
+  font-size: 1rem !important;
+  font-weight: 900 !important;
+}
+
+/* Final correction: normal Start / Break buttons beside Location */
+.quickWorkControl {
+  align-self: end !important;
+  display: grid !important;
+  padding-top: 0 !important;
+  height: auto !important;
+}
+
+.quickWorkButtons {
+  width: 100% !important;
+  height: auto !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 12px !important;
+  align-items: end !important;
+}
+
+.quickWorkButton {
+  width: 100% !important;
+  min-height: 50px !important;
+  height: 50px !important;
+  padding: 0 12px !important;
+  border-radius: 16px !important;
+  font-size: 0.95rem !important;
+  font-weight: 900 !important;
+}
+
+/* Make Start / Break fill the Location row height */
+.quickWorkControl {
+  align-self: stretch !important;
+  display: flex !important;
+  align-items: stretch !important;
+  padding-top: 0 !important;
+}
+
+.quickWorkButtons {
+  width: 100% !important;
+  height: 100% !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 12px !important;
+  align-items: stretch !important;
+}
+
+.quickWorkButton {
+  height: 100% !important;
+  min-height: 102px !important;
+  border-radius: 18px !important;
+  font-size: 1rem !important;
+  font-weight: 900 !important;
+}
