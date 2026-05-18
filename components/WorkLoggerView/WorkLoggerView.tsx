@@ -81,6 +81,7 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
             <WorkerForm
               jobId={props.jobId}
               setJobId={props.setJobId}
+              availableJobs={props.availableJobs}
               role={props.role}
               setRole={props.setRole}
               location={props.location}

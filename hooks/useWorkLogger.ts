@@ -13,11 +13,13 @@ import {
   saveLogs,
   saveSession,
 } from "@/lib/workStorage";
+import { getJobsForRole } from "@/lib/jobStorage";
 import { getWorkingStatusText, minutesBetween } from "@/lib/workUtils";
 import type {
   ActiveSession,
   CurrentUser,
   DraftState,
+  Job,
   LogItem,
   SyncStatus,
 } from "@/types/work";
@@ -28,6 +30,7 @@ export type WorkLoggerState = {
   currentUserFullName: string;
   jobId: string;
   setJobId: Dispatch<SetStateAction<string>>;
+  availableJobs: Job[];
   location: string;
   setLocation: Dispatch<SetStateAction<string>>;
   role: string;
@@ -71,6 +74,7 @@ function makeUuid(): string {
 
 export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
   const [jobId, setJobId] = useState("");
+  const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
   const [location, setLocation] = useState("");
   const [role, setRole] = useState<string>(currentUser.role);
   const [jobDocs, setJobDocs] = useState("");
@@ -130,6 +134,24 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       cancelled = true;
     };
   }, [currentUser.id, currentUser.role]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrateAvailableJobs() {
+      const jobs = await getJobsForRole(currentUser.role);
+
+      if (cancelled) return;
+
+      setAvailableJobs(jobs);
+    }
+
+    void hydrateAvailableJobs();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser.role]);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -492,6 +514,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     currentUserFullName: currentUser.fullName,
     jobId,
     setJobId,
+    availableJobs,
     location,
     setLocation,
     role,
