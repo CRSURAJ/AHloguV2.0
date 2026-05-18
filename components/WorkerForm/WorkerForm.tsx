@@ -25,9 +25,10 @@ type WorkerFormProps = {
 
 const DEFAULT_LOCATION_PLACEHOLDER = "Warehouse or Site Address";
 const SITE_ADDRESS_PLACEHOLDER = "Enter Site Address Here";
+const CUSTOM_JOB_OPTION = "__custom_job__";
 
 function getJobOptionLabel(job: Job): string {
-  const parts = [job.jobId, job.jobName, job.customerName].filter(
+  const parts = [job.jobId, job.jobName].filter(
     (part) => part.trim() !== ""
   );
 
@@ -54,15 +55,18 @@ export default function WorkerForm({
   const [locationPlaceholder, setLocationPlaceholder] = useState(
     DEFAULT_LOCATION_PLACEHOLDER
   );
+  const [customJobMode, setCustomJobMode] = useState(false);
 
   const descriptionDisabled = !isWorking || isOnBreak;
   const hasAvailableJobs = availableJobs.length > 0;
+  const selectedJobIsAssigned = availableJobs.some((job) => job.jobId === jobId);
+  const showCustomJobInput =
+    hasAvailableJobs &&
+    (customJobMode || (jobId.trim() !== "" && !selectedJobIsAssigned));
+  const jobSelectValue = showCustomJobInput ? CUSTOM_JOB_OPTION : jobId;
   const isWarehouseSelected = location === "Warehouse";
   const isSiteAddressMode =
     locationPlaceholder === SITE_ADDRESS_PLACEHOLDER && !isWarehouseSelected;
-
-  const selectedJobMissing =
-    jobId.trim() !== "" && !availableJobs.some((job) => job.jobId === jobId);
 
   function handleWarehouseClick(): void {
     setLocation("Warehouse");
@@ -83,25 +87,45 @@ export default function WorkerForm({
           </label>
 
           {hasAvailableJobs ? (
-            <select
-              id="jobId"
-              className={styles.input}
-              value={jobId}
-              onChange={(event) => setJobId(event.target.value)}
-              disabled={isWorking}
-            >
-              <option value="">Select active job</option>
+            <>
+              <select
+                id="jobId"
+                className={styles.input}
+                value={jobSelectValue}
+                onChange={(event) => {
+                  if (event.target.value === CUSTOM_JOB_OPTION) {
+                    setCustomJobMode(true);
+                    setJobId("");
+                    return;
+                  }
 
-              {selectedJobMissing ? (
-                <option value={jobId}>{jobId} (saved draft)</option>
+                  setCustomJobMode(false);
+                  setJobId(event.target.value);
+                }}
+                disabled={isWorking}
+              >
+                <option value="">Select active job</option>
+
+                {availableJobs.map((job) => (
+                  <option key={job.id} value={job.jobId}>
+                    {getJobOptionLabel(job)}
+                  </option>
+                ))}
+
+                <option value={CUSTOM_JOB_OPTION}>Custom Job</option>
+              </select>
+
+              {showCustomJobInput ? (
+                <input
+                  className={styles.input}
+                  type="text"
+                  value={jobId}
+                  onChange={(event) => setJobId(event.target.value)}
+                  disabled={isWorking}
+                  placeholder="Enter custom Job ID"
+                />
               ) : null}
-
-              {availableJobs.map((job) => (
-                <option key={job.id} value={job.jobId}>
-                  {getJobOptionLabel(job)}
-                </option>
-              ))}
-            </select>
+            </>
           ) : (
             <>
               <input

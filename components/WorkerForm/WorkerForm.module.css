@@ -695,3 +695,7 @@ select.input:disabled {
   opacity: 0.72;
   cursor: not-allowed;
 }
+
+#jobId + .input {
+  margin-top: 10px;
+}
