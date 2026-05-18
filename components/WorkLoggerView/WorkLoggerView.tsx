@@ -7,6 +7,8 @@ import type { WorkLoggerState } from "@/hooks/useWorkLogger";
 import type { CurrentUser } from "@/types/work";
 import styles from "./WorkLoggerView.module.css";
 
+const CUSTOM_SWITCH_JOB_OPTION = "__custom_switch_job__";
+
 type WorkLoggerViewProps = WorkLoggerState & {
   currentUser: CurrentUser;
   onSignOut: () => void;
@@ -25,17 +27,26 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
 
   const [switchOpen, setSwitchOpen] = useState(false);
   const [switchJobId, setSwitchJobId] = useState("");
+  const [switchCustomJobMode, setSwitchCustomJobMode] = useState(false);
   const [switchLocation, setSwitchLocation] = useState("");
   const [switchLocationPlaceholder, setSwitchLocationPlaceholder] =
     useState("Warehouse or Site Address");
   const [switchMessage, setSwitchMessage] = useState("");
 
-  const selectedSwitchJobMissing =
-    switchJobId.trim() !== "" &&
-    !props.availableJobs.some((job) => job.jobId === switchJobId);
+  const selectedSwitchJobIsAssigned = props.availableJobs.some(
+    (job) => job.jobId === switchJobId
+  );
+  const showSwitchCustomJobInput =
+    props.availableJobs.length > 0 &&
+    (switchCustomJobMode ||
+      (switchJobId.trim() !== "" && !selectedSwitchJobIsAssigned));
+  const switchJobSelectValue = showSwitchCustomJobInput
+    ? CUSTOM_SWITCH_JOB_OPTION
+    : switchJobId;
 
   function openSwitchModal() {
     setSwitchJobId("");
+    setSwitchCustomJobMode(false);
     setSwitchLocation("");
     setSwitchLocationPlaceholder("Warehouse or Site Address");
     setSwitchMessage("");
@@ -167,27 +178,49 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
                       Job ID
 
                       {props.availableJobs.length > 0 ? (
-                        <select
-                          className={styles.switchInput}
-                          value={switchJobId}
-                          onChange={(event) =>
-                            setSwitchJobId(event.target.value)
-                          }
-                        >
-                          <option value="">Select next active job</option>
+                        <>
+                          <select
+                            className={styles.switchInput}
+                            value={switchJobSelectValue}
+                            onChange={(event) => {
+                              if (
+                                event.target.value === CUSTOM_SWITCH_JOB_OPTION
+                              ) {
+                                setSwitchCustomJobMode(true);
+                                setSwitchJobId("");
+                                return;
+                              }
 
-                          {selectedSwitchJobMissing ? (
-                            <option value={switchJobId}>{switchJobId}</option>
-                          ) : null}
+                              setSwitchCustomJobMode(false);
+                              setSwitchJobId(event.target.value);
+                            }}
+                          >
+                            <option value="">Select next active job</option>
 
-                          {props.availableJobs.map((job) => (
-                            <option key={job.id} value={job.jobId}>
-                              {[job.jobId, job.jobName, job.customerName]
-                                .filter((item) => item.trim() !== "")
-                                .join(" · ")}
+                            {props.availableJobs.map((job) => (
+                              <option key={job.id} value={job.jobId}>
+                                {[job.jobId, job.jobName]
+                                  .filter((item) => item.trim() !== "")
+                                  .join(" · ")}
+                              </option>
+                            ))}
+
+                            <option value={CUSTOM_SWITCH_JOB_OPTION}>
+                              Custom Job
                             </option>
-                          ))}
-                        </select>
+                          </select>
+
+                          {showSwitchCustomJobInput ? (
+                            <input
+                              className={styles.switchInput}
+                              value={switchJobId}
+                              onChange={(event) =>
+                                setSwitchJobId(event.target.value)
+                              }
+                              placeholder="Enter custom Job ID"
+                            />
+                          ) : null}
+                        </>
                       ) : (
                         <input
                           className={styles.switchInput}
