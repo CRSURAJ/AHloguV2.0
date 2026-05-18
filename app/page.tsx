@@ -5,6 +5,7 @@ import AdminDashboard from "@/components/AdminDashboard";
 import LoginScreen from "@/components/LoginScreen/LoginScreen";
 import SecurityPanel from "@/components/SecurityPanel/SecurityPanel";
 import UserManagementPanel from "@/components/UserManagementPanel/UserManagementPanel";
+import JobManagementPanel from "@/components/JobManagementPanel/JobManagementPanel";
 import WorkLogger from "@/components/WorkLogger/WorkLogger";
 import { useLocalAuth } from "@/hooks/useLocalAuth";
 
@@ -12,6 +13,7 @@ export default function Page() {
   const auth = useLocalAuth();
   const [securityRequested, setSecurityRequested] = useState(false);
   const [userManagementOpen, setUserManagementOpen] = useState(false);
+  const [jobManagementOpen, setJobManagementOpen] = useState(false);
 
   const securityForced = auth.currentUser?.mustChangeCredential === true;
 
@@ -64,6 +66,8 @@ export default function Page() {
           securityLabel={auth.securityLabel}
           onOpenSecurity={() => setSecurityRequested(true)}
           onOpenUserManagement={() => setUserManagementOpen(true)}
+
+          onOpenJobManagement={() => setJobManagementOpen(true)}
           onSignOut={auth.handleSignOut}
         />
 
@@ -110,6 +114,11 @@ export default function Page() {
           onSubmit={auth.handleChangeOwnCredential}
         />
       ) : null}
+
+      {jobManagementOpen ? (
+        <JobManagementPanel onClose={() => setJobManagementOpen(false)} />
+      ) : null}
+
     </>
   );
 }

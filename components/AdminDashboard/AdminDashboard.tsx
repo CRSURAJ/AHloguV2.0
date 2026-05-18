@@ -11,6 +11,7 @@ type AdminDashboardProps = {
   securityLabel: string;
   onOpenSecurity: () => void;
   onOpenUserManagement: () => void;
+  onOpenJobManagement: () => void;
   onSignOut: () => void;
 };
 
@@ -52,6 +53,7 @@ export default function AdminDashboard({
   securityLabel,
   onOpenSecurity,
   onOpenUserManagement,
+  onOpenJobManagement,
   onSignOut,
 }: AdminDashboardProps) {
   return (
@@ -131,8 +133,8 @@ export default function AdminDashboard({
                 <span className={styles.actionArrow}>→</span>
               </button>
 
-              <button type="button" className={styles.actionCardMuted} disabled>
-                <span className={styles.iconBoxMuted}>
+              <button type="button" className={styles.actionCard} onClick={onOpenJobManagement}>
+                <span className={styles.iconBox}>
                   <JobIcon />
                 </span>
 
@@ -143,7 +145,7 @@ export default function AdminDashboard({
                   </span>
                 </span>
 
-                <span className={styles.badge}>Next</span>
+                <span className={styles.actionArrow}>→</span>
               </button>
 
               <button type="button" className={styles.actionCardMuted} disabled>
