@@ -12,11 +12,12 @@ export type CreateJobInput = {
   location: string;
   description: string;
   assignedRoles: WorkerRole[];
+  jobDrawings?: Job["jobDrawings"];
   isActive?: boolean;
 };
 
 export type UpdateJobInput = Partial<CreateJobInput> & {
-  jobDocs?: Job["jobDocs"];
+  jobDrawings?: Job["jobDrawings"];
 };
 
 const VALID_WORKER_ROLES = new Set<WorkerRole>(
@@ -81,7 +82,11 @@ function normalizeJob(value: unknown, index: number): Job | null {
     location: cleanString(item.location),
     description: cleanString(item.description),
     assignedRoles: cleanAssignedRoles(item.assignedRoles),
-    jobDocs: Array.isArray(item.jobDocs) ? item.jobDocs : [],
+    jobDrawings: Array.isArray((item as { jobDrawings?: unknown }).jobDrawings)
+      ? (item as { jobDrawings: Job["jobDrawings"] }).jobDrawings
+      : Array.isArray((item as { jobDocs?: unknown }).jobDocs)
+        ? (item as { jobDocs: Job["jobDrawings"] }).jobDocs
+        : [],
     isActive: typeof item.isActive === "boolean" ? item.isActive : true,
     createdAt,
     updatedAt,
@@ -122,7 +127,7 @@ export async function createJob(input: CreateJobInput): Promise<Job> {
     location: input.location.trim(),
     description: input.description.trim(),
     assignedRoles: cleanAssignedRoles(input.assignedRoles),
-    jobDocs: [],
+    jobDrawings: input.jobDrawings ?? [],
     isActive: input.isActive ?? true,
     createdAt: now,
     updatedAt: now,
@@ -154,7 +159,7 @@ export async function updateJob(
     assignedRoles: updates.assignedRoles
       ? cleanAssignedRoles(updates.assignedRoles)
       : existingJob.assignedRoles,
-    jobDocs: updates.jobDocs ?? existingJob.jobDocs,
+    jobDrawings: updates.jobDrawings ?? existingJob.jobDrawings,
     isActive: updates.isActive ?? existingJob.isActive,
     updatedAt: new Date().toISOString(),
   };

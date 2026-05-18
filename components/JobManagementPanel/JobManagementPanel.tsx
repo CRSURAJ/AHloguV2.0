@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { useJobs } from "@/hooks/useJobs";
 import { WORKER_ROLE_OPTIONS } from "@/types/work";
-import type { Job, WorkerRole } from "@/types/work";
+import type { Job, JobDrawing, WorkerRole } from "@/types/work";
 
 import styles from "./JobManagementPanel.module.css";
 
@@ -21,7 +21,7 @@ type JobFormState = {
   location: string;
   description: string;
   assignedRoles: WorkerRole[];
-  jobDocs: Job["jobDocs"];
+  jobDrawings: Job["jobDrawings"];
   isActive: boolean;
 };
 
@@ -34,9 +34,57 @@ const EMPTY_FORM: JobFormState = {
   location: "",
   description: "",
   assignedRoles: [],
-  jobDocs: [],
+  jobDrawings: [],
   isActive: true,
 };
+
+const MAX_JOB_DRAWINGS = 5;
+const MAX_JOB_DRAWING_SIZE_BYTES = 2 * 1024 * 1024;
+
+function makeClientId(prefix: string): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function formatBytes(sizeBytes: number): string {
+  if (sizeBytes < 1024) return `${sizeBytes} B`;
+
+  const sizeKb = sizeBytes / 1024;
+  if (sizeKb < 1024) return `${sizeKb.toFixed(1)} KB`;
+
+  return `${(sizeKb / 1024).toFixed(1)} MB`;
+}
+
+function readJobDrawingFile(file: File): Promise<JobDrawing> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.addEventListener("load", () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("Could not read file."));
+        return;
+      }
+
+      resolve({
+        id: makeClientId("job-doc"),
+        fileName: file.name,
+        fileData: reader.result,
+        mimeType: file.type || "application/octet-stream",
+        sizeBytes: file.size,
+        uploadedAt: new Date().toISOString(),
+      });
+    });
+
+    reader.addEventListener("error", () => {
+      reject(new Error("Could not read file."));
+    });
+
+    reader.readAsDataURL(file);
+  });
+}
 
 function getRoleLabel(role: WorkerRole): string {
   return WORKER_ROLE_OPTIONS.find((item) => item.value === role)?.label ?? role;
@@ -68,6 +116,7 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
 
   const [form, setForm] = useState<JobFormState>(EMPTY_FORM);
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
+  const [jobDrawingMessage, setJobDrawingMessage] = useState("");
 
   const sortedJobs = useMemo(
     () =>
@@ -89,6 +138,8 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
     }));
 
     if (jobMessage) clearJobMessage();
+    if (jobDrawingMessage) setJobDrawingMessage("");
+    if (jobDrawingMessage) setJobDrawingMessage("");
   }
 
   function toggleRole(role: WorkerRole): void {
@@ -104,11 +155,14 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
     });
 
     if (jobMessage) clearJobMessage();
+    if (jobDrawingMessage) setJobDrawingMessage("");
+    if (jobDrawingMessage) setJobDrawingMessage("");
   }
 
   function resetForm(): void {
     setForm(EMPTY_FORM);
     setEditingJobId(null);
+    setJobDrawingMessage("");
   }
 
   function startEdit(job: Job): void {
@@ -122,11 +176,62 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
       location: job.location,
       description: job.description,
       assignedRoles: job.assignedRoles,
-      jobDocs: job.jobDocs,
+      jobDrawings: job.jobDrawings,
       isActive: job.isActive,
     });
 
     if (jobMessage) clearJobMessage();
+    if (jobDrawingMessage) setJobDrawingMessage("");
+    if (jobDrawingMessage) setJobDrawingMessage("");
+  }
+
+  async function handleJobDrawingsUpload(files: FileList | null): Promise<void> {
+    if (!files || files.length === 0) return;
+
+    const selectedFiles = Array.from(files);
+    const remainingSlots = MAX_JOB_DRAWINGS - form.jobDrawings.length;
+
+    if (remainingSlots <= 0) {
+      setJobDrawingMessage(`Maximum ${MAX_JOB_DRAWINGS} job drawings can be attached to one job.`);
+      return;
+    }
+
+    const acceptedFiles = selectedFiles
+      .filter((file) => file.size <= MAX_JOB_DRAWING_SIZE_BYTES)
+      .slice(0, remainingSlots);
+
+    if (acceptedFiles.length === 0) {
+      setJobDrawingMessage(
+        `No files added. Each job drawing must be ${formatBytes(
+          MAX_JOB_DRAWING_SIZE_BYTES
+        )} or smaller.`
+      );
+      return;
+    }
+
+    const newDocs = await Promise.all(acceptedFiles.map(readJobDrawingFile));
+
+    setForm((current) => ({
+      ...current,
+      jobDrawings: [...current.jobDrawings, ...newDocs],
+    }));
+
+    const rejectedCount = selectedFiles.length - acceptedFiles.length;
+
+    setJobDrawingMessage(
+      rejectedCount > 0
+        ? `Added ${newDocs.length} job drawing(s). ${rejectedCount} file(s) were skipped due to size/count limit.`
+        : `Added ${newDocs.length} job drawing(s).`
+    );
+  }
+
+  function removeJobDrawing(docId: string): void {
+    setForm((current) => ({
+      ...current,
+      jobDrawings: current.jobDrawings.filter((doc) => doc.id !== docId),
+    }));
+
+    setJobDrawingMessage("");
   }
 
   async function handleSubmit(): Promise<void> {
@@ -190,6 +295,7 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
         </div>
 
         {jobMessage ? <p className={styles.message}>{jobMessage}</p> : null}
+        {jobDrawingMessage ? <p className={styles.message}>{jobDrawingMessage}</p> : null}
 
         <div className={styles.card}>
           <div className={styles.cardHeader}>
@@ -249,19 +355,48 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
               />
             </label>
 
-            <label>
-              Job Docs
-              <input
-                value={
-                  form.jobDocs.length === 0
-                    ? "No documents attached yet"
-                    : `${form.jobDocs.length} document(s) attached`
-                }
-                disabled
-                readOnly
-              />
-            </label>
+            <div className={styles.docsField}>
+              <span className={styles.docsLabel}>Job Drawings</span>
+
+              <label className={styles.fileUploadBox}>
+                <input
+                  className={styles.fileInput}
+                  type="file"
+                  multiple
+                  onChange={(event) => {
+                    void handleJobDrawingsUpload(event.currentTarget.files);
+                    event.currentTarget.value = "";
+                  }}
+                />
+                <span>Upload job drawings</span>
+              </label>
+
+              <span className={styles.docsHelp}>
+                Max {MAX_JOB_DRAWINGS} files, {formatBytes(MAX_JOB_DRAWING_SIZE_BYTES)} each.
+              </span>
+            </div>
           </div>
+
+          {form.jobDrawings.length > 0 ? (
+            <div className={styles.docList}>
+              {form.jobDrawings.map((doc) => (
+                <div className={styles.docItem} key={doc.id}>
+                  <div className={styles.docInfo}>
+                    <span className={styles.docName}>{doc.fileName}</span>
+                    <span className={styles.docSize}>{formatBytes(doc.sizeBytes)}</span>
+                  </div>
+
+                  <button
+                    className={styles.removeDocButton}
+                    type="button"
+                    onClick={() => removeJobDrawing(doc.id)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           <label className={styles.fullWidthLabel}>
             Description / Notes
@@ -348,9 +483,9 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
 
                 <p className={styles.jobMeta}>
                   {job.customerName || "No customer / site"} ·{" "}
-                  {job.jobDocs.length === 0
-                    ? "No job docs"
-                    : `${job.jobDocs.length} job doc(s)`}
+                  {job.jobDrawings.length === 0
+                    ? "No job drawings"
+                    : `${job.jobDrawings.length} job doc(s)`}
                 </p>
 
                 <p className={styles.jobRoles}>
@@ -359,6 +494,25 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
 
                 {job.description ? (
                   <p className={styles.jobDescription}>{job.description}</p>
+                ) : null}
+
+                {job.jobDrawings.length > 0 ? (
+                  <div className={styles.savedDocs}>
+                    <p className={styles.savedDocsTitle}>Job Drawings</p>
+
+                    <div className={styles.savedDocsList}>
+                      {job.jobDrawings.map((doc) => (
+                        <a
+                          className={styles.savedDocLink}
+                          href={doc.fileData}
+                          download={doc.fileName}
+                          key={doc.id}
+                        >
+                          {doc.fileName} · {formatBytes(doc.sizeBytes)}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
                 ) : null}
 
                 <div className={styles.jobActions}>

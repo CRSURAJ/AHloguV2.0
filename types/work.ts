@@ -112,7 +112,7 @@ export type LogItem = {
   syncedAt?: number;
 };
 
-export type JobDoc = {
+export type JobDrawing = {
   id: string;
   fileName: string;
   fileData: string;
@@ -131,7 +131,7 @@ export type Job = {
   location: string;
   description: string;
   assignedRoles: WorkerRole[];
-  jobDocs: JobDoc[];
+  jobDrawings: JobDrawing[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
