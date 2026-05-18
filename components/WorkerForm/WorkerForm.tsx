@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+
 import type { Job } from "@/types/work";
 import styles from "./WorkerForm.module.css";
 
@@ -16,6 +17,10 @@ type WorkerFormProps = {
   setDescription: (value: string) => void;
   isWorking: boolean;
   isOnBreak: boolean;
+  canStart: boolean;
+  canBreak: boolean;
+  handleStart: () => void;
+  handleBreak: () => void;
 };
 
 const DEFAULT_LOCATION_PLACEHOLDER = "Warehouse or Site Address";
@@ -41,6 +46,10 @@ export default function WorkerForm({
   setDescription,
   isWorking,
   isOnBreak,
+  canStart,
+  canBreak,
+  handleStart,
+  handleBreak,
 }: WorkerFormProps) {
   const [locationPlaceholder, setLocationPlaceholder] = useState(
     DEFAULT_LOCATION_PLACEHOLDER
@@ -51,8 +60,14 @@ export default function WorkerForm({
   const isWarehouseSelected = location === "Warehouse";
   const isSiteAddressMode =
     locationPlaceholder === SITE_ADDRESS_PLACEHOLDER && !isWarehouseSelected;
+
   const selectedJobMissing =
     jobId.trim() !== "" && !availableJobs.some((job) => job.jobId === jobId);
+
+  function handleWarehouseClick(): void {
+    setLocation("Warehouse");
+    setLocationPlaceholder(DEFAULT_LOCATION_PLACEHOLDER);
+  }
 
   function handleSiteAddressClick(): void {
     setLocation("");
@@ -131,19 +146,20 @@ export default function WorkerForm({
 
             <div className={styles.locationActions}>
               <button
-                className={styles.locationChip}
+                className={`${styles.locationChip} ${
+                  isWarehouseSelected ? styles.locationChipActive : ""
+                }`}
                 type="button"
-                onClick={() => {
-                  setLocation("Warehouse");
-                  setLocationPlaceholder(DEFAULT_LOCATION_PLACEHOLDER);
-                }}
+                onClick={handleWarehouseClick}
                 disabled={isWorking}
               >
                 Warehouse
               </button>
 
               <button
-                className={styles.locationChip}
+                className={`${styles.locationChip} ${
+                  isSiteAddressMode ? styles.locationChipActive : ""
+                }`}
                 type="button"
                 onClick={handleSiteAddressClick}
                 disabled={isWorking}
@@ -158,15 +174,38 @@ export default function WorkerForm({
             className={styles.input}
             type="text"
             value={location}
-            onChange={(event) => {
-              setLocation(event.target.value);
-            }}
+            onChange={(event) => setLocation(event.target.value)}
             disabled={isWorking}
             readOnly={isWarehouseSelected}
             placeholder={locationPlaceholder}
           />
         </div>
 
+        <div className={styles.quickWorkControl}>
+          <div className={styles.quickControlLabel}>Work Control</div>
+
+          <div className={styles.quickWorkButtons}>
+            <button
+              className={`${styles.quickWorkButton} ${styles.quickStartButton}`}
+              type="button"
+              onClick={handleStart}
+              disabled={!canStart}
+            >
+              Start
+            </button>
+
+            <button
+              className={`${styles.quickWorkButton} ${
+                isOnBreak ? styles.quickResumeButton : styles.quickBreakButton
+              }`}
+              type="button"
+              onClick={handleBreak}
+              disabled={!canBreak}
+            >
+              {isOnBreak ? "Resume" : "Break"}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className={styles.field}>

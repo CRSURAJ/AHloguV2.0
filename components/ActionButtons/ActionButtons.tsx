@@ -1,30 +1,20 @@
 import styles from "./ActionButtons.module.css";
 
 type ActionButtonsProps = {
-  isOnBreak: boolean;
-  canStart: boolean;
-  canBreak: boolean;
   canStop: boolean;
   canClearAll: boolean;
   unsyncedCount: number;
   failedCount: number;
-  handleStart: () => void;
-  handleBreak: () => void;
   handleStop: () => void;
   handleSync: () => void | Promise<void>;
   handleClearAll: () => void;
 };
 
 export default function ActionButtons({
-  isOnBreak,
-  canStart,
-  canBreak,
   canStop,
   canClearAll,
   unsyncedCount,
   failedCount,
-  handleStart,
-  handleBreak,
   handleStop,
   handleSync,
   handleClearAll,
@@ -50,31 +40,11 @@ export default function ActionButtons({
       <div className={styles.primaryActions}>
         <button
           type="button"
-          className={`${styles.actionButton} ${styles.startButton}`}
-          onClick={handleStart}
-          disabled={!canStart}
-        >
-          Start
-        </button>
-
-        <button
-          type="button"
-          className={`${styles.actionButton} ${
-            isOnBreak ? styles.resumeButton : styles.breakButton
-          }`}
-          onClick={handleBreak}
-          disabled={!canBreak}
-        >
-          {isOnBreak ? "Resume" : "Break"}
-        </button>
-
-        <button
-          type="button"
           className={`${styles.actionButton} ${styles.finishButton}`}
           onClick={handleStop}
           disabled={!canStop}
         >
-          Finish
+          Finish Job
         </button>
       </div>
 

@@ -90,18 +90,17 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
               setDescription={props.setDescription}
               isWorking={props.isWorking}
               isOnBreak={props.isOnBreak}
+              canStart={props.canStart}
+              canBreak={props.canBreak}
+              handleStart={props.handleStart}
+              handleBreak={props.handleBreak}
             />
 
             <ActionButtons
-              isOnBreak={props.isOnBreak}
-              canStart={props.canStart}
-              canBreak={props.canBreak}
               canStop={props.canStop}
               canClearAll={props.canClearAll}
               unsyncedCount={props.unsyncedCount}
               failedCount={props.failedCount}
-              handleStart={props.handleStart}
-              handleBreak={props.handleBreak}
               handleStop={props.handleStop}
               handleSync={props.handleSync}
               handleClearAll={props.handleClearAll}

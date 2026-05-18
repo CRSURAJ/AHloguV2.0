@@ -131,3 +131,8 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Finish remains at the bottom. Start/Break moved beside Location. */
+.primaryActions {
+  grid-template-columns: 1fr !important;
+}

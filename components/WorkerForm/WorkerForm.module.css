@@ -389,3 +389,77 @@ select.input:disabled {
   cursor: default;
   color: rgba(238, 247, 243, 0.82);
 }
+
+/* Job ID + Job Docs, Location + Start/Break */
+.fieldGrid {
+  grid-template-columns: 1fr 1fr !important;
+  gap: 18px !important;
+  align-items: start !important;
+}
+
+.quickWorkControl {
+  align-self: end;
+  display: grid;
+  gap: 8px;
+}
+
+.quickControlLabel {
+  color: rgba(238, 247, 243, 0.72);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.quickWorkButtons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.quickWorkButton {
+  min-height: 58px;
+  border-radius: 18px;
+  border: 1px solid rgba(154, 200, 184, 0.14);
+  font-size: 1rem;
+  font-weight: 900;
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    filter 0.16s ease,
+    opacity 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.quickWorkButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+.quickWorkButton:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.quickStartButton {
+  background: linear-gradient(180deg, #4fb985 0%, #2e7e65 100%);
+  color: #082019;
+}
+
+.quickBreakButton {
+  background: linear-gradient(180deg, #d6aa49 0%, #9a6a1d 100%);
+  color: #1c1406;
+}
+
+.quickResumeButton {
+  background: linear-gradient(180deg, #7ee0c0 0%, #3c9f82 100%);
+  color: #062019;
+}
+
+@media (max-width: 620px) {
+  .fieldGrid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .quickWorkControl {
+    align-self: stretch;
+  }
+}
