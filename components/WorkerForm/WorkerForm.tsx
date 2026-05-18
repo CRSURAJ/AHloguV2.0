@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Job } from "@/types/work";
 import styles from "./WorkerForm.module.css";
 
@@ -17,7 +18,8 @@ type WorkerFormProps = {
   isOnBreak: boolean;
 };
 
-const SITE_ADDRESS_PREFIX = "Site Address: ";
+const DEFAULT_LOCATION_PLACEHOLDER = "Warehouse or Site Address";
+const SITE_ADDRESS_PLACEHOLDER = "Enter Site Address Here";
 
 function getJobOptionLabel(job: Job): string {
   const parts = [job.jobId, job.jobName, job.customerName].filter(
@@ -40,15 +42,21 @@ export default function WorkerForm({
   isWorking,
   isOnBreak,
 }: WorkerFormProps) {
+  const [locationPlaceholder, setLocationPlaceholder] = useState(
+    DEFAULT_LOCATION_PLACEHOLDER
+  );
+
   const descriptionDisabled = !isWorking || isOnBreak;
   const hasAvailableJobs = availableJobs.length > 0;
+  const isWarehouseSelected = location === "Warehouse";
+  const isSiteAddressMode =
+    locationPlaceholder === SITE_ADDRESS_PLACEHOLDER && !isWarehouseSelected;
   const selectedJobMissing =
     jobId.trim() !== "" && !availableJobs.some((job) => job.jobId === jobId);
 
   function handleSiteAddressClick(): void {
-    if (location.startsWith(SITE_ADDRESS_PREFIX)) return;
-
-    setLocation(SITE_ADDRESS_PREFIX);
+    setLocation("");
+    setLocationPlaceholder(SITE_ADDRESS_PLACEHOLDER);
   }
 
   return (
@@ -125,7 +133,10 @@ export default function WorkerForm({
               <button
                 className={styles.locationChip}
                 type="button"
-                onClick={() => setLocation("Warehouse")}
+                onClick={() => {
+                  setLocation("Warehouse");
+                  setLocationPlaceholder(DEFAULT_LOCATION_PLACEHOLDER);
+                }}
                 disabled={isWorking}
               >
                 Warehouse
@@ -147,9 +158,12 @@ export default function WorkerForm({
             className={styles.input}
             type="text"
             value={location}
-            onChange={(event) => setLocation(event.target.value)}
+            onChange={(event) => {
+              setLocation(event.target.value);
+            }}
             disabled={isWorking}
-            placeholder="Warehouse or Site Address"
+            readOnly={isWarehouseSelected}
+            placeholder={locationPlaceholder}
           />
         </div>
 

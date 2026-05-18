@@ -347,3 +347,45 @@ select.input:disabled {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* Keep Location half-width for future action buttons beside it */
+.fieldGrid {
+  grid-template-columns: 1fr 1fr !important;
+}
+
+.fieldGrid > .field:nth-child(3) {
+  grid-column: auto !important;
+}
+
+@media (max-width: 620px) {
+  .fieldGrid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .fieldGrid > .field:nth-child(3) {
+    grid-column: auto !important;
+  }
+}
+
+/* Location quick buttons - less confusing default state */
+.locationChip {
+  border-color: rgba(178, 223, 220, 0.16) !important;
+  background: rgba(8, 34, 32, 0.82) !important;
+  color: rgba(238, 247, 243, 0.82) !important;
+}
+
+.locationChip:hover {
+  border-color: rgba(83, 188, 123, 0.34) !important;
+  background: rgba(8, 34, 32, 0.96) !important;
+}
+
+.locationChipActive {
+  border-color: rgba(83, 188, 123, 0.48) !important;
+  background: rgba(83, 188, 123, 0.2) !important;
+  color: #d4fbe3 !important;
+}
+
+#location:read-only {
+  cursor: default;
+  color: rgba(238, 247, 243, 0.82);
+}
