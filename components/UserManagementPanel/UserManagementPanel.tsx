@@ -17,6 +17,7 @@ import type {
 type UserManagementPanelProps = {
   users: OfflineUser[];
   onClose: () => void;
+  currentUserId: string;
   onCreateUser: (input: {
     username: string;
     fullName: string;
@@ -41,8 +42,8 @@ function getRoleLabel(role: WorkerRole): string {
 
 function getPermissionLabel(permissionLevel: PermissionLevel): string {
   return (
-    PERMISSION_LEVEL_OPTIONS.find((item) => item.value === permissionLevel)?.label ??
-    permissionLevel
+    PERMISSION_LEVEL_OPTIONS.find((item) => item.value === permissionLevel)
+      ?.label ?? permissionLevel
   );
 }
 
@@ -69,6 +70,7 @@ function TrashIcon() {
 
 export default function UserManagementPanel({
   users,
+  currentUserId,
   onClose,
   onCreateUser,
   onResetCredential,
@@ -90,15 +92,18 @@ export default function UserManagementPanel({
   const [resetConfirmSecret, setResetConfirmSecret] = useState("");
 
   const sortedUsers = useMemo(
-    () =>
-      [...users].sort((a, b) => {
+  () =>
+    users
+      .filter((user) => user.id !== currentUserId)
+      .sort((a, b) => {
         if (a.permissionLevel !== b.permissionLevel) {
           return a.permissionLevel === "admin" ? -1 : 1;
         }
+
         return a.username.localeCompare(b.username);
       }),
-    [users]
-  );
+  [users, currentUserId]
+);
 
   async function handleCreate(): Promise<void> {
     const result = await onCreateUser({
@@ -143,6 +148,11 @@ export default function UserManagementPanel({
   }
 
   function handleDelete(user: OfflineUser): void {
+    if (user.id === currentUserId) {
+      setMessage("You cannot delete your own admin account.");
+      return;
+    }
+
     const confirmed = window.confirm(
       `Delete ${user.fullName}? This cannot be undone.`
     );
@@ -269,8 +279,7 @@ export default function UserManagementPanel({
 
             <div className={styles.field}>
               <label className={styles.label} htmlFor="user-secret">
-                {permissionLevel === "admin" ||
-                credentialType === "password"
+                {permissionLevel === "admin" || credentialType === "password"
                   ? "Password"
                   : "PIN"}
               </label>
@@ -286,8 +295,7 @@ export default function UserManagementPanel({
             <div className={styles.field}>
               <label className={styles.label} htmlFor="user-secret-confirm">
                 Confirm{" "}
-                {permissionLevel === "admin" ||
-                credentialType === "password"
+                {permissionLevel === "admin" || credentialType === "password"
                   ? "Password"
                   : "PIN"}
               </label>
@@ -314,120 +322,142 @@ export default function UserManagementPanel({
           <div className={styles.sectionTitle}>Existing Users</div>
 
           <div className={styles.userList}>
-            {sortedUsers.map((user) => (
-              <div key={user.id} className={styles.userCard}>
-                <div className={styles.userTop}>
-                  <div>
-                    <div className={styles.userName}>{user.fullName}</div>
-                    <div className={styles.userMeta}>
-                      @{user.username} · {getPermissionLabel(user.permissionLevel)} ·{" "}
-                      {getRoleLabel(user.role)} · {user.credentialType}
+            {sortedUsers.map((user) => {
+              const isCurrentUser = user.id === currentUserId;
+
+              return (
+                <div key={user.id} className={styles.userCard}>
+                  <div className={styles.userTop}>
+                    <div>
+                      <div className={styles.userName}>{user.fullName}</div>
+                      <div className={styles.userMeta}>
+                        @{user.username} ·{" "}
+                        {getPermissionLabel(user.permissionLevel)} ·{" "}
+                        {getRoleLabel(user.role)} · {user.credentialType}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className={styles.topRight}>
-                    <button
-                      type="button"
-                      className={styles.iconDangerButton}
-                      onClick={() => handleDelete(user)}
-                      aria-label={`Delete user ${user.fullName}`}
-                      title="Delete user"
-                    >
-                      <TrashIcon />
-                    </button>
-
-                    <div className={styles.badges}>
-                      <span
-                        className={`${styles.badge} ${
-                          user.isActive ? styles.badgeActive : styles.badgeInactive
-                        }`}
-                      >
-                        {user.isActive ? "ACTIVE" : "INACTIVE"}
-                      </span>
-
-                      {user.mustChangeCredential ? (
-                        <span className={`${styles.badge} ${styles.badgeWarn}`}>
-                          MUST CHANGE
+                    <div className={styles.topRight}>
+                      {isCurrentUser ? (
+                        <span className={styles.selfUserBadge}>
+                          Current admin
                         </span>
-                      ) : null}
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.iconDangerButton}
+                          onClick={() => handleDelete(user)}
+                          aria-label={`Delete user ${user.fullName}`}
+                          title="Delete user"
+                        >
+                          <TrashIcon />
+                        </button>
+                      )}
+
+                      <div className={styles.badges}>
+                        <span
+                          className={`${styles.badge} ${
+                            user.isActive
+                              ? styles.badgeActive
+                              : styles.badgeInactive
+                          }`}
+                        >
+                          {user.isActive ? "ACTIVE" : "INACTIVE"}
+                        </span>
+
+                        {user.mustChangeCredential ? (
+                          <span className={`${styles.badge} ${styles.badgeWarn}`}>
+                            MUST CHANGE
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={() => {
-                      const result = onToggleActive(user.id);
-                      setMessage(result.message);
-                    }}
-                  >
-                    {user.isActive ? "Deactivate" : "Activate"}
-                  </button>
-
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={() => {
-                      setResetUserId((prev) => (prev === user.id ? null : user.id));
-                      setResetSecret("");
-                      setResetConfirmSecret("");
-                    }}
-                  >
-                    Reset {user.credentialType === "pin" ? "PIN" : "Password"}
-                  </button>
-                </div>
-
-                {resetUserId === user.id ? (
-                  <div className={styles.resetBox}>
-                    <div className={styles.resetTitle}>
-                      Reset {user.credentialType === "pin" ? "PIN" : "Password"}
-                    </div>
-
-                    <div className={styles.grid}>
-                      <div className={styles.field}>
-                        <label className={styles.label} htmlFor={`reset-${user.id}`}>
-                          New {user.credentialType === "pin" ? "PIN" : "Password"}
-                        </label>
-                        <input
-                          id={`reset-${user.id}`}
-                          className={styles.input}
-                          type="password"
-                          value={resetSecret}
-                          onChange={(e) => setResetSecret(e.target.value)}
-                        />
-                      </div>
-
-                      <div className={styles.field}>
-                        <label
-                          className={styles.label}
-                          htmlFor={`reset-confirm-${user.id}`}
-                        >
-                          Confirm{" "}
-                          {user.credentialType === "pin" ? "PIN" : "Password"}
-                        </label>
-                        <input
-                          id={`reset-confirm-${user.id}`}
-                          className={styles.input}
-                          type="password"
-                          value={resetConfirmSecret}
-                          onChange={(e) => setResetConfirmSecret(e.target.value)}
-                        />
-                      </div>
-                    </div>
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => {
+                        const result = onToggleActive(user.id);
+                        setMessage(result.message);
+                      }}
+                    >
+                      {user.isActive ? "Deactivate" : "Activate"}
+                    </button>
 
                     <button
                       type="button"
-                      className={styles.primaryButton}
-                      onClick={() => void handleReset()}
+                      className={styles.secondaryButton}
+                      onClick={() => {
+                        setResetUserId((prev) =>
+                          prev === user.id ? null : user.id
+                        );
+                        setResetSecret("");
+                        setResetConfirmSecret("");
+                      }}
                     >
-                      Save Reset
+                      Reset {user.credentialType === "pin" ? "PIN" : "Password"}
                     </button>
                   </div>
-                ) : null}
-              </div>
-            ))}
+
+                  {resetUserId === user.id ? (
+                    <div className={styles.resetBox}>
+                      <div className={styles.resetTitle}>
+                        Reset{" "}
+                        {user.credentialType === "pin" ? "PIN" : "Password"}
+                      </div>
+
+                      <div className={styles.grid}>
+                        <div className={styles.field}>
+                          <label
+                            className={styles.label}
+                            htmlFor={`reset-${user.id}`}
+                          >
+                            New{" "}
+                            {user.credentialType === "pin" ? "PIN" : "Password"}
+                          </label>
+                          <input
+                            id={`reset-${user.id}`}
+                            className={styles.input}
+                            type="password"
+                            value={resetSecret}
+                            onChange={(e) => setResetSecret(e.target.value)}
+                          />
+                        </div>
+
+                        <div className={styles.field}>
+                          <label
+                            className={styles.label}
+                            htmlFor={`reset-confirm-${user.id}`}
+                          >
+                            Confirm{" "}
+                            {user.credentialType === "pin" ? "PIN" : "Password"}
+                          </label>
+                          <input
+                            id={`reset-confirm-${user.id}`}
+                            className={styles.input}
+                            type="password"
+                            value={resetConfirmSecret}
+                            onChange={(e) =>
+                              setResetConfirmSecret(e.target.value)
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className={styles.primaryButton}
+                        onClick={() => void handleReset()}
+                      >
+                        Save Reset
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </section>
       </div>

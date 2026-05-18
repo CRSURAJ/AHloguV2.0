@@ -1,0 +1,142 @@
+.actionGrid {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.actionCard,
+.actionCardMuted {
+  width: 100%;
+  min-height: 92px;
+  border-radius: 22px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  border: 1px solid rgba(178, 223, 220, 0.14);
+}
+
+.actionCard {
+  cursor: pointer;
+  color: #eef7f3;
+  background:
+    radial-gradient(circle at top left, rgba(83, 188, 123, 0.16), transparent 12rem),
+    rgba(8, 34, 32, 0.72);
+  box-shadow:
+    0 14px 28px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease;
+}
+
+.actionCard:hover {
+  transform: translateY(-1px);
+  border-color: rgba(83, 188, 123, 0.36);
+  background:
+    radial-gradient(circle at top left, rgba(83, 188, 123, 0.22), transparent 12rem),
+    rgba(8, 81, 83, 0.76);
+}
+
+.actionCardMuted {
+  color: rgba(238, 247, 243, 0.62);
+  background: rgba(8, 34, 32, 0.42);
+  cursor: not-allowed;
+}
+
+.iconBox,
+.iconBoxMuted {
+  width: 50px;
+  height: 50px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.iconBox {
+  color: #d4fbe3;
+  background: rgba(83, 188, 123, 0.14);
+  border: 1px solid rgba(83, 188, 123, 0.24);
+}
+
+.iconBoxMuted {
+  color: rgba(238, 247, 243, 0.48);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.icon {
+  width: 24px;
+  height: 24px;
+}
+
+.actionContent {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.actionTitle {
+  color: #eef7f3;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.actionCardMuted .actionTitle {
+  color: rgba(238, 247, 243, 0.58);
+}
+
+.actionText {
+  color: rgba(238, 247, 243, 0.68);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.actionCardMuted .actionText {
+  color: rgba(238, 247, 243, 0.44);
+}
+
+.actionArrow {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: #072c29;
+  background: #53bc7b;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.badge {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  color: #fff0c9;
+  background: rgba(226, 173, 63, 0.12);
+  border: 1px solid rgba(226, 173, 63, 0.22);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+@media (max-width: 560px) {
+  .actionCard,
+  .actionCardMuted {
+    grid-template-columns: auto 1fr;
+  }
+
+  .actionArrow,
+  .badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

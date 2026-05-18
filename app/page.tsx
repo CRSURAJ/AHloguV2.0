@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import AdminDashboard from "@/components/AdminDashboard";
 import LoginScreen from "@/components/LoginScreen/LoginScreen";
 import SecurityPanel from "@/components/SecurityPanel/SecurityPanel";
 import UserManagementPanel from "@/components/UserManagementPanel/UserManagementPanel";
@@ -13,7 +14,7 @@ export default function Page() {
   const [userManagementOpen, setUserManagementOpen] = useState(false);
 
   const securityForced = auth.currentUser?.mustChangeCredential === true;
-  
+
   if (!auth.isReady) {
     return (
       <div
@@ -55,14 +56,49 @@ export default function Page() {
     );
   }
 
+  if (auth.canManageUsers) {
+    return (
+      <>
+        <AdminDashboard
+          currentUser={auth.currentUser}
+          securityLabel={auth.securityLabel}
+          onOpenSecurity={() => setSecurityRequested(true)}
+          onOpenUserManagement={() => setUserManagementOpen(true)}
+          onSignOut={auth.handleSignOut}
+        />
+
+        {securityRequested ? (
+          <SecurityPanel
+            credentialType={auth.currentUser.credentialType}
+            forced={false}
+            onClose={() => setSecurityRequested(false)}
+            onSubmit={auth.handleChangeOwnCredential}
+          />
+        ) : null}
+
+        {userManagementOpen ? (
+          <UserManagementPanel
+            users={auth.users}
+            currentUserId={auth.currentUser.id}
+            onClose={() => setUserManagementOpen(false)}
+            onCreateUser={auth.handleCreateUser}
+            onResetCredential={auth.handleAdminResetCredential}
+            onToggleActive={auth.handleToggleUserActive}
+            onDeleteUser={auth.handleDeleteUser}
+          />
+        ) : null}
+      </>
+    );
+  }
+
   return (
     <>
       <WorkLogger
         currentUser={auth.currentUser}
         onSignOut={auth.handleSignOut}
         onOpenSecurity={() => setSecurityRequested(true)}
-        onOpenUserManagement={() => setUserManagementOpen(true)}
-        canManageUsers={auth.canManageUsers}
+        onOpenUserManagement={() => {}}
+        canManageUsers={false}
         securityLabel={auth.securityLabel}
       />
 
@@ -72,17 +108,6 @@ export default function Page() {
           forced={false}
           onClose={() => setSecurityRequested(false)}
           onSubmit={auth.handleChangeOwnCredential}
-        />
-      ) : null}
-
-      {userManagementOpen && auth.canManageUsers ? (
-        <UserManagementPanel
-          users={auth.users}
-          onClose={() => setUserManagementOpen(false)}
-          onCreateUser={auth.handleCreateUser}
-          onResetCredential={auth.handleAdminResetCredential}
-          onToggleActive={auth.handleToggleUserActive}
-          onDeleteUser={auth.handleDeleteUser}
         />
       ) : null}
     </>
