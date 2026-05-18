@@ -13,8 +13,7 @@ export default function Page() {
   const [userManagementOpen, setUserManagementOpen] = useState(false);
 
   const securityForced = auth.currentUser?.mustChangeCredential === true;
-  const securityOpen = securityForced || securityRequested;
-
+  
   if (!auth.isReady) {
     return (
       <div
