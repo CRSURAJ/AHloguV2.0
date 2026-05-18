@@ -1,0 +1,183 @@
+import { WORKER_ROLE_OPTIONS } from "@/types/work";
+import type { Job, WorkerRole } from "@/types/work";
+
+const JOBS_STORAGE_KEY = "project_logu:jobs";
+
+export type CreateJobInput = {
+  caseNo: string;
+  jobId: string;
+  orderNo: string;
+  jobName: string;
+  customerName: string;
+  location: string;
+  description: string;
+  assignedRoles: WorkerRole[];
+  isActive?: boolean;
+};
+
+export type UpdateJobInput = Partial<CreateJobInput> & {
+  jobDocs?: Job["jobDocs"];
+};
+
+const VALID_WORKER_ROLES = new Set<WorkerRole>(
+  WORKER_ROLE_OPTIONS.map((option) => option.value)
+);
+
+function makeId(prefix: string): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function parseJson<T>(raw: string | null): T | null {
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+function cleanString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function cleanDate(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? fallback : value;
+}
+
+function cleanAssignedRoles(value: unknown): WorkerRole[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.filter(
+    (role): role is WorkerRole =>
+      typeof role === "string" && VALID_WORKER_ROLES.has(role as WorkerRole)
+  );
+}
+
+function normalizeJob(value: unknown, index: number): Job | null {
+  if (!value || typeof value !== "object") return null;
+
+  const item = value as Partial<Job>;
+  const now = new Date().toISOString();
+
+  const id = cleanString(item.id) || makeId(`job-${index}`);
+  const createdAt = cleanDate(item.createdAt, now);
+  const updatedAt = cleanDate(item.updatedAt, createdAt);
+
+  return {
+    id,
+    caseNo: cleanString(item.caseNo),
+    jobId: cleanString(item.jobId),
+    orderNo: cleanString(item.orderNo),
+    jobName: cleanString(item.jobName),
+    customerName: cleanString(item.customerName),
+    location: cleanString(item.location),
+    description: cleanString(item.description),
+    assignedRoles: cleanAssignedRoles(item.assignedRoles),
+    jobDocs: Array.isArray(item.jobDocs) ? item.jobDocs : [],
+    isActive: typeof item.isActive === "boolean" ? item.isActive : true,
+    createdAt,
+    updatedAt,
+  };
+}
+
+export async function loadJobs(): Promise<Job[]> {
+  if (typeof window === "undefined") return [];
+
+  const raw = window.localStorage.getItem(JOBS_STORAGE_KEY);
+  const parsed = parseJson<unknown[]>(raw);
+
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed
+    .map(normalizeJob)
+    .filter((job): job is Job => job !== null)
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+}
+
+export async function saveJobs(jobs: Job[]): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(jobs));
+}
+
+export async function createJob(input: CreateJobInput): Promise<Job> {
+  const jobs = await loadJobs();
+  const now = new Date().toISOString();
+
+  const job: Job = {
+    id: makeId("job"),
+    caseNo: input.caseNo.trim(),
+    jobId: input.jobId.trim(),
+    orderNo: input.orderNo.trim(),
+    jobName: input.jobName.trim(),
+    customerName: input.customerName.trim(),
+    location: input.location.trim(),
+    description: input.description.trim(),
+    assignedRoles: cleanAssignedRoles(input.assignedRoles),
+    jobDocs: [],
+    isActive: input.isActive ?? true,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await saveJobs([job, ...jobs]);
+
+  return job;
+}
+
+export async function updateJob(
+  id: string,
+  updates: UpdateJobInput
+): Promise<Job | null> {
+  const jobs = await loadJobs();
+  const existingJob = jobs.find((job) => job.id === id);
+
+  if (!existingJob) return null;
+
+  const updatedJob: Job = {
+    ...existingJob,
+    caseNo: updates.caseNo?.trim() ?? existingJob.caseNo,
+    jobId: updates.jobId?.trim() ?? existingJob.jobId,
+    orderNo: updates.orderNo?.trim() ?? existingJob.orderNo,
+    jobName: updates.jobName?.trim() ?? existingJob.jobName,
+    customerName: updates.customerName?.trim() ?? existingJob.customerName,
+    location: updates.location?.trim() ?? existingJob.location,
+    description: updates.description?.trim() ?? existingJob.description,
+    assignedRoles: updates.assignedRoles
+      ? cleanAssignedRoles(updates.assignedRoles)
+      : existingJob.assignedRoles,
+    jobDocs: updates.jobDocs ?? existingJob.jobDocs,
+    isActive: updates.isActive ?? existingJob.isActive,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await saveJobs(jobs.map((job) => (job.id === id ? updatedJob : job)));
+
+  return updatedJob;
+}
+
+export async function deleteJob(id: string): Promise<void> {
+  const jobs = await loadJobs();
+
+  await saveJobs(jobs.filter((job) => job.id !== id));
+}
+
+export async function getActiveJobs(): Promise<Job[]> {
+  const jobs = await loadJobs();
+
+  return jobs.filter((job) => job.isActive);
+}
+
+export async function getJobsForRole(role: WorkerRole): Promise<Job[]> {
+  const jobs = await getActiveJobs();
+
+  return jobs.filter((job) => job.assignedRoles.includes(role));
+}
