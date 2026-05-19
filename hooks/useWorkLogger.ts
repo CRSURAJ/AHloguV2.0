@@ -14,6 +14,7 @@ import {
   saveSession,
 } from "@/lib/workStorage";
 import { getJobsForRole } from "@/lib/jobStorage";
+import { addToSyncQueue } from "@/lib/cloud/syncQueue";
 import { getWorkingStatusText, minutesBetween } from "@/lib/workUtils";
 import type {
   ActiveSession,
@@ -374,7 +375,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       syncMessage: "Waiting to sync",
       stickyNote: "",
    };
-
+addToSyncQueue("workLog.upload", logItem);
     setLogs((prev) => [logItem, ...prev]);
     setIsWorking(false);
     setIsOnBreak(false);
@@ -435,7 +436,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       syncMessage: "Waiting to sync",
       stickyNote: "",
     };
-
+addToSyncQueue("workLog.upload", logItem);
     const newStartTime = new Date().toISOString();
 
     setLogs((prev) => [logItem, ...prev]);
