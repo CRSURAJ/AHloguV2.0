@@ -1,3 +1,4 @@
+import { awsCloudProvider } from "./awsProvider";
 import { noopCloudProvider } from "./noopProvider";
 import type { CloudProvider } from "./types";
 
@@ -9,12 +10,11 @@ export function getCloudProvider(): CloudProvider {
     | undefined;
 
   switch (provider) {
+    case "aws":
+      return awsCloudProvider;
+
     case "supabase":
       // Later: return supabaseCloudProvider;
-      return noopCloudProvider;
-
-    case "aws":
-      // Later: return awsCloudProvider;
       return noopCloudProvider;
 
     case "noop":
