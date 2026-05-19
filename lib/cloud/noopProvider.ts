@@ -1,13 +1,16 @@
 import type { CloudProvider } from "./types";
 
+const NOOP_MESSAGE =
+  "Cloud provider not connected yet. Local/offline mode is active.";
+
 export const noopCloudProvider: CloudProvider = {
   providerName: "noop",
 
   async healthCheck() {
     return {
-      ok: true,
+      ok: false,
       provider: "noop",
-      message: "Cloud provider not connected yet. Local/offline mode is active.",
+      message: NOOP_MESSAGE,
     };
   },
 
@@ -18,22 +21,22 @@ export const noopCloudProvider: CloudProvider = {
 
     async create() {
       return {
-        ok: true,
-        message: "No cloud provider connected. Job kept local only.",
+        ok: false,
+        message: NOOP_MESSAGE,
       };
     },
 
     async update() {
       return {
-        ok: true,
-        message: "No cloud provider connected. Job update kept local only.",
+        ok: false,
+        message: NOOP_MESSAGE,
       };
     },
 
     async delete() {
       return {
-        ok: true,
-        message: "No cloud provider connected. Job delete kept local only.",
+        ok: false,
+        message: NOOP_MESSAGE,
       };
     },
   },
@@ -41,15 +44,15 @@ export const noopCloudProvider: CloudProvider = {
   workLogs: {
     async upload() {
       return {
-        ok: true,
-        message: "No cloud provider connected. Work log kept local only.",
+        ok: false,
+        message: NOOP_MESSAGE,
       };
     },
 
     async uploadMany() {
       return {
-        ok: true,
-        message: "No cloud provider connected. Work logs kept local only.",
+        ok: false,
+        message: NOOP_MESSAGE,
       };
     },
   },
@@ -57,8 +60,8 @@ export const noopCloudProvider: CloudProvider = {
   drawings: {
     async upload() {
       return {
-        ok: true,
-        message: "No cloud provider connected. Drawing kept local only.",
+        ok: false,
+        message: NOOP_MESSAGE,
       };
     },
   },
