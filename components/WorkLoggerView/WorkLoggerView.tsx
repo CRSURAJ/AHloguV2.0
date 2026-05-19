@@ -296,7 +296,9 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
                 </div>
               </div>
             ) : null}
-            <CloudSyncStatus />
+            <div className={styles.cloudSyncSection}>
+  <CloudSyncStatus />
+</div>
             <LogsList
               logs={props.logs}
               expandedLogId={props.expandedLogId}
