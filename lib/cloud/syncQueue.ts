@@ -1,5 +1,5 @@
 const SYNC_QUEUE_STORAGE_KEY = "ahlogu:cloud-sync-queue";
-
+export const SYNC_QUEUE_CHANGED_EVENT = "ahlogu:cloud-sync-queue-changed";
 export type SyncQueueAction =
   | "job.create"
   | "job.update"
@@ -62,6 +62,7 @@ function writeQueue(queue: SyncQueueItem[]) {
   }
 
   window.localStorage.setItem(SYNC_QUEUE_STORAGE_KEY, JSON.stringify(queue));
+  window.dispatchEvent(new CustomEvent(SYNC_QUEUE_CHANGED_EVENT));
 }
 
 export function getSyncQueue() {

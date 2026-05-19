@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { checkCloudHealth } from "@/lib/cloud/health";
-import { getSyncQueueCount } from "@/lib/cloud/syncQueue";
+import {
+  getSyncQueueCount,
+  SYNC_QUEUE_CHANGED_EVENT,
+} from "@/lib/cloud/syncQueue";
 import {
   processCloudSyncQueue,
   type ProcessSyncQueueResult,
@@ -112,16 +115,18 @@ export function useCloudSync() {
 
 
   useEffect(() => {
-    const refresh = () => refreshPendingCount();
+  const refresh = () => refreshPendingCount();
 
-    window.addEventListener("storage", refresh);
-    window.addEventListener("focus", refresh);
+  window.addEventListener("storage", refresh);
+  window.addEventListener("focus", refresh);
+  window.addEventListener(SYNC_QUEUE_CHANGED_EVENT, refresh);
 
-    return () => {
-      window.removeEventListener("storage", refresh);
-      window.removeEventListener("focus", refresh);
-    };
-  }, [refreshPendingCount]);
+  return () => {
+    window.removeEventListener("storage", refresh);
+    window.removeEventListener("focus", refresh);
+    window.removeEventListener(SYNC_QUEUE_CHANGED_EVENT, refresh);
+  };
+}, [refreshPendingCount]);
 
   return {
     ...state,
