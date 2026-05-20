@@ -1,16 +1,27 @@
+import { randomUUID } from "crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  DeleteCommand,
+  DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+  ScanCommand,
+} from "@aws-sdk/lib-dynamodb";
 
 const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "ap-southeast-4";
+
 const USERS_TABLE = process.env.USERS_TABLE;
+const JOBS_TABLE = process.env.JOBS_TABLE;
+const WORK_LOGS_TABLE = process.env.WORK_LOGS_TABLE;
+const SYNC_EVENTS_TABLE = process.env.SYNC_EVENTS_TABLE;
 
 const dynamo = DynamoDBDocumentClient.from(
   new DynamoDBClient({ region: REGION }),
   {
     marshallOptions: {
-      removeUndefinedValues: true
-    }
-  }
+      removeUndefinedValues: true,
+    },
+  },
 );
 
 function json(statusCode, body) {
@@ -20,16 +31,16 @@ function json(statusCode, body) {
       "content-type": "application/json",
       "access-control-allow-origin": "*",
       "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
-      "access-control-allow-headers": "content-type,authorization"
+      "access-control-allow-headers": "content-type,authorization",
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
   };
 }
 
 function getRequest(event) {
   return {
     method: event.requestContext?.http?.method || event.httpMethod || "GET",
-    path: event.rawPath || event.path || "/"
+    path: event.rawPath || event.path || "/",
   };
 }
 
@@ -41,55 +52,364 @@ function getClaims(event) {
   );
 }
 
-async function getMe(event) {
-  if (!USERS_TABLE) {
-    return json(500, {
-      error: "Missing USERS_TABLE environment variable"
-    });
+function parseBody(event) {
+  if (!event.body) {
+    return {};
   }
 
+  const bodyText = event.isBase64Encoded
+    ? Buffer.from(event.body, "base64").toString("utf8")
+    : event.body;
+
+  try {
+    return JSON.parse(bodyText);
+  } catch {
+    throw new Error("Invalid JSON body.");
+  }
+}
+
+function requireEnv(name, value) {
+  if (!value) {
+    throw new Error(`Missing ${name} environment variable.`);
+  }
+
+  return value;
+}
+
+async function getUserProfile(event) {
+  const tableName = requireEnv("USERS_TABLE", USERS_TABLE);
   const claims = getClaims(event);
   const sub = claims.sub;
   const email = claims.email;
 
   if (!sub) {
-    return json(401, {
-      error: "Missing Cognito user claims. Protect this route with a Cognito authorizer."
-    });
+    return {
+      ok: false,
+      response: json(401, {
+        error: "Missing Cognito user claims. Protect this route with a Cognito authorizer.",
+      }),
+    };
   }
 
   const result = await dynamo.send(
     new GetCommand({
-      TableName: USERS_TABLE,
+      TableName: tableName,
       Key: {
-        id: sub
-      }
-    })
+        id: sub,
+      },
+    }),
   );
 
   if (!result.Item) {
-    return json(404, {
-      error: "User profile not found in AHloguUsers",
-      id: sub,
-      email: email || ""
-    });
+    return {
+      ok: false,
+      response: json(404, {
+        error: "User profile not found in AHloguUsers",
+        id: sub,
+        email: email || "",
+      }),
+    };
   }
 
-  const user = result.Item;
-
-  if (user.isActive === false) {
-    return json(403, {
-      error: "User is inactive"
-    });
+  if (result.Item.isActive === false) {
+    return {
+      ok: false,
+      response: json(403, {
+        error: "User is inactive",
+      }),
+    };
   }
+
+  return {
+    ok: true,
+    user: {
+      ...result.Item,
+      email: result.Item.email || email || "",
+    },
+  };
+}
+
+async function requireActiveUser(event) {
+  const profile = await getUserProfile(event);
+
+  if (!profile.ok) {
+    return profile;
+  }
+
+  return profile;
+}
+
+async function requireAdminUser(event) {
+  const profile = await getUserProfile(event);
+
+  if (!profile.ok) {
+    return profile;
+  }
+
+  if (!profile.user.isAdmin) {
+    return {
+      ok: false,
+      response: json(403, {
+        error: "Admin access required.",
+      }),
+    };
+  }
+
+  return profile;
+}
+
+async function getMe(event) {
+  const profile = await requireActiveUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const user = profile.user;
 
   return json(200, {
     id: user.id,
-    email: user.email || email || "",
+    email: user.email || "",
     fullName: user.fullName || "",
     role: user.role || "",
     isAdmin: Boolean(user.isAdmin),
-    isActive: user.isActive !== false
+    isActive: user.isActive !== false,
+  });
+}
+
+async function listJobs(event) {
+  const profile = await requireActiveUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("JOBS_TABLE", JOBS_TABLE);
+
+  const result = await dynamo.send(
+    new ScanCommand({
+      TableName: tableName,
+    }),
+  );
+
+  const jobs = (result.Items ?? []).sort((a, b) =>
+    String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")),
+  );
+
+  return json(200, jobs);
+}
+
+async function createJob(event) {
+  const profile = await requireAdminUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("JOBS_TABLE", JOBS_TABLE);
+  const body = parseBody(event);
+
+  const now = new Date().toISOString();
+  const id = body.id || randomUUID();
+
+  const job = {
+    ...body,
+    id,
+    createdAt: body.createdAt || now,
+    updatedAt: now,
+  };
+
+  await dynamo.send(
+    new PutCommand({
+      TableName: tableName,
+      Item: job,
+    }),
+  );
+
+  return json(201, {
+    ok: true,
+    cloudId: id,
+    job,
+  });
+}
+
+async function updateJob(event, path) {
+  const profile = await requireAdminUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("JOBS_TABLE", JOBS_TABLE);
+  const id = decodeURIComponent(path.replace("/jobs/", ""));
+  const body = parseBody(event);
+
+  if (!id) {
+    return json(400, {
+      error: "Missing job id.",
+    });
+  }
+
+  const job = {
+    ...body,
+    id,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await dynamo.send(
+    new PutCommand({
+      TableName: tableName,
+      Item: job,
+    }),
+  );
+
+  return json(200, {
+    ok: true,
+    cloudId: id,
+    job,
+  });
+}
+
+async function deleteJob(event, path) {
+  const profile = await requireAdminUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("JOBS_TABLE", JOBS_TABLE);
+  const id = decodeURIComponent(path.replace("/jobs/", ""));
+
+  if (!id) {
+    return json(400, {
+      error: "Missing job id.",
+    });
+  }
+
+  await dynamo.send(
+    new DeleteCommand({
+      TableName: tableName,
+      Key: {
+        id,
+      },
+    }),
+  );
+
+  return json(200, {
+    ok: true,
+    cloudId: id,
+  });
+}
+
+async function putSyncEvent(item) {
+  if (!SYNC_EVENTS_TABLE) {
+    return;
+  }
+
+  await dynamo.send(
+    new PutCommand({
+      TableName: SYNC_EVENTS_TABLE,
+      Item: {
+        id: randomUUID(),
+        ...item,
+        createdAt: new Date().toISOString(),
+      },
+    }),
+  );
+}
+
+async function uploadWorkLog(event) {
+  const profile = await requireActiveUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("WORK_LOGS_TABLE", WORK_LOGS_TABLE);
+  const body = parseBody(event);
+  const now = new Date().toISOString();
+  const id = body.id || randomUUID();
+
+  const log = {
+    ...body,
+    id,
+    uploadedBy: profile.user.id,
+    uploadedByEmail: profile.user.email || "",
+    uploadedAt: now,
+  };
+
+  await dynamo.send(
+    new PutCommand({
+      TableName: tableName,
+      Item: log,
+    }),
+  );
+
+  await putSyncEvent({
+    type: "workLog.upload",
+    userId: profile.user.id,
+    email: profile.user.email || "",
+    entityId: id,
+  });
+
+  return json(201, {
+    ok: true,
+    cloudId: id,
+  });
+}
+
+async function uploadWorkLogsBulk(event) {
+  const profile = await requireActiveUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("WORK_LOGS_TABLE", WORK_LOGS_TABLE);
+  const body = parseBody(event);
+  const logs = Array.isArray(body.logs) ? body.logs : [];
+
+  if (logs.length === 0) {
+    return json(400, {
+      error: "Missing logs array.",
+    });
+  }
+
+  const now = new Date().toISOString();
+  const savedIds = [];
+
+  for (const inputLog of logs) {
+    const id = inputLog.id || randomUUID();
+
+    const log = {
+      ...inputLog,
+      id,
+      uploadedBy: profile.user.id,
+      uploadedByEmail: profile.user.email || "",
+      uploadedAt: now,
+    };
+
+    await dynamo.send(
+      new PutCommand({
+        TableName: tableName,
+        Item: log,
+      }),
+    );
+
+    savedIds.push(id);
+  }
+
+  await putSyncEvent({
+    type: "workLog.bulkUpload",
+    userId: profile.user.id,
+    email: profile.user.email || "",
+    count: savedIds.length,
+  });
+
+  return json(201, {
+    ok: true,
+    count: savedIds.length,
+    cloudIds: savedIds,
   });
 }
 
@@ -105,7 +425,7 @@ export const handler = async (event) => {
       return json(200, {
         ok: true,
         service: "AHloguApi",
-        time: new Date().toISOString()
+        time: new Date().toISOString(),
       });
     }
 
@@ -113,16 +433,41 @@ export const handler = async (event) => {
       return getMe(event);
     }
 
+    if (method === "GET" && path === "/jobs") {
+      return listJobs(event);
+    }
+
+    if (method === "POST" && path === "/jobs") {
+      return createJob(event);
+    }
+
+    if (method === "PUT" && path.startsWith("/jobs/")) {
+      return updateJob(event, path);
+    }
+
+    if (method === "DELETE" && path.startsWith("/jobs/")) {
+      return deleteJob(event, path);
+    }
+
+    if (method === "POST" && path === "/work-logs") {
+      return uploadWorkLog(event);
+    }
+
+    if (method === "POST" && path === "/work-logs/bulk") {
+      return uploadWorkLogsBulk(event);
+    }
+
     return json(404, {
       error: "Route not found",
       method,
-      path
+      path,
     });
   } catch (error) {
     console.error("AHloguApi error:", error);
 
     return json(500, {
-      error: "Internal server error"
+      error: "Internal server error",
+      message: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
