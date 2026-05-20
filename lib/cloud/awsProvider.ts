@@ -18,6 +18,68 @@ function getErrorMessage(error: unknown) {
   return "Unknown AWS cloud error";
 }
 
+function getCognitoIdToken(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const tokenKey = Object.keys(window.localStorage).find(
+    (key) =>
+      key.includes("CognitoIdentityServiceProvider") &&
+      key.endsWith(".idToken"),
+  );
+
+  if (!tokenKey) {
+    return "";
+  }
+
+  return window.localStorage.getItem(tokenKey) ?? "";
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const token = getCognitoIdToken();
+
+  if (!token) {
+    return {};
+  }
+
+  return {
+    Authorization: `Bearer ${token}`,
+  };
+}
+
+export type AwsCurrentUserProfile = {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  isAdmin: boolean;
+  isActive: boolean;
+};
+
+export async function getAwsCurrentUser(): Promise<AwsCurrentUserProfile | null> {
+  const baseUrl = getAwsApiBaseUrl();
+
+  if (!baseUrl) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${baseUrl}/me`, {
+      method: "GET",
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return (await response.json()) as AwsCurrentUserProfile;
+  } catch {
+    return null;
+  }
+}
+
 async function requestJson<TPayload>(
   path: string,
   options: {
@@ -39,6 +101,7 @@ async function requestJson<TPayload>(
       method: options.method,
       headers: {
         "Content-Type": "application/json",
+        ...getAuthHeaders(),
       },
       body:
         options.method === "GET" || options.payload === undefined
@@ -111,6 +174,7 @@ export const awsCloudProvider: CloudProvider = {
       try {
         const response = await fetch(`${baseUrl}/jobs`, {
           method: "GET",
+          headers: getAuthHeaders(),
         });
 
         if (!response.ok) {
@@ -187,6 +251,7 @@ export const awsCloudProvider: CloudProvider = {
       try {
         const response = await fetch(`${baseUrl}/drawings`, {
           method: "POST",
+          headers: getAuthHeaders(),
           body: formData,
         });
 
