@@ -147,17 +147,17 @@ export async function loadJobs(): Promise<Job[]> {
     return localJobs;
   }
 
-  const cloudJobs = await getCloud().jobs.list();
+  try {
+    const cloudJobs = await getCloud().jobs.list();
+    const mergedJobs = mergeCloudJobsWithLocalDrawings(cloudJobs, localJobs);
 
-  if (cloudJobs.length === 0) {
+    await saveJobs(mergedJobs);
+
+    return mergedJobs;
+  } catch (error) {
+    console.warn("Could not load AWS jobs. Using local job cache.", error);
     return localJobs;
   }
-
-  const mergedJobs = mergeCloudJobsWithLocalDrawings(cloudJobs, localJobs);
-
-  await saveJobs(mergedJobs);
-
-  return mergedJobs;
 }
 
 export async function saveJobs(jobs: Job[]): Promise<void> {
@@ -187,8 +187,6 @@ export async function createJob(input: CreateJobInput): Promise<Job> {
     updatedAt: now,
   };
 
-  await saveJobs([job, ...jobs]);
-
   if (shouldUseAwsJobs()) {
     const result = await getCloud().jobs.create(stripJobDrawingsForCloud(job));
 
@@ -196,6 +194,8 @@ export async function createJob(input: CreateJobInput): Promise<Job> {
       throw new Error(result.message || "Could not create job in AWS.");
     }
   }
+
+  await saveJobs([job, ...jobs.filter((item) => item.id !== job.id)]);
 
   return job;
 }
@@ -226,8 +226,6 @@ export async function updateJob(
     updatedAt: new Date().toISOString(),
   };
 
-  await saveJobs(jobs.map((job) => (job.id === id ? updatedJob : job)));
-
   if (shouldUseAwsJobs()) {
     const result = await getCloud().jobs.update(stripJobDrawingsForCloud(updatedJob));
 
@@ -236,13 +234,13 @@ export async function updateJob(
     }
   }
 
+  await saveJobs(jobs.map((job) => (job.id === id ? updatedJob : job)));
+
   return updatedJob;
 }
 
 export async function deleteJob(id: string): Promise<void> {
   const jobs = await loadJobs();
-
-  await saveJobs(jobs.filter((job) => job.id !== id));
 
   if (shouldUseAwsJobs()) {
     const result = await getCloud().jobs.delete(id);
@@ -251,6 +249,8 @@ export async function deleteJob(id: string): Promise<void> {
       throw new Error(result.message || "Could not delete job in AWS.");
     }
   }
+
+  await saveJobs(jobs.filter((job) => job.id !== id));
 }
 
 export async function getActiveJobs(): Promise<Job[]> {

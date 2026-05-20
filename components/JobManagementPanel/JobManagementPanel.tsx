@@ -267,8 +267,8 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
           <div>
             <h2>Job Management</h2>
             <p className={styles.subtitle}>
-              Create jobs and assign them to worker roles. Jobs are stored locally
-              first and synced to AWS when cloud mode is enabled.
+              Create jobs and assign them to worker roles. Jobs are stored in AWS
+              and cached locally for offline viewing. Job drawings remain local-only until S3 is added.
             </p>
           </div>
 

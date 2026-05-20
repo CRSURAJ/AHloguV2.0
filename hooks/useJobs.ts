@@ -121,13 +121,21 @@ export function useJobs(): UseJobsReturn {
         return { ok: false, message: validationError };
       }
 
-      const job = await createJob(input);
-      await refreshJobs();
+      try {
+        const job = await createJob(input);
+        await refreshJobs();
 
-      const message = `Created ${getJobLabel(job)}.`;
-      setJobMessage(message);
+        const message = `Created ${getJobLabel(job)}.`;
+        setJobMessage(message);
 
-      return { ok: true, message };
+        return { ok: true, message };
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Could not create job.";
+        setJobMessage(message);
+
+        return { ok: false, message };
+      }
     },
     [refreshJobs]
   );
@@ -144,20 +152,28 @@ export function useJobs(): UseJobsReturn {
         return { ok: false, message: validationError };
       }
 
-      const updatedJob = await updateJob(id, updates);
+      try {
+        const updatedJob = await updateJob(id, updates);
 
-      if (!updatedJob) {
-        const message = "Job could not be found.";
+        if (!updatedJob) {
+          const message = "Job could not be found.";
+          setJobMessage(message);
+          return { ok: false, message };
+        }
+
+        await refreshJobs();
+
+        const message = `Updated ${getJobLabel(updatedJob)}.`;
         setJobMessage(message);
+
+        return { ok: true, message };
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Could not update job.";
+        setJobMessage(message);
+
         return { ok: false, message };
       }
-
-      await refreshJobs();
-
-      const message = `Updated ${getJobLabel(updatedJob)}.`;
-      setJobMessage(message);
-
-      return { ok: true, message };
     },
     [refreshJobs]
   );
@@ -172,13 +188,21 @@ export function useJobs(): UseJobsReturn {
         return { ok: false, message };
       }
 
-      await deleteJob(id);
-      await refreshJobs();
+      try {
+        await deleteJob(id);
+        await refreshJobs();
 
-      const message = `Deleted ${getJobLabel(job)}.`;
-      setJobMessage(message);
+        const message = `Deleted ${getJobLabel(job)}.`;
+        setJobMessage(message);
 
-      return { ok: true, message };
+        return { ok: true, message };
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Could not delete job.";
+        setJobMessage(message);
+
+        return { ok: false, message };
+      }
     },
     [jobs, refreshJobs]
   );
@@ -193,25 +217,33 @@ export function useJobs(): UseJobsReturn {
         return { ok: false, message };
       }
 
-      const updatedJob = await updateJob(id, {
-        isActive: !job.isActive,
-      });
+      try {
+        const updatedJob = await updateJob(id, {
+          isActive: !job.isActive,
+        });
 
-      if (!updatedJob) {
-        const message = "Job could not be updated.";
+        if (!updatedJob) {
+          const message = "Job could not be updated.";
+          setJobMessage(message);
+          return { ok: false, message };
+        }
+
+        await refreshJobs();
+
+        const message = updatedJob.isActive
+          ? `Activated ${getJobLabel(updatedJob)}.`
+          : `Deactivated ${getJobLabel(updatedJob)}.`;
+
         setJobMessage(message);
+
+        return { ok: true, message };
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Could not update job.";
+        setJobMessage(message);
+
         return { ok: false, message };
       }
-
-      await refreshJobs();
-
-      const message = updatedJob.isActive
-        ? `Activated ${getJobLabel(updatedJob)}.`
-        : `Deactivated ${getJobLabel(updatedJob)}.`;
-
-      setJobMessage(message);
-
-      return { ok: true, message };
     },
     [jobs, refreshJobs]
   );

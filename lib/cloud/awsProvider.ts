@@ -187,29 +187,33 @@ export const awsCloudProvider: CloudProvider = {
       const baseUrl = getAwsApiBaseUrl();
 
       if (!baseUrl) {
-        return [];
+        throw new Error("Missing NEXT_PUBLIC_AHLOGU_API_URL.");
       }
 
-      try {
-        const response = await fetch(`${baseUrl}/jobs`, {
-          method: "GET",
-          headers: getAuthHeaders(),
-        });
+      const response = await fetch(`${baseUrl}/jobs`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
 
-        if (!response.ok) {
-          return [];
-        }
+      const data: unknown = await response.json().catch(() => null);
 
-        const data: unknown = await response.json();
+      if (!response.ok) {
+        const message =
+          data &&
+          typeof data === "object" &&
+          "error" in data &&
+          typeof data.error === "string"
+            ? data.error
+            : `AWS jobs list failed with status ${response.status}.`;
 
-        if (!Array.isArray(data)) {
-          return [];
-        }
-
-        return data as Job[];
-      } catch {
-        return [];
+        throw new Error(message);
       }
+
+      if (!Array.isArray(data)) {
+        throw new Error("AWS jobs list returned an invalid response.");
+      }
+
+      return data as Job[];
     },
 
     async create(job: Job) {
