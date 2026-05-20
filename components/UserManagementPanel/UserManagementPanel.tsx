@@ -43,6 +43,7 @@ type UserManagementPanelProps = {
   onRefresh: () => void;
   onCreateUser: (input: CreateAwsUserInput) => Promise<AuthActionResult>;
   onToggleActive: (userId: string, isActive: boolean) => Promise<AuthActionResult>;
+  onDeleteUser: (userId: string) => Promise<AuthActionResult>;
 };
 
 function getRoleLabel(role: string): string {
@@ -67,6 +68,7 @@ export default function UserManagementPanel({
   onRefresh,
   onCreateUser,
   onToggleActive,
+  onDeleteUser,
 }: UserManagementPanelProps) {
   const [localMessage, setLocalMessage] = useState("");
   const [fullName, setFullName] = useState("");
@@ -78,17 +80,18 @@ export default function UserManagementPanel({
   const [confirmTemporaryPassword, setConfirmTemporaryPassword] = useState("");
   const [creating, setCreating] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState("");
+  const [deletingUserId, setDeletingUserId] = useState("");
 
   const sortedUsers = useMemo(
     () =>
-      [...users].sort((a, b) => {
+      [...users].filter((user) => user.id !== currentUserId).sort((a, b) => {
         if (a.permissionLevel !== b.permissionLevel) {
           return a.permissionLevel === "admin" ? -1 : 1;
         }
 
         return (a.email || a.username).localeCompare(b.email || b.username);
       }),
-    [users],
+    [users, currentUserId],
   );
 
   const displayMessage = localMessage || message;
@@ -145,6 +148,33 @@ export default function UserManagementPanel({
       setLocalMessage(result.message);
     } finally {
       setUpdatingUserId("");
+    }
+  }
+
+  async function handleDeleteUser(user: AwsUserListItem): Promise<void> {
+    setLocalMessage("");
+
+    if (user.id === currentUserId) {
+      setLocalMessage("You cannot delete your own admin account.");
+      return;
+    }
+
+    const label = user.fullName || user.email || user.username || "this user";
+    const confirmed = window.confirm(
+      `Delete ${label}? This will remove the user from Cognito and AHloguUsers.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingUserId(user.id);
+
+    try {
+      const result = await onDeleteUser(user.id);
+      setLocalMessage(result.message);
+    } finally {
+      setDeletingUserId("");
     }
   }
 
@@ -302,6 +332,7 @@ export default function UserManagementPanel({
             {sortedUsers.map((user) => {
               const isCurrentUser = user.id === currentUserId;
               const isUpdatingUser = updatingUserId === user.id;
+              const isDeletingUser = deletingUserId === user.id;
 
               return (
                 <div key={user.id || user.email} className={styles.userCard}>
@@ -357,13 +388,22 @@ export default function UserManagementPanel({
                       type="button"
                       className={styles.secondaryButton}
                       onClick={() => void handleToggleActive(user)}
-                      disabled={isCurrentUser || isUpdatingUser || !user.id}
+                      disabled={isCurrentUser || isUpdatingUser || isDeletingUser || !user.id}
                     >
                       {isUpdatingUser
                         ? "Updating..."
                         : user.isActive
                           ? "Deactivate User"
                           : "Activate User"}
+                    </button>
+
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => void handleDeleteUser(user)}
+                      disabled={isCurrentUser || isUpdatingUser || isDeletingUser || !user.id}
+                    >
+                      {isDeletingUser ? "Deleting..." : "🗑 Delete User"}
                     </button>
                   </div>
                 </div>

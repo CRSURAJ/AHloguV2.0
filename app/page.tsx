@@ -838,6 +838,63 @@ export default function Page() {
     }
   }
 
+  async function handleDeleteAwsUser(userId: string): Promise<AuthActionResult> {
+    setUsersMessage("");
+
+    if (userId === currentUser?.id) {
+      return {
+        ok: false,
+        message: "You cannot delete your own admin account.",
+      };
+    }
+
+    try {
+      const session = await getCurrentCognitoSession();
+
+      if (!session) {
+        throw new Error("No valid Cognito session found.");
+      }
+
+      const idToken = session.getIdToken().getJwtToken();
+
+      const response = await fetch(`${getApiBaseUrl()}/users/${encodeURIComponent(userId)}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const responseJson = (await response.json().catch(() => null)) as unknown;
+
+      if (!response.ok) {
+        const errorMessage =
+          responseJson &&
+          typeof responseJson === "object" &&
+          "error" in responseJson &&
+          typeof responseJson.error === "string"
+            ? responseJson.error
+            : `Could not delete user. Status ${response.status}.`;
+
+        throw new Error(errorMessage);
+      }
+
+      const users = await fetchAwsUsersFromCloud();
+      setAwsUsers(users);
+
+      return {
+        ok: true,
+        message: "User deleted from Cognito and AHloguUsers.",
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        message:
+          error instanceof Error ? error.message : "Could not delete AWS user.",
+      };
+    }
+  }
+
   function handleSignOut() {
     signOutCognito();
     setCurrentUser(null);
@@ -943,6 +1000,7 @@ export default function Page() {
             onRefresh={() => void handleOpenUserManagement()}
             onCreateUser={handleCreateAwsUser}
             onToggleActive={handleToggleAwsUserActive}
+            onDeleteUser={handleDeleteAwsUser}
           />
         ) : null}
 

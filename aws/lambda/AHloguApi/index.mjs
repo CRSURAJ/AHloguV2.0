@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import {
   AdminCreateUserCommand,
+  AdminDeleteUserCommand,
   AdminDisableUserCommand,
   AdminEnableUserCommand,
   CognitoIdentityProviderClient,
@@ -501,6 +502,85 @@ async function updateUserActive(event, path) {
   });
 }
 
+async function deleteUser(event, path) {
+  const profile = await requireAdminUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("USERS_TABLE", USERS_TABLE);
+  const userPoolId = requireEnv("COGNITO_USER_POOL_ID", COGNITO_USER_POOL_ID);
+  const id = decodeURIComponent(path.replace("/users/", ""));
+
+  if (!id) {
+    return json(400, {
+      error: "Missing user id.",
+    });
+  }
+
+  if (id === profile.user.id) {
+    return json(400, {
+      error: "You cannot delete your own admin account.",
+    });
+  }
+
+  const existingResult = await dynamo.send(
+    new GetCommand({
+      TableName: tableName,
+      Key: {
+        id,
+      },
+    }),
+  );
+
+  if (!existingResult.Item) {
+    return json(404, {
+      error: "User not found.",
+      id,
+    });
+  }
+
+  const cognitoUsername = cleanString(
+    existingResult.Item.email || existingResult.Item.username,
+  );
+
+  if (!cognitoUsername) {
+    return json(400, {
+      error: "User has no Cognito username/email saved.",
+      id,
+    });
+  }
+
+  await cognito.send(
+    new AdminDeleteUserCommand({
+      UserPoolId: userPoolId,
+      Username: cognitoUsername,
+    }),
+  );
+
+  await dynamo.send(
+    new DeleteCommand({
+      TableName: tableName,
+      Key: {
+        id,
+      },
+    }),
+  );
+
+  await putSyncEvent({
+    type: "user.delete",
+    userId: profile.user.id,
+    email: profile.user.email || "",
+    entityId: id,
+  });
+
+  return json(200, {
+    ok: true,
+    cloudId: id,
+  });
+}
+
 async function listJobs(event) {
   const profile = await requireActiveUser(event);
 
@@ -767,6 +847,10 @@ export const handler = async (event) => {
 
     if (method === "PUT" && path.startsWith("/users/")) {
       return updateUserActive(event, path);
+    }
+
+    if (method === "DELETE" && path.startsWith("/users/")) {
+      return deleteUser(event, path);
     }
 
     if (method === "GET" && path === "/jobs") {
