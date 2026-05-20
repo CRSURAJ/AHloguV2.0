@@ -1,4 +1,8 @@
 import { randomUUID } from "crypto";
+import {
+  AdminCreateUserCommand,
+  CognitoIdentityProviderClient,
+} from "@aws-sdk/client-cognito-identity-provider";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   DeleteCommand,
@@ -14,6 +18,7 @@ const USERS_TABLE = process.env.USERS_TABLE;
 const JOBS_TABLE = process.env.JOBS_TABLE;
 const WORK_LOGS_TABLE = process.env.WORK_LOGS_TABLE;
 const SYNC_EVENTS_TABLE = process.env.SYNC_EVENTS_TABLE;
+const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || process.env.USER_POOL_ID;
 
 const dynamo = DynamoDBDocumentClient.from(
   new DynamoDBClient({ region: REGION }),
@@ -23,6 +28,8 @@ const dynamo = DynamoDBDocumentClient.from(
     },
   },
 );
+
+const cognito = new CognitoIdentityProviderClient({ region: REGION });
 
 function json(statusCode, body) {
   return {
@@ -177,6 +184,156 @@ async function getMe(event) {
   });
 }
 
+
+
+const ALLOWED_USER_ROLES = new Set([
+  "plumber",
+  "electrician",
+  "gas_fitter",
+  "hvac_technician",
+  "refrigeration_technician",
+  "apprentice",
+  "supervisor",
+  "other",
+]);
+
+function cleanString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeUserRole(value) {
+  const role = cleanString(value).toLowerCase();
+
+  if (ALLOWED_USER_ROLES.has(role)) {
+    return role;
+  }
+
+  if (role === "hvac technician") {
+    return "hvac_technician";
+  }
+
+  if (role === "refrigeration technician") {
+    return "refrigeration_technician";
+  }
+
+  if (role === "gas fitter") {
+    return "gas_fitter";
+  }
+
+  return "other";
+}
+
+function getCreatedUserSub(cognitoUser) {
+  const attributes = cognitoUser?.Attributes ?? [];
+  const subAttribute = attributes.find((attribute) => attribute.Name === "sub");
+
+  return subAttribute?.Value || "";
+}
+
+async function createUser(event) {
+  const profile = await requireAdminUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("USERS_TABLE", USERS_TABLE);
+  const userPoolId = requireEnv("COGNITO_USER_POOL_ID", COGNITO_USER_POOL_ID);
+  const body = parseBody(event);
+
+  const email = cleanString(body.email || body.username).toLowerCase();
+  const fullName = cleanString(body.fullName || body.name);
+  const role = normalizeUserRole(body.role);
+  const permissionLevel = cleanString(body.permissionLevel).toLowerCase();
+  const isAdmin = permissionLevel === "admin" || body.isAdmin === true;
+  const temporaryPassword = cleanString(body.temporaryPassword || body.password);
+
+  if (!email || !email.includes("@")) {
+    return json(400, {
+      error: "Valid email is required.",
+    });
+  }
+
+  if (!fullName) {
+    return json(400, {
+      error: "Full name is required.",
+    });
+  }
+
+  if (temporaryPassword.length < 8) {
+    return json(400, {
+      error: "Temporary password must be at least 8 characters.",
+    });
+  }
+
+  const created = await cognito.send(
+    new AdminCreateUserCommand({
+      UserPoolId: userPoolId,
+      Username: email,
+      TemporaryPassword: temporaryPassword,
+      MessageAction: "SUPPRESS",
+      UserAttributes: [
+        {
+          Name: "email",
+          Value: email,
+        },
+        {
+          Name: "email_verified",
+          Value: "true",
+        },
+        {
+          Name: "name",
+          Value: fullName,
+        },
+      ],
+    }),
+  );
+
+  const userSub = getCreatedUserSub(created.User);
+
+  if (!userSub) {
+    return json(500, {
+      error: "Cognito user was created but no sub was returned.",
+    });
+  }
+
+  const now = new Date().toISOString();
+
+  const user = {
+    id: userSub,
+    email,
+    username: email,
+    fullName,
+    role,
+    permissionLevel: isAdmin ? "admin" : "user",
+    isAdmin,
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+    createdBy: profile.user.id,
+    createdByEmail: profile.user.email || "",
+  };
+
+  await dynamo.send(
+    new PutCommand({
+      TableName: tableName,
+      Item: user,
+    }),
+  );
+
+  await putSyncEvent({
+    type: "user.create",
+    userId: profile.user.id,
+    email: profile.user.email || "",
+    entityId: userSub,
+  });
+
+  return json(201, {
+    ok: true,
+    cloudId: userSub,
+    user,
+  });
+}
 
 async function listUsers(event) {
   const profile = await requireAdminUser(event);
@@ -471,6 +628,10 @@ export const handler = async (event) => {
 
     if (method === "GET" && path === "/me") {
       return getMe(event);
+    }
+
+    if (method === "POST" && path === "/users") {
+      return createUser(event);
     }
 
     if (method === "GET" && path === "/users") {
