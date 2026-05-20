@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import AdminDashboard from "@/components/AdminDashboard";
 import JobManagementPanel from "@/components/JobManagementPanel/JobManagementPanel";
+import UserManagementPanel from "@/components/UserManagementPanel/UserManagementPanel";
 import WorkLogger from "@/components/WorkLogger/WorkLogger";
 import {
   completeNewCognitoPassword,
@@ -15,6 +16,7 @@ import {
   type CognitoSignInResult,
 } from "@/lib/auth/cognitoClient";
 import type {
+  AuthActionResult,
   CredentialType,
   CurrentUser,
   PermissionLevel,
@@ -22,6 +24,16 @@ import type {
 } from "@/types/work";
 
 type ProfileRecord = Record<string, unknown>;
+
+type CreateAwsUserPayload = {
+  email: string;
+  fullName: string;
+  permissionLevel: PermissionLevel;
+  role: WorkerRole;
+  temporaryPassword: string;
+  confirmTemporaryPassword: string;
+};
+
 
 type AwsUserListItem = {
   id: string;
@@ -557,13 +569,6 @@ export default function Page() {
   const [awsUsers, setAwsUsers] = useState<AwsUserListItem[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersMessage, setUsersMessage] = useState("");
-  const [createUserFullName, setCreateUserFullName] = useState("");
-  const [createUserEmail, setCreateUserEmail] = useState("");
-  const [createUserRole, setCreateUserRole] = useState<WorkerRole>("plumber");
-  const [createUserPermission, setCreateUserPermission] = useState<PermissionLevel>("user");
-  const [createUserPassword, setCreateUserPassword] = useState("");
-  const [createUserConfirmPassword, setCreateUserConfirmPassword] = useState("");
-  const [createUserBusy, setCreateUserBusy] = useState(false);
   const [jobManagementOpen, setJobManagementOpen] = useState(false);
 
   const canManageUsers = currentUser?.permissionLevel === "admin";
@@ -694,20 +699,24 @@ export default function Page() {
     }
   }
 
-  async function handleCreateAwsUser() {
+  async function handleCreateAwsUser(
+    input: CreateAwsUserPayload,
+  ): Promise<AuthActionResult> {
     setUsersMessage("");
 
-    if (createUserPassword !== createUserConfirmPassword) {
-      setUsersMessage("Passwords do not match.");
-      return;
+    if (input.temporaryPassword !== input.confirmTemporaryPassword) {
+      return {
+        ok: false,
+        message: "Passwords do not match.",
+      };
     }
 
-    if (createUserPassword.trim().length < 8) {
-      setUsersMessage("Temporary password must be at least 8 characters.");
-      return;
+    if (input.temporaryPassword.trim().length < 8) {
+      return {
+        ok: false,
+        message: "Temporary password must be at least 8 characters.",
+      };
     }
-
-    setCreateUserBusy(true);
 
     try {
       const session = await getCurrentCognitoSession();
@@ -725,11 +734,11 @@ export default function Page() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email: createUserEmail,
-          fullName: createUserFullName,
-          role: createUserRole,
-          permissionLevel: createUserPermission,
-          temporaryPassword: createUserPassword,
+          email: input.email,
+          fullName: input.fullName,
+          role: input.role,
+          permissionLevel: input.permissionLevel,
+          temporaryPassword: input.temporaryPassword,
         }),
       });
 
@@ -747,24 +756,20 @@ export default function Page() {
         throw new Error(errorMessage);
       }
 
-      setCreateUserFullName("");
-      setCreateUserEmail("");
-      setCreateUserRole("plumber");
-      setCreateUserPermission("user");
-      setCreateUserPassword("");
-      setCreateUserConfirmPassword("");
-      setUsersMessage(
-        "User created in Cognito and AHloguUsers. Give them the temporary password and they will be asked to set a new password at first login.",
-      );
-
       const users = await fetchAwsUsersFromCloud();
       setAwsUsers(users);
+
+      return {
+        ok: true,
+        message:
+          "User created in Cognito and AHloguUsers. Give them the temporary password. They will be asked to set a new password on first login.",
+      };
     } catch (error) {
-      setUsersMessage(
-        error instanceof Error ? error.message : "Could not create AWS user.",
-      );
-    } finally {
-      setCreateUserBusy(false);
+      return {
+        ok: false,
+        message:
+          error instanceof Error ? error.message : "Could not create AWS user.",
+      };
     }
   }
 
@@ -864,367 +869,15 @@ export default function Page() {
         ) : null}
 
         {userManagementOpen ? (
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              display: "grid",
-              placeItems: "center",
-              padding: "20px",
-              background: "rgba(0,0,0,0.48)",
-              zIndex: 100,
-            }}
-          >
-            <div
-              style={{
-                width: "min(780px, 100%)",
-                maxHeight: "86vh",
-                overflow: "auto",
-                borderRadius: "24px",
-                padding: "24px",
-                background: "#11302D",
-                color: "#eef7f3",
-                border: "1px solid rgba(255,255,255,0.14)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: "16px",
-                  alignItems: "flex-start",
-                  marginBottom: "18px",
-                }}
-              >
-                <div>
-                  <h2 style={{ margin: 0 }}>User Management</h2>
-                  <p
-                    style={{
-                      margin: "8px 0 0",
-                      color: "rgba(255,255,255,0.68)",
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    AWS users from AHloguUsers. New users are created in
-                    Cognito and saved into AHloguUsers.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setUserManagementOpen(false)}
-                  style={{
-                    border: 0,
-                    borderRadius: "14px",
-                    padding: "12px 16px",
-                    background: "rgba(255,255,255,0.1)",
-                    color: "#eef7f3",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                  }}
-                >
-                  Close
-                </button>
-              </div>
-
-              <div
-                style={{
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  borderRadius: "20px",
-                  padding: "16px",
-                  background: "rgba(255,255,255,0.06)",
-                  marginBottom: "16px",
-                }}
-              >
-                <h3 style={{ margin: "0 0 12px" }}>Create AWS User</h3>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-                    gap: "12px",
-                  }}
-                >
-                  <label style={{ display: "grid", gap: "6px", fontWeight: 800 }}>
-                    Full Name
-                    <input
-                      value={createUserFullName}
-                      onChange={(event) => setCreateUserFullName(event.target.value)}
-                      style={{
-                        border: "1px solid rgba(255,255,255,0.14)",
-                        borderRadius: "14px",
-                        padding: "12px",
-                        background: "rgba(255,255,255,0.08)",
-                        color: "#eef7f3",
-                        font: "inherit",
-                      }}
-                    />
-                  </label>
-
-                  <label style={{ display: "grid", gap: "6px", fontWeight: 800 }}>
-                    Email
-                    <input
-                      type="email"
-                      value={createUserEmail}
-                      onChange={(event) => setCreateUserEmail(event.target.value)}
-                      style={{
-                        border: "1px solid rgba(255,255,255,0.14)",
-                        borderRadius: "14px",
-                        padding: "12px",
-                        background: "rgba(255,255,255,0.08)",
-                        color: "#eef7f3",
-                        font: "inherit",
-                      }}
-                    />
-                  </label>
-
-                  <label style={{ display: "grid", gap: "6px", fontWeight: 800 }}>
-                    Permission
-                    <select
-                      value={createUserPermission}
-                      onChange={(event) =>
-                        setCreateUserPermission(event.target.value as PermissionLevel)
-                      }
-                      style={{
-                        border: "1px solid rgba(255,255,255,0.14)",
-                        borderRadius: "14px",
-                        padding: "12px",
-                        background: "#143b37",
-                        color: "#eef7f3",
-                        font: "inherit",
-                      }}
-                    >
-                      <option value="user">User</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </label>
-
-                  <label style={{ display: "grid", gap: "6px", fontWeight: 800 }}>
-                    Role
-                    <select
-                      value={createUserRole}
-                      onChange={(event) =>
-                        setCreateUserRole(event.target.value as WorkerRole)
-                      }
-                      style={{
-                        border: "1px solid rgba(255,255,255,0.14)",
-                        borderRadius: "14px",
-                        padding: "12px",
-                        background: "#143b37",
-                        color: "#eef7f3",
-                        font: "inherit",
-                      }}
-                    >
-                      <option value="plumber">Plumber</option>
-                      <option value="electrician">Electrician</option>
-                      <option value="gas_fitter">Gas Fitter</option>
-                      <option value="hvac_technician">HVAC Technician</option>
-                      <option value="refrigeration_technician">
-                        Refrigeration Technician
-                      </option>
-                      <option value="apprentice">Apprentice</option>
-                      <option value="supervisor">Supervisor</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </label>
-
-                  <label style={{ display: "grid", gap: "6px", fontWeight: 800 }}>
-                    Temporary Password
-                    <input
-                      type="password"
-                      value={createUserPassword}
-                      onChange={(event) =>
-                        setCreateUserPassword(event.target.value)
-                      }
-                      style={{
-                        border: "1px solid rgba(255,255,255,0.14)",
-                        borderRadius: "14px",
-                        padding: "12px",
-                        background: "rgba(255,255,255,0.08)",
-                        color: "#eef7f3",
-                        font: "inherit",
-                      }}
-                    />
-                  </label>
-
-                  <label style={{ display: "grid", gap: "6px", fontWeight: 800 }}>
-                    Confirm Password
-                    <input
-                      type="password"
-                      value={createUserConfirmPassword}
-                      onChange={(event) =>
-                        setCreateUserConfirmPassword(event.target.value)
-                      }
-                      style={{
-                        border: "1px solid rgba(255,255,255,0.14)",
-                        borderRadius: "14px",
-                        padding: "12px",
-                        background: "rgba(255,255,255,0.08)",
-                        color: "#eef7f3",
-                        font: "inherit",
-                      }}
-                    />
-                  </label>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => void handleCreateAwsUser()}
-                  disabled={createUserBusy}
-                  style={{
-                    border: 0,
-                    borderRadius: "14px",
-                    padding: "12px 16px",
-                    background: createUserBusy
-                      ? "rgba(83,188,123,0.5)"
-                      : "#53BC7B",
-                    color: "#11302D",
-                    fontWeight: 800,
-                    cursor: createUserBusy ? "not-allowed" : "pointer",
-                    marginTop: "14px",
-                  }}
-                >
-                  {createUserBusy ? "Creating..." : "Create User"}
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => void handleOpenUserManagement()}
-                disabled={usersLoading}
-                style={{
-                  border: 0,
-                  borderRadius: "14px",
-                  padding: "12px 16px",
-                  background: usersLoading ? "rgba(83,188,123,0.5)" : "#53BC7B",
-                  color: "#11302D",
-                  fontWeight: 800,
-                  cursor: usersLoading ? "not-allowed" : "pointer",
-                  marginBottom: "16px",
-                }}
-              >
-                {usersLoading ? "Refreshing..." : "Refresh Users"}
-              </button>
-
-              {usersMessage ? (
-                <div
-                  style={{
-                    borderRadius: "16px",
-                    padding: "12px 14px",
-                    background: "rgba(255,255,255,0.1)",
-                    marginBottom: "16px",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {usersMessage}
-                </div>
-              ) : null}
-
-              {usersLoading && awsUsers.length === 0 ? (
-                <div
-                  style={{
-                    borderRadius: "16px",
-                    padding: "16px",
-                    background: "rgba(255,255,255,0.08)",
-                  }}
-                >
-                  Loading users...
-                </div>
-              ) : null}
-
-              {!usersLoading && awsUsers.length === 0 ? (
-                <div
-                  style={{
-                    borderRadius: "16px",
-                    padding: "16px",
-                    background: "rgba(255,255,255,0.08)",
-                  }}
-                >
-                  No AWS users found.
-                </div>
-              ) : null}
-
-              <div style={{ display: "grid", gap: "12px" }}>
-                {awsUsers.map((user) => (
-                  <div
-                    key={user.id || user.email}
-                    style={{
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      borderRadius: "18px",
-                      padding: "16px",
-                      background: "rgba(255,255,255,0.06)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        gap: "14px",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 900, fontSize: "17px" }}>
-                          {user.fullName || user.email || "Unnamed user"}
-                        </div>
-                        <div
-                          style={{
-                            color: "rgba(255,255,255,0.68)",
-                            marginTop: "4px",
-                          }}
-                        >
-                          {user.email || user.username || "No email"} ·{" "}
-                          {user.role || "other"}
-                        </div>
-                      </div>
-
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "8px",
-                          alignItems: "center",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <span
-                          style={{
-                            borderRadius: "999px",
-                            padding: "6px 10px",
-                            background:
-                              user.permissionLevel === "admin"
-                                ? "rgba(83,188,123,0.2)"
-                                : "rgba(255,255,255,0.1)",
-                            color: "#eef7f3",
-                            fontSize: "12px",
-                            fontWeight: 900,
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          {user.permissionLevel}
-                        </span>
-
-                        <span
-                          style={{
-                            borderRadius: "999px",
-                            padding: "6px 10px",
-                            background: user.isActive
-                              ? "rgba(83,188,123,0.2)"
-                              : "rgba(255,120,120,0.18)",
-                            color: "#eef7f3",
-                            fontSize: "12px",
-                            fontWeight: 900,
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          {user.isActive ? "Active" : "Inactive"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <UserManagementPanel
+            users={awsUsers}
+            currentUserId={currentUser.id}
+            loading={usersLoading}
+            message={usersMessage}
+            onClose={() => setUserManagementOpen(false)}
+            onRefresh={() => void handleOpenUserManagement()}
+            onCreateUser={handleCreateAwsUser}
+          />
         ) : null}
 
         {jobManagementOpen ? (

@@ -8,36 +8,46 @@ import {
 } from "@/types/work";
 import type {
   AuthActionResult,
-  CredentialType,
-  OfflineUser,
   PermissionLevel,
   WorkerRole,
 } from "@/types/work";
 
-type UserManagementPanelProps = {
-  users: OfflineUser[];
-  onClose: () => void;
-  currentUserId: string;
-  onCreateUser: (input: {
-    username: string;
-    fullName: string;
-    permissionLevel: PermissionLevel;
-    role: WorkerRole;
-    credentialType: CredentialType;
-    secret: string;
-    confirmSecret: string;
-  }) => Promise<AuthActionResult>;
-  onResetCredential: (
-    userId: string,
-    nextSecret: string,
-    confirmSecret: string
-  ) => Promise<AuthActionResult>;
-  onToggleActive: (userId: string) => AuthActionResult;
-  onDeleteUser: (userId: string) => AuthActionResult;
+export type AwsUserListItem = {
+  id: string;
+  email: string;
+  username: string;
+  fullName: string;
+  role: string;
+  permissionLevel: PermissionLevel;
+  isAdmin: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
-function getRoleLabel(role: WorkerRole): string {
-  return WORKER_ROLE_OPTIONS.find((item) => item.value === role)?.label ?? role;
+export type CreateAwsUserInput = {
+  email: string;
+  fullName: string;
+  permissionLevel: PermissionLevel;
+  role: WorkerRole;
+  temporaryPassword: string;
+  confirmTemporaryPassword: string;
+};
+
+type UserManagementPanelProps = {
+  users: AwsUserListItem[];
+  currentUserId: string;
+  loading: boolean;
+  message: string;
+  onClose: () => void;
+  onRefresh: () => void;
+  onCreateUser: (input: CreateAwsUserInput) => Promise<AuthActionResult>;
+};
+
+function getRoleLabel(role: string): string {
+  return (
+    WORKER_ROLE_OPTIONS.find((item) => item.value === role)?.label ?? role
+  );
 }
 
 function getPermissionLabel(permissionLevel: PermissionLevel): string {
@@ -47,125 +57,71 @@ function getPermissionLabel(permissionLevel: PermissionLevel): string {
   );
 }
 
-function TrashIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={styles.iconSvg}
-      aria-hidden="true"
-    >
-      <path d="M3 6h18" />
-      <path d="M8 6V4.8c0-.9.7-1.6 1.6-1.6h4.8c.9 0 1.6.7 1.6 1.6V6" />
-      <path d="M6.8 6l.8 12.1c.1 1.4 1.2 2.5 2.6 2.5h3.6c1.4 0 2.5-1.1 2.6-2.5L17.2 6" />
-      <path d="M10 10.2v6.2" />
-      <path d="M14 10.2v6.2" />
-    </svg>
-  );
-}
-
 export default function UserManagementPanel({
   users,
   currentUserId,
+  loading,
+  message,
   onClose,
+  onRefresh,
   onCreateUser,
-  onResetCredential,
-  onToggleActive,
-  onDeleteUser,
 }: UserManagementPanelProps) {
-  const [message, setMessage] = useState("");
+  const [localMessage, setLocalMessage] = useState("");
   const [fullName, setFullName] = useState("");
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [permissionLevel, setPermissionLevel] =
     useState<PermissionLevel>("user");
   const [role, setRole] = useState<WorkerRole>("plumber");
-  const [credentialType, setCredentialType] =
-    useState<CredentialType>("pin");
-  const [secret, setSecret] = useState("");
-  const [confirmSecret, setConfirmSecret] = useState("");
-  const [resetUserId, setResetUserId] = useState<string | null>(null);
-  const [resetSecret, setResetSecret] = useState("");
-  const [resetConfirmSecret, setResetConfirmSecret] = useState("");
+  const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [confirmTemporaryPassword, setConfirmTemporaryPassword] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const sortedUsers = useMemo(
-  () =>
-    users
-      .filter((user) => user.id !== currentUserId)
-      .sort((a, b) => {
+    () =>
+      [...users].sort((a, b) => {
         if (a.permissionLevel !== b.permissionLevel) {
           return a.permissionLevel === "admin" ? -1 : 1;
         }
 
-        return a.username.localeCompare(b.username);
+        return (a.email || a.username).localeCompare(b.email || b.username);
       }),
-  [users, currentUserId]
-);
+    [users],
+  );
+
+  const displayMessage = localMessage || message;
 
   async function handleCreate(): Promise<void> {
-    const result = await onCreateUser({
-      username,
-      fullName,
-      permissionLevel,
-      role,
-      credentialType: permissionLevel === "admin" ? "password" : credentialType,
-      secret,
-      confirmSecret,
-    });
+    setLocalMessage("");
 
-    setMessage(result.message);
-
-    if (result.ok) {
-      setFullName("");
-      setUsername("");
-      setPermissionLevel("user");
-      setRole("plumber");
-      setCredentialType("pin");
-      setSecret("");
-      setConfirmSecret("");
-    }
-  }
-
-  async function handleReset(): Promise<void> {
-    if (!resetUserId) return;
-
-    const result = await onResetCredential(
-      resetUserId,
-      resetSecret,
-      resetConfirmSecret
-    );
-
-    setMessage(result.message);
-
-    if (result.ok) {
-      setResetUserId(null);
-      setResetSecret("");
-      setResetConfirmSecret("");
-    }
-  }
-
-  function handleDelete(user: OfflineUser): void {
-    if (user.id === currentUserId) {
-      setMessage("You cannot delete your own admin account.");
+    if (temporaryPassword !== confirmTemporaryPassword) {
+      setLocalMessage("Passwords do not match.");
       return;
     }
 
-    const confirmed = window.confirm(
-      `Delete ${user.fullName}? This cannot be undone.`
-    );
+    setCreating(true);
 
-    if (!confirmed) return;
+    try {
+      const result = await onCreateUser({
+        email,
+        fullName,
+        permissionLevel,
+        role,
+        temporaryPassword,
+        confirmTemporaryPassword,
+      });
 
-    const result = onDeleteUser(user.id);
-    setMessage(result.message);
+      setLocalMessage(result.message);
 
-    if (result.ok && resetUserId === user.id) {
-      setResetUserId(null);
-      setResetSecret("");
-      setResetConfirmSecret("");
+      if (result.ok) {
+        setFullName("");
+        setEmail("");
+        setPermissionLevel("user");
+        setRole("plumber");
+        setTemporaryPassword("");
+        setConfirmTemporaryPassword("");
+      }
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -176,8 +132,8 @@ export default function UserManagementPanel({
           <div>
             <h3 className={styles.title}>User Management</h3>
             <p className={styles.subtitle}>
-              Create users, assign permission level and trade role, reset
-              PIN/password, activate, deactivate, or delete accounts.
+              Create Cognito users, assign admin/user access and trade role,
+              then store the matching profile in AHloguUsers.
             </p>
           </div>
 
@@ -186,7 +142,9 @@ export default function UserManagementPanel({
           </button>
         </div>
 
-        {message ? <div className={styles.message}>{message}</div> : null}
+        {displayMessage ? (
+          <div className={styles.message}>{displayMessage}</div>
+        ) : null}
 
         <section className={styles.section}>
           <div className={styles.sectionTitle}>Add User</div>
@@ -200,19 +158,20 @@ export default function UserManagementPanel({
                 id="user-full-name"
                 className={styles.input}
                 value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                onChange={(event) => setFullName(event.target.value)}
               />
             </div>
 
             <div className={styles.field}>
-              <label className={styles.label} htmlFor="user-username">
-                Username
+              <label className={styles.label} htmlFor="user-email">
+                Email
               </label>
               <input
-                id="user-username"
+                id="user-email"
                 className={styles.input}
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
               />
             </div>
 
@@ -224,14 +183,9 @@ export default function UserManagementPanel({
                 id="user-permission-level"
                 className={styles.select}
                 value={permissionLevel}
-                onChange={(e) => {
-                  const nextLevel = e.target.value as PermissionLevel;
-                  setPermissionLevel(nextLevel);
-
-                  if (nextLevel === "admin") {
-                    setCredentialType("password");
-                  }
-                }}
+                onChange={(event) =>
+                  setPermissionLevel(event.target.value as PermissionLevel)
+                }
               >
                 {PERMISSION_LEVEL_OPTIONS.map((item) => (
                   <option key={item.value} value={item.value}>
@@ -249,7 +203,7 @@ export default function UserManagementPanel({
                 id="user-role"
                 className={styles.select}
                 value={role}
-                onChange={(e) => setRole(e.target.value as WorkerRole)}
+                onChange={(event) => setRole(event.target.value as WorkerRole)}
               >
                 {WORKER_ROLE_OPTIONS.map((item) => (
                   <option key={item.value} value={item.value}>
@@ -260,51 +214,33 @@ export default function UserManagementPanel({
             </div>
 
             <div className={styles.field}>
-              <label className={styles.label} htmlFor="user-credential-type">
-                Credential Type
-              </label>
-              <select
-                id="user-credential-type"
-                className={styles.select}
-                value={permissionLevel === "admin" ? "password" : credentialType}
-                onChange={(e) =>
-                  setCredentialType(e.target.value as CredentialType)
-                }
-                disabled={permissionLevel === "admin"}
-              >
-                <option value="pin">PIN</option>
-                <option value="password">Password</option>
-              </select>
-            </div>
-
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="user-secret">
-                {permissionLevel === "admin" || credentialType === "password"
-                  ? "Password"
-                  : "PIN"}
+              <label className={styles.label} htmlFor="user-temp-password">
+                Temporary Password
               </label>
               <input
-                id="user-secret"
+                id="user-temp-password"
                 className={styles.input}
                 type="password"
-                value={secret}
-                onChange={(e) => setSecret(e.target.value)}
+                value={temporaryPassword}
+                onChange={(event) => setTemporaryPassword(event.target.value)}
               />
             </div>
 
             <div className={styles.field}>
-              <label className={styles.label} htmlFor="user-secret-confirm">
-                Confirm{" "}
-                {permissionLevel === "admin" || credentialType === "password"
-                  ? "Password"
-                  : "PIN"}
+              <label
+                className={styles.label}
+                htmlFor="user-temp-password-confirm"
+              >
+                Confirm Temporary Password
               </label>
               <input
-                id="user-secret-confirm"
+                id="user-temp-password-confirm"
                 className={styles.input}
                 type="password"
-                value={confirmSecret}
-                onChange={(e) => setConfirmSecret(e.target.value)}
+                value={confirmTemporaryPassword}
+                onChange={(event) =>
+                  setConfirmTemporaryPassword(event.target.value)
+                }
               />
             </div>
           </div>
@@ -313,27 +249,47 @@ export default function UserManagementPanel({
             type="button"
             className={styles.primaryButton}
             onClick={() => void handleCreate()}
+            disabled={creating}
           >
-            Create User
+            {creating ? "Creating User..." : "Create User"}
           </button>
         </section>
 
         <section className={styles.section}>
           <div className={styles.sectionTitle}>Existing Users</div>
 
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={onRefresh}
+            disabled={loading}
+          >
+            {loading ? "Refreshing..." : "Refresh Users"}
+          </button>
+
           <div className={styles.userList}>
+            {loading && sortedUsers.length === 0 ? (
+              <div className={styles.userCard}>Loading users...</div>
+            ) : null}
+
+            {!loading && sortedUsers.length === 0 ? (
+              <div className={styles.userCard}>No AWS users found.</div>
+            ) : null}
+
             {sortedUsers.map((user) => {
               const isCurrentUser = user.id === currentUserId;
 
               return (
-                <div key={user.id} className={styles.userCard}>
+                <div key={user.id || user.email} className={styles.userCard}>
                   <div className={styles.userTop}>
                     <div>
-                      <div className={styles.userName}>{user.fullName}</div>
+                      <div className={styles.userName}>
+                        {user.fullName || user.email || "Unnamed user"}
+                      </div>
                       <div className={styles.userMeta}>
-                        @{user.username} ·{" "}
+                        {user.email || user.username} ·{" "}
                         {getPermissionLabel(user.permissionLevel)} ·{" "}
-                        {getRoleLabel(user.role)} · {user.credentialType}
+                        {getRoleLabel(user.role)}
                       </div>
                     </div>
 
@@ -342,17 +298,7 @@ export default function UserManagementPanel({
                         <span className={styles.selfUserBadge}>
                           Current admin
                         </span>
-                      ) : (
-                        <button
-                          type="button"
-                          className={styles.iconDangerButton}
-                          onClick={() => handleDelete(user)}
-                          aria-label={`Delete user ${user.fullName}`}
-                          title="Delete user"
-                        >
-                          <TrashIcon />
-                        </button>
-                      )}
+                      ) : null}
 
                       <div className={styles.badges}>
                         <span
@@ -365,9 +311,9 @@ export default function UserManagementPanel({
                           {user.isActive ? "ACTIVE" : "INACTIVE"}
                         </span>
 
-                        {user.mustChangeCredential ? (
+                        {user.permissionLevel === "admin" ? (
                           <span className={`${styles.badge} ${styles.badgeWarn}`}>
-                            MUST CHANGE
+                            ADMIN
                           </span>
                         ) : null}
                       </div>
@@ -378,83 +324,19 @@ export default function UserManagementPanel({
                     <button
                       type="button"
                       className={styles.secondaryButton}
-                      onClick={() => {
-                        const result = onToggleActive(user.id);
-                        setMessage(result.message);
-                      }}
+                      disabled
                     >
-                      {user.isActive ? "Deactivate" : "Activate"}
+                      Reset Password Later
                     </button>
 
                     <button
                       type="button"
                       className={styles.secondaryButton}
-                      onClick={() => {
-                        setResetUserId((prev) =>
-                          prev === user.id ? null : user.id
-                        );
-                        setResetSecret("");
-                        setResetConfirmSecret("");
-                      }}
+                      disabled
                     >
-                      Reset {user.credentialType === "pin" ? "PIN" : "Password"}
+                      Activate / Deactivate Later
                     </button>
                   </div>
-
-                  {resetUserId === user.id ? (
-                    <div className={styles.resetBox}>
-                      <div className={styles.resetTitle}>
-                        Reset{" "}
-                        {user.credentialType === "pin" ? "PIN" : "Password"}
-                      </div>
-
-                      <div className={styles.grid}>
-                        <div className={styles.field}>
-                          <label
-                            className={styles.label}
-                            htmlFor={`reset-${user.id}`}
-                          >
-                            New{" "}
-                            {user.credentialType === "pin" ? "PIN" : "Password"}
-                          </label>
-                          <input
-                            id={`reset-${user.id}`}
-                            className={styles.input}
-                            type="password"
-                            value={resetSecret}
-                            onChange={(e) => setResetSecret(e.target.value)}
-                          />
-                        </div>
-
-                        <div className={styles.field}>
-                          <label
-                            className={styles.label}
-                            htmlFor={`reset-confirm-${user.id}`}
-                          >
-                            Confirm{" "}
-                            {user.credentialType === "pin" ? "PIN" : "Password"}
-                          </label>
-                          <input
-                            id={`reset-confirm-${user.id}`}
-                            className={styles.input}
-                            type="password"
-                            value={resetConfirmSecret}
-                            onChange={(e) =>
-                              setResetConfirmSecret(e.target.value)
-                            }
-                          />
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        className={styles.primaryButton}
-                        onClick={() => void handleReset()}
-                      >
-                        Save Reset
-                      </button>
-                    </div>
-                  ) : null}
                 </div>
               );
             })}
