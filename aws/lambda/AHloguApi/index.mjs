@@ -177,6 +177,46 @@ async function getMe(event) {
   });
 }
 
+
+async function listUsers(event) {
+  const profile = await requireAdminUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("USERS_TABLE", USERS_TABLE);
+
+  const result = await dynamo.send(
+    new ScanCommand({
+      TableName: tableName,
+    }),
+  );
+
+  const users = (result.Items ?? [])
+    .map((user) => ({
+      id: String(user.id || ""),
+      email: String(user.email || ""),
+      username: String(user.email || user.username || ""),
+      fullName: String(user.fullName || user.name || user.email || ""),
+      role: String(user.role || "other"),
+      permissionLevel: user.isAdmin ? "admin" : "user",
+      isAdmin: Boolean(user.isAdmin),
+      isActive: user.isActive !== false,
+      createdAt: String(user.createdAt || ""),
+      updatedAt: String(user.updatedAt || ""),
+    }))
+    .sort((a, b) => {
+      if (a.permissionLevel !== b.permissionLevel) {
+        return a.permissionLevel === "admin" ? -1 : 1;
+      }
+
+      return a.email.localeCompare(b.email);
+    });
+
+  return json(200, users);
+}
+
 async function listJobs(event) {
   const profile = await requireActiveUser(event);
 
@@ -431,6 +471,10 @@ export const handler = async (event) => {
 
     if (method === "GET" && path === "/me") {
       return getMe(event);
+    }
+
+    if (method === "GET" && path === "/users") {
+      return listUsers(event);
     }
 
     if (method === "GET" && path === "/jobs") {

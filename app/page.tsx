@@ -23,6 +23,20 @@ import type {
 
 type ProfileRecord = Record<string, unknown>;
 
+type AwsUserListItem = {
+  id: string;
+  email: string;
+  username: string;
+  fullName: string;
+  role: string;
+  permissionLevel: PermissionLevel;
+  isAdmin: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+
 const WORKER_ROLES: WorkerRole[] = [
   "plumber",
   "electrician",
@@ -180,6 +194,64 @@ function getApiBaseUrl(): string {
   }
 
   return apiBaseUrl.replace(/\/$/, "");
+}
+
+
+async function fetchAwsUsersFromCloud(): Promise<AwsUserListItem[]> {
+  const session = await getCurrentCognitoSession();
+
+  if (!session) {
+    throw new Error("No valid Cognito session found.");
+  }
+
+  const idToken = session.getIdToken().getJwtToken();
+
+  const response = await fetch(`${getApiBaseUrl()}/users`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  const responseJson = (await response.json().catch(() => null)) as unknown;
+
+  if (!response.ok) {
+    const message =
+      responseJson &&
+      typeof responseJson === "object" &&
+      "error" in responseJson &&
+      typeof responseJson.error === "string"
+        ? responseJson.error
+        : `Could not load users. Status ${response.status}.`;
+
+    throw new Error(message);
+  }
+
+  if (!Array.isArray(responseJson)) {
+    return [];
+  }
+
+  return responseJson.map((item) => {
+    const record = item && typeof item === "object" ? (item as ProfileRecord) : {};
+
+    const permissionLevel = getStringValue(record, ["permissionLevel"]) === "admin"
+      ? "admin"
+      : "user";
+
+    return {
+      id: getStringValue(record, ["id"]),
+      email: getStringValue(record, ["email"]),
+      username: getStringValue(record, ["username", "email"]),
+      fullName: getStringValue(record, ["fullName", "name", "email"]),
+      role: getStringValue(record, ["role"]) || "other",
+      permissionLevel,
+      isAdmin: getBooleanValue(record, ["isAdmin"]),
+      isActive: record.isActive !== false,
+      createdAt: getStringValue(record, ["createdAt"]),
+      updatedAt: getStringValue(record, ["updatedAt"]),
+    };
+  });
 }
 
 async function fetchCurrentUserFromCloud(
@@ -482,6 +554,9 @@ export default function Page() {
     useState<NonNullable<CognitoSignInResult["cognitoUser"]> | null>(null);
   const [accountMessage, setAccountMessage] = useState("");
   const [userManagementOpen, setUserManagementOpen] = useState(false);
+  const [awsUsers, setAwsUsers] = useState<AwsUserListItem[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersMessage, setUsersMessage] = useState("");
   const [jobManagementOpen, setJobManagementOpen] = useState(false);
 
   const canManageUsers = currentUser?.permissionLevel === "admin";
@@ -595,6 +670,23 @@ export default function Page() {
     }
   }
 
+  async function handleOpenUserManagement() {
+    setUserManagementOpen(true);
+    setUsersLoading(true);
+    setUsersMessage("");
+
+    try {
+      const users = await fetchAwsUsersFromCloud();
+      setAwsUsers(users);
+    } catch (error) {
+      setUsersMessage(
+        error instanceof Error ? error.message : "Could not load AWS users.",
+      );
+    } finally {
+      setUsersLoading(false);
+    }
+  }
+
   function handleSignOut() {
     signOutCognito();
     setCurrentUser(null);
@@ -642,7 +734,7 @@ export default function Page() {
               "Password changes are now controlled by Cognito. Main password-change UI can be added after this login cutover is confirmed.",
             )
           }
-          onOpenUserManagement={() => setUserManagementOpen(true)}
+          onOpenUserManagement={() => void handleOpenUserManagement()}
           onOpenJobManagement={() => setJobManagementOpen(true)}
           onSignOut={handleSignOut}
         />
@@ -704,7 +796,9 @@ export default function Page() {
           >
             <div
               style={{
-                width: "min(520px, 100%)",
+                width: "min(780px, 100%)",
+                maxHeight: "86vh",
+                overflow: "auto",
                 borderRadius: "24px",
                 padding: "24px",
                 background: "#11302D",
@@ -712,27 +806,181 @@ export default function Page() {
                 border: "1px solid rgba(255,255,255,0.14)",
               }}
             >
-              <h2 style={{ marginTop: 0 }}>User Management</h2>
-              <p style={{ lineHeight: 1.5 }}>
-                Main login is now Cognito-only. User Management should be moved
-                to Cognito/AHloguUsers next, instead of the old local user
-                store.
-              </p>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: "16px",
+                  alignItems: "flex-start",
+                  marginBottom: "18px",
+                }}
+              >
+                <div>
+                  <h2 style={{ margin: 0 }}>User Management</h2>
+                  <p
+                    style={{
+                      margin: "8px 0 0",
+                      color: "rgba(255,255,255,0.68)",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    Read-only AWS users from AHloguUsers. Create/reset/delete
+                    will be added after the list is confirmed.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setUserManagementOpen(false)}
+                  style={{
+                    border: 0,
+                    borderRadius: "14px",
+                    padding: "12px 16px",
+                    background: "rgba(255,255,255,0.1)",
+                    color: "#eef7f3",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={() => setUserManagementOpen(false)}
+                onClick={() => void handleOpenUserManagement()}
+                disabled={usersLoading}
                 style={{
                   border: 0,
                   borderRadius: "14px",
                   padding: "12px 16px",
-                  background: "#53BC7B",
+                  background: usersLoading ? "rgba(83,188,123,0.5)" : "#53BC7B",
                   color: "#11302D",
                   fontWeight: 800,
-                  cursor: "pointer",
+                  cursor: usersLoading ? "not-allowed" : "pointer",
+                  marginBottom: "16px",
                 }}
               >
-                Close
+                {usersLoading ? "Refreshing..." : "Refresh Users"}
               </button>
+
+              {usersMessage ? (
+                <div
+                  style={{
+                    borderRadius: "16px",
+                    padding: "12px 14px",
+                    background: "rgba(255,255,255,0.1)",
+                    marginBottom: "16px",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {usersMessage}
+                </div>
+              ) : null}
+
+              {usersLoading && awsUsers.length === 0 ? (
+                <div
+                  style={{
+                    borderRadius: "16px",
+                    padding: "16px",
+                    background: "rgba(255,255,255,0.08)",
+                  }}
+                >
+                  Loading users...
+                </div>
+              ) : null}
+
+              {!usersLoading && awsUsers.length === 0 ? (
+                <div
+                  style={{
+                    borderRadius: "16px",
+                    padding: "16px",
+                    background: "rgba(255,255,255,0.08)",
+                  }}
+                >
+                  No AWS users found.
+                </div>
+              ) : null}
+
+              <div style={{ display: "grid", gap: "12px" }}>
+                {awsUsers.map((user) => (
+                  <div
+                    key={user.id || user.email}
+                    style={{
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      borderRadius: "18px",
+                      padding: "16px",
+                      background: "rgba(255,255,255,0.06)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: "14px",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 900, fontSize: "17px" }}>
+                          {user.fullName || user.email || "Unnamed user"}
+                        </div>
+                        <div
+                          style={{
+                            color: "rgba(255,255,255,0.68)",
+                            marginTop: "4px",
+                          }}
+                        >
+                          {user.email || user.username || "No email"} ·{" "}
+                          {user.role || "other"}
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "8px",
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span
+                          style={{
+                            borderRadius: "999px",
+                            padding: "6px 10px",
+                            background:
+                              user.permissionLevel === "admin"
+                                ? "rgba(83,188,123,0.2)"
+                                : "rgba(255,255,255,0.1)",
+                            color: "#eef7f3",
+                            fontSize: "12px",
+                            fontWeight: 900,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {user.permissionLevel}
+                        </span>
+
+                        <span
+                          style={{
+                            borderRadius: "999px",
+                            padding: "6px 10px",
+                            background: user.isActive
+                              ? "rgba(83,188,123,0.2)"
+                              : "rgba(255,120,120,0.18)",
+                            color: "#eef7f3",
+                            fontSize: "12px",
+                            fontWeight: 900,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {user.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         ) : null}
