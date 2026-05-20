@@ -4,6 +4,8 @@ import type { Job, WorkerRole } from "@/types/work";
 
 const JOBS_STORAGE_KEY = "project_logu:jobs";
 
+export const JOBS_CHANGED_EVENT = "ahlogu:jobs-changed";
+
 export type CreateJobInput = {
   caseNo: string;
   jobId: string;
@@ -162,6 +164,7 @@ export async function saveJobs(jobs: Job[]): Promise<void> {
   if (typeof window === "undefined") return;
 
   window.localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(jobs));
+  window.dispatchEvent(new Event(JOBS_CHANGED_EVENT));
 }
 
 export async function createJob(input: CreateJobInput): Promise<Job> {

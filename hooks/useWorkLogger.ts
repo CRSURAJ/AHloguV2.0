@@ -1,7 +1,7 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   clearDraft,
   clearLogs,
@@ -13,7 +13,7 @@ import {
   saveLogs,
   saveSession,
 } from "@/lib/workStorage";
-import { getJobsForRole } from "@/lib/jobStorage";
+import { getJobsForRole, JOBS_CHANGED_EVENT } from "@/lib/jobStorage";
 import { addToSyncQueue } from "@/lib/cloud/syncQueue";
 import { getWorkingStatusText, minutesBetween } from "@/lib/workUtils";
 import type {
@@ -142,6 +142,11 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     };
   }, [currentUser.id, currentUser.role]);
 
+  const refreshAvailableJobs = useCallback(async () => {
+    const jobs = await getJobsForRole(currentUser.role);
+    setAvailableJobs(jobs);
+  }, [currentUser.role]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -159,6 +164,24 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       cancelled = true;
     };
   }, [currentUser.role]);
+
+  useEffect(() => {
+    function refreshJobs() {
+      void refreshAvailableJobs();
+    }
+
+    window.addEventListener("focus", refreshJobs);
+    window.addEventListener("online", refreshJobs);
+    window.addEventListener("storage", refreshJobs);
+    window.addEventListener(JOBS_CHANGED_EVENT, refreshJobs);
+
+    return () => {
+      window.removeEventListener("focus", refreshJobs);
+      window.removeEventListener("online", refreshJobs);
+      window.removeEventListener("storage", refreshJobs);
+      window.removeEventListener(JOBS_CHANGED_EVENT, refreshJobs);
+    };
+  }, [refreshAvailableJobs]);
 
   useEffect(() => {
     if (!isHydrated) return;
