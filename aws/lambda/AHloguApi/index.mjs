@@ -1,6 +1,8 @@
 import { randomUUID } from "crypto";
 import {
   AdminCreateUserCommand,
+  AdminDisableUserCommand,
+  AdminEnableUserCommand,
   CognitoIdentityProviderClient,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
@@ -10,6 +12,7 @@ import {
   GetCommand,
   PutCommand,
   ScanCommand,
+  UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 
 const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "ap-southeast-4";
@@ -374,6 +377,130 @@ async function listUsers(event) {
   return json(200, users);
 }
 
+async function updateUserActive(event, path) {
+  const profile = await requireAdminUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("USERS_TABLE", USERS_TABLE);
+  const userPoolId = requireEnv("COGNITO_USER_POOL_ID", COGNITO_USER_POOL_ID);
+  const id = decodeURIComponent(path.replace("/users/", ""));
+  const body = parseBody(event);
+
+  if (!id) {
+    return json(400, {
+      error: "Missing user id.",
+    });
+  }
+
+  if (typeof body.isActive !== "boolean") {
+    return json(400, {
+      error: "isActive boolean is required.",
+    });
+  }
+
+  if (id === profile.user.id && body.isActive === false) {
+    return json(400, {
+      error: "You cannot deactivate your own admin account.",
+    });
+  }
+
+  const existingResult = await dynamo.send(
+    new GetCommand({
+      TableName: tableName,
+      Key: {
+        id,
+      },
+    }),
+  );
+
+  if (!existingResult.Item) {
+    return json(404, {
+      error: "User not found.",
+      id,
+    });
+  }
+
+  const cognitoUsername = cleanString(
+    existingResult.Item.email || existingResult.Item.username,
+  );
+
+  if (!cognitoUsername) {
+    return json(400, {
+      error: "User has no Cognito username/email saved.",
+      id,
+    });
+  }
+
+  if (body.isActive) {
+    await cognito.send(
+      new AdminEnableUserCommand({
+        UserPoolId: userPoolId,
+        Username: cognitoUsername,
+      }),
+    );
+  } else {
+    await cognito.send(
+      new AdminDisableUserCommand({
+        UserPoolId: userPoolId,
+        Username: cognitoUsername,
+      }),
+    );
+  }
+
+  const now = new Date().toISOString();
+
+  const updateResult = await dynamo.send(
+    new UpdateCommand({
+      TableName: tableName,
+      Key: {
+        id,
+      },
+      UpdateExpression: "SET #isActive = :isActive, updatedAt = :updatedAt",
+      ExpressionAttributeNames: {
+        "#isActive": "isActive",
+      },
+      ExpressionAttributeValues: {
+        ":isActive": body.isActive,
+        ":updatedAt": now,
+      },
+      ReturnValues: "ALL_NEW",
+    }),
+  );
+
+  const user = updateResult.Attributes || {
+    ...existingResult.Item,
+    isActive: body.isActive,
+    updatedAt: now,
+  };
+
+  await putSyncEvent({
+    type: body.isActive ? "user.activate" : "user.deactivate",
+    userId: profile.user.id,
+    email: profile.user.email || "",
+    entityId: id,
+  });
+
+  return json(200, {
+    ok: true,
+    cloudId: id,
+    user: {
+      id: String(user.id || ""),
+      email: String(user.email || ""),
+      username: String(user.email || user.username || ""),
+      fullName: String(user.fullName || user.name || user.email || ""),
+      role: String(user.role || "other"),
+      permissionLevel: user.isAdmin ? "admin" : "user",
+      isAdmin: Boolean(user.isAdmin),
+      isActive: user.isActive !== false,
+      createdAt: String(user.createdAt || ""),
+      updatedAt: String(user.updatedAt || ""),
+    },
+  });
+}
+
 async function listJobs(event) {
   const profile = await requireActiveUser(event);
 
@@ -636,6 +763,10 @@ export const handler = async (event) => {
 
     if (method === "GET" && path === "/users") {
       return listUsers(event);
+    }
+
+    if (method === "PUT" && path.startsWith("/users/")) {
+      return updateUserActive(event, path);
     }
 
     if (method === "GET" && path === "/jobs") {

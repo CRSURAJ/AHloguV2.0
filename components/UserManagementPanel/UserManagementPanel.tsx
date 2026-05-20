@@ -42,6 +42,7 @@ type UserManagementPanelProps = {
   onClose: () => void;
   onRefresh: () => void;
   onCreateUser: (input: CreateAwsUserInput) => Promise<AuthActionResult>;
+  onToggleActive: (userId: string, isActive: boolean) => Promise<AuthActionResult>;
 };
 
 function getRoleLabel(role: string): string {
@@ -65,6 +66,7 @@ export default function UserManagementPanel({
   onClose,
   onRefresh,
   onCreateUser,
+  onToggleActive,
 }: UserManagementPanelProps) {
   const [localMessage, setLocalMessage] = useState("");
   const [fullName, setFullName] = useState("");
@@ -75,6 +77,7 @@ export default function UserManagementPanel({
   const [temporaryPassword, setTemporaryPassword] = useState("");
   const [confirmTemporaryPassword, setConfirmTemporaryPassword] = useState("");
   const [creating, setCreating] = useState(false);
+  const [updatingUserId, setUpdatingUserId] = useState("");
 
   const sortedUsers = useMemo(
     () =>
@@ -122,6 +125,26 @@ export default function UserManagementPanel({
       }
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleToggleActive(user: AwsUserListItem): Promise<void> {
+    setLocalMessage("");
+
+    if (user.id === currentUserId) {
+      setLocalMessage("You cannot deactivate your own admin account.");
+      return;
+    }
+
+    const nextActiveState = !user.isActive;
+
+    setUpdatingUserId(user.id);
+
+    try {
+      const result = await onToggleActive(user.id, nextActiveState);
+      setLocalMessage(result.message);
+    } finally {
+      setUpdatingUserId("");
     }
   }
 
@@ -278,6 +301,7 @@ export default function UserManagementPanel({
 
             {sortedUsers.map((user) => {
               const isCurrentUser = user.id === currentUserId;
+              const isUpdatingUser = updatingUserId === user.id;
 
               return (
                 <div key={user.id || user.email} className={styles.userCard}>
@@ -332,9 +356,14 @@ export default function UserManagementPanel({
                     <button
                       type="button"
                       className={styles.secondaryButton}
-                      disabled
+                      onClick={() => void handleToggleActive(user)}
+                      disabled={isCurrentUser || isUpdatingUser || !user.id}
                     >
-                      Activate / Deactivate Later
+                      {isUpdatingUser
+                        ? "Updating..."
+                        : user.isActive
+                          ? "Deactivate User"
+                          : "Activate User"}
                     </button>
                   </div>
                 </div>
