@@ -33,7 +33,31 @@ function getJobLabel(job: Job): string {
   return job.jobName || job.jobId || job.caseNo || "job";
 }
 
-function validateCreateJob(input: CreateJobInput): string {
+function normalizeJobIdForCompare(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function findDuplicateJobId(
+  jobs: Job[],
+  jobId: string,
+  ignoreJobRecordId?: string,
+): Job | undefined {
+  const normalizedJobId = normalizeJobIdForCompare(jobId);
+
+  if (!normalizedJobId) {
+    return undefined;
+  }
+
+  return jobs.find((job) => {
+    if (ignoreJobRecordId && job.id === ignoreJobRecordId) {
+      return false;
+    }
+
+    return normalizeJobIdForCompare(job.jobId) === normalizedJobId;
+  });
+}
+
+function validateCreateJob(input: CreateJobInput, jobs: Job[]): string {
   if (input.jobId.trim() === "") return "Job ID is required.";
   if (input.jobName.trim() === "") return "Job name is required.";
   if (input.customerName.trim() === "") return "Customer / site is required.";
@@ -41,10 +65,20 @@ function validateCreateJob(input: CreateJobInput): string {
     return "Assign this job to at least one worker role.";
   }
 
+  const duplicateJob = findDuplicateJobId(jobs, input.jobId);
+
+  if (duplicateJob) {
+    return `Job ID already exists on ${getJobLabel(duplicateJob)}. Use a unique Job ID.`;
+  }
+
   return "";
 }
 
-function validateUpdateJob(updates: UpdateJobInput): string {
+function validateUpdateJob(
+  id: string,
+  updates: UpdateJobInput,
+  jobs: Job[],
+): string {
   if (updates.jobId !== undefined && updates.jobId.trim() === "") {
     return "Job ID is required.";
   }
@@ -62,6 +96,14 @@ function validateUpdateJob(updates: UpdateJobInput): string {
 
   if (updates.assignedRoles !== undefined && updates.assignedRoles.length === 0) {
     return "Assign this job to at least one worker role.";
+  }
+
+  if (updates.jobId !== undefined) {
+    const duplicateJob = findDuplicateJobId(jobs, updates.jobId, id);
+
+    if (duplicateJob) {
+      return `Job ID already exists on ${getJobLabel(duplicateJob)}. Use a unique Job ID.`;
+    }
   }
 
   return "";
@@ -114,7 +156,7 @@ export function useJobs(): UseJobsReturn {
 
   const handleCreateJob = useCallback(
     async (input: CreateJobInput): Promise<AuthActionResult> => {
-      const validationError = validateCreateJob(input);
+      const validationError = validateCreateJob(input, jobs);
 
       if (validationError) {
         setJobMessage(validationError);
@@ -137,7 +179,7 @@ export function useJobs(): UseJobsReturn {
         return { ok: false, message };
       }
     },
-    [refreshJobs]
+    [jobs, refreshJobs]
   );
 
   const handleUpdateJob = useCallback(
@@ -145,7 +187,7 @@ export function useJobs(): UseJobsReturn {
       id: string,
       updates: UpdateJobInput
     ): Promise<AuthActionResult> => {
-      const validationError = validateUpdateJob(updates);
+      const validationError = validateUpdateJob(id, updates, jobs);
 
       if (validationError) {
         setJobMessage(validationError);
@@ -175,7 +217,7 @@ export function useJobs(): UseJobsReturn {
         return { ok: false, message };
       }
     },
-    [refreshJobs]
+    [jobs, refreshJobs]
   );
 
   const handleDeleteJob = useCallback(

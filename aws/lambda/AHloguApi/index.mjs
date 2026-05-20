@@ -235,6 +235,36 @@ function getCreatedUserSub(cognitoUser) {
   return subAttribute?.Value || "";
 }
 
+function normalizeJobIdForCompare(value) {
+  return cleanString(value).toLowerCase();
+}
+
+async function findDuplicateJobByJobId(tableName, jobId, ignoreJobRecordId = "") {
+  const normalizedJobId = normalizeJobIdForCompare(jobId);
+
+  if (!normalizedJobId) {
+    return null;
+  }
+
+  const result = await dynamo.send(
+    new ScanCommand({
+      TableName: tableName,
+    }),
+  );
+
+  return (result.Items ?? []).find((job) => {
+    if (ignoreJobRecordId && String(job.id || "") === ignoreJobRecordId) {
+      return false;
+    }
+
+    return normalizeJobIdForCompare(job.jobId) === normalizedJobId;
+  }) || null;
+}
+
+function getJobLabel(job) {
+  return cleanString(job.jobName) || cleanString(job.jobId) || cleanString(job.caseNo) || "job";
+}
+
 async function createUser(event) {
   const profile = await requireAdminUser(event);
 
@@ -696,6 +726,21 @@ async function createJob(event) {
 
   const tableName = requireEnv("JOBS_TABLE", JOBS_TABLE);
   const body = parseBody(event);
+  const jobId = cleanString(body.jobId);
+
+  if (!jobId) {
+    return json(400, {
+      error: "Job ID is required.",
+    });
+  }
+
+  const duplicateJob = await findDuplicateJobByJobId(tableName, jobId);
+
+  if (duplicateJob) {
+    return json(409, {
+      error: `Job ID already exists on ${getJobLabel(duplicateJob)}. Use a unique Job ID.`,
+    });
+  }
 
   const now = new Date().toISOString();
   const id = body.id || randomUUID();
@@ -703,6 +748,7 @@ async function createJob(event) {
   const job = {
     ...body,
     id,
+    jobId,
     createdAt: body.createdAt || now,
     updatedAt: now,
   };
@@ -731,6 +777,7 @@ async function updateJob(event, path) {
   const tableName = requireEnv("JOBS_TABLE", JOBS_TABLE);
   const id = decodeURIComponent(path.replace("/jobs/", ""));
   const body = parseBody(event);
+  const jobId = cleanString(body.jobId);
 
   if (!id) {
     return json(400, {
@@ -738,9 +785,24 @@ async function updateJob(event, path) {
     });
   }
 
+  if (!jobId) {
+    return json(400, {
+      error: "Job ID is required.",
+    });
+  }
+
+  const duplicateJob = await findDuplicateJobByJobId(tableName, jobId, id);
+
+  if (duplicateJob) {
+    return json(409, {
+      error: `Job ID already exists on ${getJobLabel(duplicateJob)}. Use a unique Job ID.`,
+    });
+  }
+
   const job = {
     ...body,
     id,
+    jobId,
     updatedAt: new Date().toISOString(),
   };
 
