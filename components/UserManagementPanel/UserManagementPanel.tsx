@@ -43,6 +43,7 @@ type UserManagementPanelProps = {
   onRefresh: () => void;
   onCreateUser: (input: CreateAwsUserInput) => Promise<AuthActionResult>;
   onToggleActive: (userId: string, isActive: boolean) => Promise<AuthActionResult>;
+  onResetPassword: (userId: string, temporaryPassword: string) => Promise<AuthActionResult>;
   onDeleteUser: (userId: string) => Promise<AuthActionResult>;
 };
 
@@ -68,6 +69,7 @@ export default function UserManagementPanel({
   onRefresh,
   onCreateUser,
   onToggleActive,
+  onResetPassword,
   onDeleteUser,
 }: UserManagementPanelProps) {
   const [localMessage, setLocalMessage] = useState("");
@@ -80,6 +82,7 @@ export default function UserManagementPanel({
   const [confirmTemporaryPassword, setConfirmTemporaryPassword] = useState("");
   const [creating, setCreating] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState("");
+  const [resettingUserId, setResettingUserId] = useState("");
   const [deletingUserId, setDeletingUserId] = useState("");
 
   const sortedUsers = useMemo(
@@ -148,6 +151,51 @@ export default function UserManagementPanel({
       setLocalMessage(result.message);
     } finally {
       setUpdatingUserId("");
+    }
+  }
+
+  async function handleResetPassword(user: AwsUserListItem): Promise<void> {
+    setLocalMessage("");
+
+    if (user.id === currentUserId) {
+      setLocalMessage("You cannot reset your own admin password from User Management.");
+      return;
+    }
+
+    const label = user.fullName || user.email || user.username || "this user";
+    const temporaryPassword = window.prompt(
+      `Enter a temporary password for ${label}. The user will need to set a new password on next sign-in.`,
+    );
+
+    if (temporaryPassword === null) {
+      return;
+    }
+
+    const confirmTemporaryPassword = window.prompt(
+      "Confirm the temporary password.",
+    );
+
+    if (confirmTemporaryPassword === null) {
+      return;
+    }
+
+    if (temporaryPassword !== confirmTemporaryPassword) {
+      setLocalMessage("Temporary passwords do not match.");
+      return;
+    }
+
+    if (temporaryPassword.trim().length < 8) {
+      setLocalMessage("Temporary password must be at least 8 characters.");
+      return;
+    }
+
+    setResettingUserId(user.id);
+
+    try {
+      const result = await onResetPassword(user.id, temporaryPassword);
+      setLocalMessage(result.message);
+    } finally {
+      setResettingUserId("");
     }
   }
 
@@ -332,6 +380,7 @@ export default function UserManagementPanel({
             {sortedUsers.map((user) => {
               const isCurrentUser = user.id === currentUserId;
               const isUpdatingUser = updatingUserId === user.id;
+              const isResettingUser = resettingUserId === user.id;
               const isDeletingUser = deletingUserId === user.id;
 
               return (
@@ -379,16 +428,17 @@ export default function UserManagementPanel({
                     <button
                       type="button"
                       className={styles.secondaryButton}
-                      disabled
+                      onClick={() => void handleResetPassword(user)}
+                      disabled={isCurrentUser || isUpdatingUser || isResettingUser || isDeletingUser || !user.id}
                     >
-                      Reset Password Later
+                      {isResettingUser ? "Resetting..." : "Reset Password"}
                     </button>
 
                     <button
                       type="button"
                       className={styles.secondaryButton}
                       onClick={() => void handleToggleActive(user)}
-                      disabled={isCurrentUser || isUpdatingUser || isDeletingUser || !user.id}
+                      disabled={isCurrentUser || isUpdatingUser || isResettingUser || isDeletingUser || !user.id}
                     >
                       {isUpdatingUser
                         ? "Updating..."
@@ -401,7 +451,7 @@ export default function UserManagementPanel({
                       type="button"
                       className={styles.secondaryButton}
                       onClick={() => void handleDeleteUser(user)}
-                      disabled={isCurrentUser || isUpdatingUser || isDeletingUser || !user.id}
+                      disabled={isCurrentUser || isUpdatingUser || isResettingUser || isDeletingUser || !user.id}
                     >
                       {isDeletingUser ? "Deleting..." : "🗑 Delete User"}
                     </button>

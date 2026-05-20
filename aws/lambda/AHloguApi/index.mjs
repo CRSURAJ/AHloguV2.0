@@ -4,6 +4,7 @@ import {
   AdminDeleteUserCommand,
   AdminDisableUserCommand,
   AdminEnableUserCommand,
+  AdminSetUserPasswordCommand,
   CognitoIdentityProviderClient,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
@@ -502,6 +503,89 @@ async function updateUserActive(event, path) {
   });
 }
 
+
+async function resetUserPassword(event, path) {
+  const profile = await requireAdminUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("USERS_TABLE", USERS_TABLE);
+  const userPoolId = requireEnv("COGNITO_USER_POOL_ID", COGNITO_USER_POOL_ID);
+  const id = decodeURIComponent(
+    path.replace("/users/", "").replace("/reset-password", ""),
+  );
+  const body = parseBody(event);
+  const temporaryPassword = cleanString(body.temporaryPassword || body.password);
+
+  if (!id) {
+    return json(400, {
+      error: "Missing user id.",
+    });
+  }
+
+  if (id === profile.user.id) {
+    return json(400, {
+      error: "You cannot reset your own admin password from User Management.",
+    });
+  }
+
+  if (temporaryPassword.length < 8) {
+    return json(400, {
+      error: "Temporary password must be at least 8 characters.",
+    });
+  }
+
+  const existingResult = await dynamo.send(
+    new GetCommand({
+      TableName: tableName,
+      Key: {
+        id,
+      },
+    }),
+  );
+
+  if (!existingResult.Item) {
+    return json(404, {
+      error: "User not found.",
+      id,
+    });
+  }
+
+  const cognitoUsername = cleanString(
+    existingResult.Item.email || existingResult.Item.username,
+  );
+
+  if (!cognitoUsername) {
+    return json(400, {
+      error: "User has no Cognito username/email saved.",
+      id,
+    });
+  }
+
+  await cognito.send(
+    new AdminSetUserPasswordCommand({
+      UserPoolId: userPoolId,
+      Username: cognitoUsername,
+      Password: temporaryPassword,
+      Permanent: false,
+    }),
+  );
+
+  await putSyncEvent({
+    type: "user.resetPassword",
+    userId: profile.user.id,
+    email: profile.user.email || "",
+    entityId: id,
+  });
+
+  return json(200, {
+    ok: true,
+    cloudId: id,
+  });
+}
+
 async function deleteUser(event, path) {
   const profile = await requireAdminUser(event);
 
@@ -843,6 +927,14 @@ export const handler = async (event) => {
 
     if (method === "GET" && path === "/users") {
       return listUsers(event);
+    }
+
+    if (
+      method === "POST" &&
+      path.startsWith("/users/") &&
+      path.endsWith("/reset-password")
+    ) {
+      return resetUserPassword(event, path);
     }
 
     if (method === "PUT" && path.startsWith("/users/")) {

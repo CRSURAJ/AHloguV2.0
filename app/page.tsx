@@ -838,6 +838,77 @@ export default function Page() {
     }
   }
 
+  async function handleResetAwsUserPassword(
+    userId: string,
+    temporaryPassword: string,
+  ): Promise<AuthActionResult> {
+    setUsersMessage("");
+
+    if (userId === currentUser?.id) {
+      return {
+        ok: false,
+        message: "You cannot reset your own admin password from User Management.",
+      };
+    }
+
+    if (temporaryPassword.trim().length < 8) {
+      return {
+        ok: false,
+        message: "Temporary password must be at least 8 characters.",
+      };
+    }
+
+    try {
+      const session = await getCurrentCognitoSession();
+
+      if (!session) {
+        throw new Error("No valid Cognito session found.");
+      }
+
+      const idToken = session.getIdToken().getJwtToken();
+
+      const response = await fetch(
+        `${getApiBaseUrl()}/users/${encodeURIComponent(userId)}/reset-password`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            temporaryPassword,
+          }),
+        },
+      );
+
+      const responseJson = (await response.json().catch(() => null)) as unknown;
+
+      if (!response.ok) {
+        const errorMessage =
+          responseJson &&
+          typeof responseJson === "object" &&
+          "error" in responseJson &&
+          typeof responseJson.error === "string"
+            ? responseJson.error
+            : `Could not reset password. Status ${response.status}.`;
+
+        throw new Error(errorMessage);
+      }
+
+      return {
+        ok: true,
+        message:
+          "Temporary password set. The user must set a new password on next sign-in.",
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        message:
+          error instanceof Error ? error.message : "Could not reset password.",
+      };
+    }
+  }
+
   async function handleDeleteAwsUser(userId: string): Promise<AuthActionResult> {
     setUsersMessage("");
 
@@ -1000,6 +1071,7 @@ export default function Page() {
             onRefresh={() => void handleOpenUserManagement()}
             onCreateUser={handleCreateAwsUser}
             onToggleActive={handleToggleAwsUserActive}
+            onResetPassword={handleResetAwsUserPassword}
             onDeleteUser={handleDeleteAwsUser}
           />
         ) : null}
