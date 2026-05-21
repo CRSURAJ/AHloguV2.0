@@ -136,3 +136,34 @@ export type Job = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type WorkerLiveStatusValue =
+  | "online"
+  | "available"
+  | "working"
+  | "on_break"
+  | "offline";
+
+export type WorkerLiveStatus = {
+  userId: string;
+  fullName: string;
+  email: string;
+  role: WorkerRole;
+  status: WorkerLiveStatusValue;
+  lastKnownStatus?: WorkerLiveStatusValue;
+
+  currentJobId?: string;
+  currentJobName?: string;
+  currentJobLocation?: string;
+
+  startedAt?: string;
+  breakStartedAt?: string;
+  breakMinutes: number;
+
+  pendingSyncCount: number;
+  failedSyncCount: number;
+  oldestPendingSyncAt?: string;
+
+  lastSeenAt: string;
+  updatedAt: string;
+};

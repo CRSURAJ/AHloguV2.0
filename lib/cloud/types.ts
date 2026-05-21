@@ -1,4 +1,4 @@
-import type { Job, LogItem } from "@/types/work";
+import type { Job, LogItem, WorkerLiveStatus } from "@/types/work";
 
 export type CloudSyncResult = {
   ok: boolean;
@@ -14,7 +14,6 @@ export type CloudHealthResult = {
 
 export type CloudProvider = {
   providerName: string;
-
   healthCheck: () => Promise<CloudHealthResult>;
 
   jobs: {
@@ -27,6 +26,11 @@ export type CloudProvider = {
   workLogs: {
     upload: (log: LogItem) => Promise<CloudSyncResult>;
     uploadMany: (logs: LogItem[]) => Promise<CloudSyncResult>;
+  };
+
+  workerStatus: {
+    list: () => Promise<WorkerLiveStatus[]>;
+    updateMine: (status: WorkerLiveStatus) => Promise<CloudSyncResult>;
   };
 
   drawings: {

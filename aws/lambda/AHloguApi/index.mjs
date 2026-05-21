@@ -21,7 +21,7 @@ const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "ap-s
 
 const USERS_TABLE = process.env.USERS_TABLE;
 const JOBS_TABLE = process.env.JOBS_TABLE;
-const WORK_LOGS_TABLE = process.env.WORK_LOGS_TABLE;
+const WORK_LOGS_TABLE = process.env.WORK_LOGS_TABLE; const WORKER_STATUS_TABLE = process.env.WORKER_STATUS_TABLE;
 const SYNC_EVENTS_TABLE = process.env.SYNC_EVENTS_TABLE;
 const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || process.env.USER_POOL_ID;
 
@@ -963,6 +963,209 @@ async function uploadWorkLogsBulk(event) {
   });
 }
 
+
+function normalizeWorkerStatus(body, profile) {
+  const now = new Date().toISOString();
+  const status = cleanString(body.status) || "online";
+
+  const allowedStatuses = new Set([
+    "online",
+    "available",
+    "working",
+    "on_break",
+    "offline",
+  ]);
+
+  return {
+    userId: profile.user.id,
+    fullName: cleanString(body.fullName) || cleanString(profile.user.fullName),
+    email: cleanString(body.email) || cleanString(profile.user.email),
+    role: normalizeUserRole(body.role || profile.user.role),
+    status: allowedStatuses.has(status) ? status : "online",
+
+    currentJobId: cleanString(body.currentJobId),
+    currentJobName: cleanString(body.currentJobName),
+    currentJobLocation: cleanString(body.currentJobLocation),
+
+    startedAt: cleanString(body.startedAt),
+    breakStartedAt: cleanString(body.breakStartedAt),
+    breakMinutes: Number.isFinite(Number(body.breakMinutes))
+      ? Number(body.breakMinutes)
+      : 0,
+
+    pendingSyncCount: Number.isFinite(Number(body.pendingSyncCount))
+      ? Number(body.pendingSyncCount)
+      : 0,
+    failedSyncCount: Number.isFinite(Number(body.failedSyncCount))
+      ? Number(body.failedSyncCount)
+      : 0,
+    oldestPendingSyncAt: cleanString(body.oldestPendingSyncAt),
+
+    lastSeenAt: now,
+    updatedAt: now,
+  };
+}
+
+async function listWorkerStatus(event) {
+  const profile = await requireAdminUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const usersTableName = requireEnv("USERS_TABLE", USERS_TABLE);
+  const workerStatusTableName = requireEnv(
+    "WORKER_STATUS_TABLE",
+    WORKER_STATUS_TABLE,
+  );
+
+  const [usersResult, statusResult] = await Promise.all([
+    dynamo.send(
+      new ScanCommand({
+        TableName: usersTableName,
+      }),
+    ),
+    dynamo.send(
+      new ScanCommand({
+        TableName: workerStatusTableName,
+      }),
+    ),
+  ]);
+
+  const nowMs = Date.now();
+
+  const statusItems = statusResult.Items ?? [];
+  const statusByUserId = new Map();
+
+  for (const item of statusItems) {
+    const userId = cleanString(item.userId) || cleanString(item.id);
+
+    if (!userId) continue;
+
+    statusByUserId.set(userId, item);
+  }
+
+  const activeUsers = (usersResult.Items ?? []).filter((user) => {
+    if (user.isActive === false) return false;
+    if (user.status === "inactive") return false;
+    return true;
+  });
+
+  const knownUserIds = new Set();
+
+  const statuses = activeUsers.map((user) => {
+    const userId = cleanString(user.id) || cleanString(user.userId);
+    knownUserIds.add(userId);
+
+    const statusItem = statusByUserId.get(userId);
+    const lastSeenAt = cleanString(statusItem?.lastSeenAt || statusItem?.updatedAt);
+    const lastSeenMs = Date.parse(lastSeenAt);
+    const isStale =
+      !Number.isFinite(lastSeenMs) || nowMs - lastSeenMs > 15 * 60 * 1000;
+
+    return {
+      userId,
+      fullName:
+        cleanString(statusItem?.fullName) ||
+        cleanString(user.fullName) ||
+        cleanString(user.name),
+      email:
+        cleanString(statusItem?.email) ||
+        cleanString(user.email) ||
+        cleanString(user.username),
+      role: cleanString(statusItem?.role) || cleanString(user.role) || "other",
+      status: statusItem ? (isStale ? "offline" : cleanString(statusItem.status) || "online") : "offline",
+      lastKnownStatus: cleanString(statusItem?.status) || "offline",
+
+      currentJobId: statusItem ? cleanString(statusItem.currentJobId) : "",
+      currentJobName: statusItem ? cleanString(statusItem.currentJobName) : "",
+      currentJobLocation: statusItem ? cleanString(statusItem.currentJobLocation) : "",
+
+      startedAt: statusItem ? cleanString(statusItem.startedAt) : "",
+      breakStartedAt: statusItem ? cleanString(statusItem.breakStartedAt) : "",
+      breakMinutes: Number(statusItem?.breakMinutes || 0),
+
+      pendingSyncCount: Number(statusItem?.pendingSyncCount || 0),
+      failedSyncCount: Number(statusItem?.failedSyncCount || 0),
+      oldestPendingSyncAt: cleanString(statusItem?.oldestPendingSyncAt),
+
+      lastSeenAt,
+      updatedAt: cleanString(statusItem?.updatedAt),
+    };
+  });
+
+  for (const item of statusItems) {
+    const userId = cleanString(item.userId) || cleanString(item.id);
+
+    if (!userId || knownUserIds.has(userId)) continue;
+
+    const lastSeenAt = cleanString(item.lastSeenAt || item.updatedAt);
+    const lastSeenMs = Date.parse(lastSeenAt);
+    const isStale =
+      !Number.isFinite(lastSeenMs) || nowMs - lastSeenMs > 15 * 60 * 1000;
+
+    statuses.push({
+      userId,
+      fullName: cleanString(item.fullName),
+      email: cleanString(item.email),
+      role: cleanString(item.role) || "other",
+      status: isStale ? "offline" : cleanString(item.status) || "online",
+      lastKnownStatus: cleanString(item.status) || "offline",
+
+      currentJobId: cleanString(item.currentJobId),
+      currentJobName: cleanString(item.currentJobName),
+      currentJobLocation: cleanString(item.currentJobLocation),
+
+      startedAt: cleanString(item.startedAt),
+      breakStartedAt: cleanString(item.breakStartedAt),
+      breakMinutes: Number(item.breakMinutes || 0),
+
+      pendingSyncCount: Number(item.pendingSyncCount || 0),
+      failedSyncCount: Number(item.failedSyncCount || 0),
+      oldestPendingSyncAt: cleanString(item.oldestPendingSyncAt),
+
+      lastSeenAt,
+      updatedAt: cleanString(item.updatedAt),
+    });
+  }
+
+  statuses.sort((a, b) => {
+    const nameA = a.fullName || a.email || a.userId;
+    const nameB = b.fullName || b.email || b.userId;
+    return nameA.localeCompare(nameB);
+  });
+
+  return json(200, statuses);
+}
+
+async function updateMyWorkerStatus(event) {
+  const profile = await requireActiveUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("WORKER_STATUS_TABLE", WORKER_STATUS_TABLE);
+  const body = parseBody(event);
+  const status = normalizeWorkerStatus(body, profile);
+
+  await dynamo.send(
+    new PutCommand({
+      TableName: tableName,
+      Item: {
+        id: profile.user.id,
+        ...status,
+      },
+    }),
+  );
+
+  return json(200, {
+    ok: true,
+    cloudId: profile.user.id,
+    status,
+  });
+}
+
 export const handler = async (event) => {
   try {
     const { method, path } = getRequest(event);
@@ -1022,6 +1225,15 @@ export const handler = async (event) => {
     if (method === "DELETE" && path.startsWith("/jobs/")) {
       return deleteJob(event, path);
     }
+    if (method === "GET" && path === "/worker-status") {
+      return listWorkerStatus(event);
+    }
+
+    if (method === "PUT" && path === "/worker-status/me") {
+      return updateMyWorkerStatus(event);
+    }
+
+
 
     if (method === "POST" && path === "/work-logs") {
       return uploadWorkLog(event);

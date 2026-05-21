@@ -35,6 +35,42 @@ function shouldUseAwsJobs(): boolean {
   return getCloud().providerName === "aws";
 }
 
+const CLOUD_JOBS_REFRESH_MS = 15_000;
+let cachedCloudJobs: Job[] | null = null;
+let cachedCloudJobsAt = 0;
+let inFlightCloudJobs: Promise<Job[]> | null = null;
+
+async function listCloudJobsWithGuard(): Promise<Job[]> {
+  const now = Date.now();
+
+  if (cachedCloudJobs && now - cachedCloudJobsAt < CLOUD_JOBS_REFRESH_MS) {
+    return cachedCloudJobs;
+  }
+
+  if (inFlightCloudJobs) {
+    return inFlightCloudJobs;
+  }
+
+  inFlightCloudJobs = getCloud()
+    .jobs.list()
+    .then((jobs) => {
+      cachedCloudJobs = jobs;
+      cachedCloudJobsAt = Date.now();
+      return jobs;
+    })
+    .finally(() => {
+      inFlightCloudJobs = null;
+    });
+
+  return inFlightCloudJobs;
+}
+
+function clearCloudJobsCache(): void {
+  cachedCloudJobs = null;
+  cachedCloudJobsAt = 0;
+  inFlightCloudJobs = null;
+}
+
 function stripJobDrawingsForCloud(job: Job): Job {
   return {
     ...job,
@@ -148,10 +184,10 @@ export async function loadJobs(): Promise<Job[]> {
   }
 
   try {
-    const cloudJobs = await getCloud().jobs.list();
+    const cloudJobs = await listCloudJobsWithGuard();
     const mergedJobs = mergeCloudJobsWithLocalDrawings(cloudJobs, localJobs);
 
-    await saveJobs(mergedJobs);
+    await saveJobs(mergedJobs, { notify: false });
 
     return mergedJobs;
   } catch (error) {
@@ -160,10 +196,20 @@ export async function loadJobs(): Promise<Job[]> {
   }
 }
 
-export async function saveJobs(jobs: Job[]): Promise<void> {
+type SaveJobsOptions = {
+  notify?: boolean;
+};
+
+export async function saveJobs(
+  jobs: Job[],
+  options: SaveJobsOptions = {}
+): Promise<void> {
   if (typeof window === "undefined") return;
 
   window.localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(jobs));
+
+  if (options.notify === false) return;
+
   window.dispatchEvent(new Event(JOBS_CHANGED_EVENT));
 }
 
@@ -193,6 +239,8 @@ export async function createJob(input: CreateJobInput): Promise<Job> {
     if (!result.ok) {
       throw new Error(result.message || "Could not create job in AWS.");
     }
+
+    clearCloudJobsCache();
   }
 
   await saveJobs([job, ...jobs.filter((item) => item.id !== job.id)]);
@@ -232,6 +280,8 @@ export async function updateJob(
     if (!result.ok) {
       throw new Error(result.message || "Could not update job in AWS.");
     }
+
+    clearCloudJobsCache();
   }
 
   await saveJobs(jobs.map((job) => (job.id === id ? updatedJob : job)));
@@ -248,6 +298,8 @@ export async function deleteJob(id: string): Promise<void> {
     if (!result.ok) {
       throw new Error(result.message || "Could not delete job in AWS.");
     }
+
+    clearCloudJobsCache();
   }
 
   await saveJobs(jobs.filter((job) => job.id !== id));

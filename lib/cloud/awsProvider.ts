@@ -1,4 +1,4 @@
-import type { Job, LogItem } from "@/types/work";
+import type { Job, LogItem, WorkerLiveStatus } from "@/types/work";
 
 import type { CloudProvider, CloudSyncResult } from "./types";
 
@@ -251,6 +251,48 @@ export const awsCloudProvider: CloudProvider = {
         payload: {
           logs,
         },
+      });
+    },
+  },
+
+  workerStatus: {
+    async list() {
+      const baseUrl = getAwsApiBaseUrl();
+
+      if (!baseUrl) {
+        throw new Error("Missing NEXT_PUBLIC_AHLOGU_API_URL.");
+      }
+
+      const response = await fetch(`${baseUrl}/worker-status`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
+
+      const data: unknown = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message =
+          data &&
+          typeof data === "object" &&
+          "error" in data &&
+          typeof data.error === "string"
+            ? data.error
+            : `AWS worker status list failed with status ${response.status}.`;
+
+        throw new Error(message);
+      }
+
+      if (!Array.isArray(data)) {
+        throw new Error("AWS worker status list returned an invalid response.");
+      }
+
+      return data as WorkerLiveStatus[];
+    },
+
+    async updateMine(status: WorkerLiveStatus) {
+      return requestJson("/worker-status/me", {
+        method: "PUT",
+        payload: status,
       });
     },
   },

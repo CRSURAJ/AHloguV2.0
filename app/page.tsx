@@ -7,6 +7,7 @@ import FeedbackMessage from "@/components/FeedbackMessage";
 import AdminDashboard from "@/components/AdminDashboard";
 import JobManagementPanel from "@/components/JobManagementPanel/JobManagementPanel";
 import UserManagementPanel from "@/components/UserManagementPanel/UserManagementPanel";
+import WorkerStatusPanel from "@/components/WorkerStatusPanel/WorkerStatusPanel";
 import WorkLogger from "@/components/WorkLogger/WorkLogger";
 import PasswordRequirementsNote from "@/components/PasswordRequirementsNote";
 import {
@@ -575,6 +576,7 @@ export default function Page() {
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersMessage, setUsersMessage] = useState("");
   const [jobManagementOpen, setJobManagementOpen] = useState(false);
+  const [workerStatusOpen, setWorkerStatusOpen] = useState(false);
 
   const canManageUsers = currentUser?.permissionLevel === "admin";
 
@@ -1095,6 +1097,7 @@ export default function Page() {
     setConfirmPasswordInput("");
     setUserManagementOpen(false);
     setJobManagementOpen(false);
+    setWorkerStatusOpen(false);
     setMessage("");
   }
 
@@ -1130,6 +1133,7 @@ export default function Page() {
           onOpenSecurity={handleOpenChangePassword}
           onOpenUserManagement={() => void handleOpenUserManagement()}
           onOpenJobManagement={() => setJobManagementOpen(true)}
+          onOpenWorkerStatus={() => setWorkerStatusOpen(true)}
           onSignOut={handleSignOut}
         />
 
@@ -1342,7 +1346,11 @@ export default function Page() {
           />
         ) : null}
 
-        {jobManagementOpen ? (
+        {workerStatusOpen ? (
+        <WorkerStatusPanel onClose={() => setWorkerStatusOpen(false)} />
+      ) : null}
+
+      {jobManagementOpen ? (
           <JobManagementPanel onClose={() => setJobManagementOpen(false)} />
         ) : null}
       </>

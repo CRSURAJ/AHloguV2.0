@@ -57,6 +57,15 @@ export const noopCloudProvider: CloudProvider = {
     },
   },
 
+  workerStatus: {
+    async list() {
+      return [];
+    },
+    async updateMine() {
+      return { ok: false, message: NOOP_MESSAGE };
+    },
+  },
+
   drawings: {
     async upload() {
       return {

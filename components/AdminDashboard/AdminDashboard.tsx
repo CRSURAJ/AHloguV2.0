@@ -6,12 +6,14 @@ import type { CurrentUser } from "@/types/work";
 import workerStyles from "@/components/WorkLoggerView/WorkLoggerView.module.css";
 import styles from "./AdminDashboard.module.css";
 
+
 type AdminDashboardProps = {
   currentUser: CurrentUser;
   securityLabel: string;
   onOpenSecurity: () => void;
   onOpenUserManagement: () => void;
   onOpenJobManagement: () => void;
+  onOpenWorkerStatus: () => void;
   onSignOut: () => void;
 };
 
@@ -37,6 +39,27 @@ function JobIcon() {
   );
 }
 
+
+function WorkerStatusIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M15.5 5.5a5 5 0 0 0 3 3l-9.2 9.2a2.2 2.2 0 0 1-3.1 0 2.2 2.2 0 0 1 0-3.1l9.3-9.1Z" />
+      <path d="M14.5 4.5a5 5 0 0 1 5 5" />
+      <path d="M7.8 16.2 4 20" />
+    </svg>
+  );
+}
+
 function LogsIcon() {
   return (
     <svg viewBox="0 0 24 24" className={styles.icon} aria-hidden="true">
@@ -54,6 +77,7 @@ export default function AdminDashboard({
   onOpenSecurity,
   onOpenUserManagement,
   onOpenJobManagement,
+  onOpenWorkerStatus,
   onSignOut,
 }: AdminDashboardProps) {
   return (
@@ -148,7 +172,22 @@ export default function AdminDashboard({
                 <span className={styles.actionArrow}>→</span>
               </button>
 
-              <button type="button" className={styles.actionCardMuted} disabled>
+                        <button type="button" className={styles.actionCard} onClick={onOpenWorkerStatus}>
+                <span className={styles.iconBox}>
+                  <WorkerStatusIcon />
+                </span>
+
+                <span className={styles.actionContent}>
+                  <span className={styles.actionTitle}>Worker Status</span>
+                  <span className={styles.actionText}>
+                    View live worker status
+                  </span>
+                </span>
+
+                <span className={styles.actionArrow}>→</span>
+              </button>
+
+<button type="button" className={styles.actionCardMuted} disabled>
                 <span className={styles.iconBoxMuted}>
                   <LogsIcon />
                 </span>
@@ -162,7 +201,9 @@ export default function AdminDashboard({
 
                 <span className={styles.badge}>Later</span>
               </button>
-            </div>
+
+
+</div>
           </section>
         </div>
       </div>

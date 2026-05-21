@@ -1,7 +1,7 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   clearDraft,
   clearLogs,
@@ -14,7 +14,7 @@ import {
   saveSession,
 } from "@/lib/workStorage";
 import { getJobsForRole, JOBS_CHANGED_EVENT } from "@/lib/jobStorage";
-import { addToSyncQueue } from "@/lib/cloud/syncQueue";
+import { getCloudProvider } from "@/lib/cloud/client";
 import { getWorkingStatusText, minutesBetween } from "@/lib/workUtils";
 import type {
   ActiveSession,
@@ -24,6 +24,7 @@ import type {
   Job,
   LogItem,
   SyncStatus,
+  WorkerLiveStatus,
 } from "@/types/work";
 
 const TB_URL = process.env.NEXT_PUBLIC_PROJECT_LOGU_SYNC_URL ?? "";
@@ -95,6 +96,11 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
   const [bannerMessage, setBannerMessage] = useState("");
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const lastWorkerStatusSignatureRef = useRef("");
+  const workerStatusInFlightRef = useRef(false);
+  const lastWorkerStatusSentAtRef = useRef(0);
+  const lastJobsRefreshAtRef = useRef(0);
+  const jobsRefreshInFlightRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,8 +149,20 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
   }, [currentUser.id, currentUser.role]);
 
   const refreshAvailableJobs = useCallback(async () => {
-    const jobs = await getJobsForRole(currentUser.role);
-    setAvailableJobs(jobs);
+    const now = Date.now();
+
+    if (jobsRefreshInFlightRef.current) return;
+    if (now - lastJobsRefreshAtRef.current < 5_000) return;
+
+    jobsRefreshInFlightRef.current = true;
+    lastJobsRefreshAtRef.current = now;
+
+    try {
+      const jobs = await getJobsForRole(currentUser.role);
+      setAvailableJobs(jobs);
+    } finally {
+      jobsRefreshInFlightRef.current = false;
+    }
   }, [currentUser.role]);
 
   useEffect(() => {
@@ -166,7 +184,14 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
   }, [currentUser.role]);
 
   useEffect(() => {
-    function refreshJobs() {
+    function refreshJobs(event?: Event) {
+      if (
+        event instanceof StorageEvent &&
+        event.key !== "project_logu:jobs"
+      ) {
+        return;
+      }
+
       void refreshAvailableJobs();
     }
 
@@ -289,6 +314,138 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     logs.length > 0 && logs.every((item) => item.syncStatus === "synced");
 
   const workingStatusText = getWorkingStatusText(isWorking, isOnBreak);
+
+  const publishWorkerStatus = useCallback(
+    async (options: { force?: boolean } = {}) => {
+      if (!isHydrated) return;
+
+      const pendingItems = logs.filter(
+        (item) => item.syncStatus === "pending" || item.syncStatus === "failed"
+      );
+
+      const oldestPendingSyncAt = pendingItems
+        .map((item) => item.stoppedAt || item.startedAt)
+        .filter((value): value is string => Boolean(value))
+        .sort()[0];
+
+      const trimmedJobId = jobId.trim();
+      const currentJob = availableJobs.find(
+        (job) => job.jobId === trimmedJobId || job.id === trimmedJobId
+      );
+
+      const nowIso = new Date().toISOString();
+
+      const statusPayload: WorkerLiveStatus = {
+        userId: currentUser.id,
+        fullName: currentUser.fullName,
+        email: currentUser.username,
+        role: currentUser.role,
+        status: isWorking ? (isOnBreak ? "on_break" : "working") : "available",
+
+        currentJobId: trimmedJobId || undefined,
+        currentJobName: currentJob?.jobName || undefined,
+        currentJobLocation: location.trim() || undefined,
+
+        startedAt: isWorking && startTime ? startTime : undefined,
+        breakStartedAt:
+          isWorking && isOnBreak && breakStartTime ? breakStartTime : undefined,
+        breakMinutes,
+
+        pendingSyncCount: pendingItems.length,
+        failedSyncCount: failedCount,
+        oldestPendingSyncAt,
+
+        lastSeenAt: nowIso,
+        updatedAt: nowIso,
+      };
+
+      const signature = JSON.stringify({
+        userId: statusPayload.userId,
+        status: statusPayload.status,
+        currentJobId: statusPayload.currentJobId,
+        currentJobName: statusPayload.currentJobName,
+        currentJobLocation: statusPayload.currentJobLocation,
+        startedAt: statusPayload.startedAt,
+        breakStartedAt: statusPayload.breakStartedAt,
+        breakMinutes: statusPayload.breakMinutes,
+        pendingSyncCount: statusPayload.pendingSyncCount,
+        failedSyncCount: statusPayload.failedSyncCount,
+        oldestPendingSyncAt: statusPayload.oldestPendingSyncAt,
+      });
+
+      const nowMs = Date.now();
+
+      if (
+        !options.force &&
+        signature === lastWorkerStatusSignatureRef.current &&
+        nowMs - lastWorkerStatusSentAtRef.current < 10 * 60 * 1000
+      ) {
+        return;
+      }
+
+      if (workerStatusInFlightRef.current) return;
+
+      workerStatusInFlightRef.current = true;
+
+      try {
+        const result = await getCloudProvider().workerStatus.updateMine(
+          statusPayload
+        );
+
+        if (!result.ok) {
+          console.warn("Worker live status update failed:", result.message);
+          return;
+        }
+
+        lastWorkerStatusSignatureRef.current = signature;
+        lastWorkerStatusSentAtRef.current = nowMs;
+      } catch (error) {
+        console.warn("Worker live status update failed:", error);
+      } finally {
+        workerStatusInFlightRef.current = false;
+      }
+    },
+    [
+      availableJobs,
+      breakMinutes,
+      breakStartTime,
+      currentUser.fullName,
+      currentUser.id,
+      currentUser.role,
+      currentUser.username,
+      failedCount,
+      isHydrated,
+      isOnBreak,
+      isWorking,
+      jobId,
+      location,
+      logs,
+      startTime,
+    ]
+  );
+
+  useEffect(() => {
+    void publishWorkerStatus();
+  }, [publishWorkerStatus]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    const sendHeartbeat = () => {
+      void publishWorkerStatus({ force: true });
+    };
+
+    const intervalId = window.setInterval(sendHeartbeat, 10 * 60 * 1000);
+
+    window.addEventListener("focus", sendHeartbeat);
+    window.addEventListener("online", sendHeartbeat);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", sendHeartbeat);
+      window.removeEventListener("online", sendHeartbeat);
+    };
+  }, [isHydrated, publishWorkerStatus]);
  
  function handleStickyNoteChange(id: string, value: string) {
   setLogs((prev) =>
@@ -398,7 +555,6 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       syncMessage: "Waiting to sync",
       stickyNote: "",
    };
-addToSyncQueue("workLog.upload", logItem);
     setLogs((prev) => [logItem, ...prev]);
     setIsWorking(false);
     setIsOnBreak(false);
@@ -459,7 +615,6 @@ addToSyncQueue("workLog.upload", logItem);
       syncMessage: "Waiting to sync",
       stickyNote: "",
     };
-addToSyncQueue("workLog.upload", logItem);
     const newStartTime = new Date().toISOString();
 
     setLogs((prev) => [logItem, ...prev]);
@@ -479,10 +634,6 @@ addToSyncQueue("workLog.upload", logItem);
   }
 
   async function syncOneItem(item: LogItem): Promise<number> {
-    if (!TB_URL) {
-      throw new Error("Sync URL is not configured.");
-    }
-
     setLogs((prev) =>
       prev.map((log) =>
         log.id === item.id
@@ -495,13 +646,34 @@ addToSyncQueue("workLog.upload", logItem);
       )
     );
 
+    const cloud = getCloudProvider();
+
+    if (cloud.providerName === "aws") {
+      const result = await cloud.workLogs.upload(item);
+
+      if (!result.ok) {
+        throw new Error(result.message || "AWS work log upload failed.");
+      }
+
+      return Date.now();
+    }
+
+    if (!TB_URL) {
+      throw new Error(
+        "No AWS cloud provider selected and NEXT_PUBLIC_PROJECT_LOGU_SYNC_URL is not configured."
+      );
+    }
+
     const payload = {
+      id: item.id,
       loguId: item.loguId,
+      ts: item.ts,
       fullname: item.fullname,
       jobId: item.jobId,
-      stickyNote: item.stickyNote ??"",
+      stickyNote: item.stickyNote ?? "",
       location: item.location,
       role: item.role,
+      jobDocs: item.jobDocs,
       description: item.description,
       startedAt: item.startedAt,
       stoppedAt: item.stoppedAt,

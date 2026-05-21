@@ -4,7 +4,6 @@ import Image from "next/image";
 import { useState } from "react";
 import {
   ActionButtons,
-  CloudSyncStatus,
   LogsList,
   WorkerForm,
 } from "@/components";
@@ -297,7 +296,6 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
               </div>
             ) : null}
             <div className={styles.cloudSyncSection}>
-  <CloudSyncStatus />
 </div>
             <LogsList
               logs={props.logs}
