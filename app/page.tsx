@@ -382,19 +382,6 @@ function CognitoLoginCard({
             style={{ objectFit: "contain", marginBottom: "18px" }}
           />
 
-          <h1 style={{ margin: 0, fontSize: "28px", lineHeight: 1.1 }}>
-            Sign in to AHlogu
-          </h1>
-
-          <p
-            style={{
-              margin: "10px 0 0",
-              color: "rgba(255,255,255,0.68)",
-              lineHeight: 1.5,
-            }}
-          >
-            Use your Cognito email and password. Local login is no longer used.
-          </p>
         </div>
 
         {message ? (
@@ -669,19 +656,19 @@ export default function Page() {
       if (result.status === "new-password-required" && result.cognitoUser) {
         setNewPasswordUser(result.cognitoUser);
         setPassword("");
-        setMessage("Cognito requires a new password before continuing.");
+        setMessage("Please set a new password before continuing.");
         return;
       }
 
       if (!result.session) {
-        setMessage("Cognito sign in succeeded but no session was returned.");
+        setMessage("Sign in succeeded but no session was returned.");
         return;
       }
 
       await finishSignIn(result.session);
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Cognito sign in failed.",
+        error instanceof Error ? error.message : "Sign in failed.",
       );
     } finally {
       setIsBusy(false);
@@ -698,7 +685,7 @@ export default function Page() {
       setAwsUsers(users);
     } catch (error) {
       setUsersMessage(
-        error instanceof Error ? error.message : "Could not load AWS users.",
+        error instanceof Error ? error.message : "Could not load Users.",
       );
     } finally {
       setUsersLoading(false);
@@ -728,7 +715,7 @@ export default function Page() {
       const session = await getCurrentCognitoSession();
 
       if (!session) {
-        throw new Error("No valid Cognito session found.");
+        throw new Error("No valid session found.");
       }
 
       const idToken = session.getIdToken().getJwtToken();
@@ -768,13 +755,13 @@ export default function Page() {
       return {
         ok: true,
         message:
-          "User created in Cognito and AHloguUsers. Give them the temporary password. They will be asked to set a new password on first login.",
+          "User created successfully. They will be asked to set a new password on first login.",
       };
     } catch (error) {
       return {
         ok: false,
         message:
-          error instanceof Error ? error.message : "Could not create AWS user.",
+          error instanceof Error ? error.message : "Could not create User.",
       };
     }
   }
@@ -796,7 +783,7 @@ export default function Page() {
       const session = await getCurrentCognitoSession();
 
       if (!session) {
-        throw new Error("No valid Cognito session found.");
+        throw new Error("No valid session found.");
       }
 
       const idToken = session.getIdToken().getJwtToken();
@@ -832,14 +819,14 @@ export default function Page() {
       return {
         ok: true,
         message: isActive
-          ? "User activated in Cognito and AHloguUsers."
-          : "User deactivated in Cognito and AHloguUsers.",
+          ? "User activated."
+          : "User deactivated.",
       };
     } catch (error) {
       return {
         ok: false,
         message:
-          error instanceof Error ? error.message : "Could not update AWS user.",
+          error instanceof Error ? error.message : "Could not update user.",
       };
     }
   }
@@ -868,7 +855,7 @@ export default function Page() {
       const session = await getCurrentCognitoSession();
 
       if (!session) {
-        throw new Error("No valid Cognito session found.");
+        throw new Error("No valid session found.");
       }
 
       const idToken = session.getIdToken().getJwtToken();
@@ -961,13 +948,13 @@ export default function Page() {
 
       return {
         ok: true,
-        message: "User deleted from Cognito and AHloguUsers.",
+        message: "User deleted.",
       };
     } catch (error) {
       return {
         ok: false,
         message:
-          error instanceof Error ? error.message : "Could not delete AWS user.",
+          error instanceof Error ? error.message : "Could not delete user.",
       };
     }
   }
@@ -1037,7 +1024,7 @@ export default function Page() {
     setConfirmPasswordInput("");
     setUserManagementOpen(false);
     setJobManagementOpen(false);
-    setMessage("Signed out.");
+    setMessage("");
   }
 
   if (!isReady) {
@@ -1145,7 +1132,7 @@ export default function Page() {
               <h2 style={{ marginTop: 0 }}>Change Password</h2>
 
               <p style={{ lineHeight: 1.5, color: "rgba(255,255,255,0.72)" }}>
-                Enter your current password, then choose a new Cognito password.
+                Enter your current password, then choose a new password.
               </p>
 
               {accountMessage ? (
