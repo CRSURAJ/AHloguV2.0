@@ -8,6 +8,7 @@ import AdminDashboard from "@/components/AdminDashboard";
 import JobManagementPanel from "@/components/JobManagementPanel/JobManagementPanel";
 import UserManagementPanel from "@/components/UserManagementPanel/UserManagementPanel";
 import WorkLogger from "@/components/WorkLogger/WorkLogger";
+import PasswordRequirementsNote from "@/components/PasswordRequirementsNote";
 import {
   changeCurrentCognitoPassword,
   completeNewCognitoPassword,
@@ -16,6 +17,7 @@ import {
   signOutCognito,
   type CognitoSignInResult,
 } from "@/lib/auth/cognitoClient";
+import { getPasswordPolicyError } from "@/lib/auth/passwordPolicy";
 import type {
   AuthActionResult,
   CredentialType,
@@ -214,7 +216,7 @@ async function fetchAwsUsersFromCloud(): Promise<AwsUserListItem[]> {
   const session = await getCurrentCognitoSession();
 
   if (!session) {
-    throw new Error("No valid Cognito session found.");
+    throw new Error("No valid session found.");
   }
 
   const idToken = session.getIdToken().getJwtToken();
@@ -515,6 +517,8 @@ function CognitoLoginCard({
           </>
         )}
 
+        {requiresNewPassword ? <PasswordRequirementsNote /> : null}
+
         <button
           type="submit"
           disabled={isBusy}
@@ -596,7 +600,7 @@ export default function Page() {
           setMessage(
             error instanceof Error
               ? error.message
-              : "Could not restore your Cognito session.",
+              : "Could not restore your session.",
           );
         }
       } finally {
@@ -632,8 +636,13 @@ export default function Page() {
 
     try {
       if (newPasswordUser) {
-        if (newPassword.trim().length < 8) {
-          setMessage("New password must be at least 8 characters.");
+        const passwordPolicyError = getPasswordPolicyError(
+          newPassword,
+          "New password",
+        );
+
+        if (passwordPolicyError) {
+          setMessage(passwordPolicyError);
           return;
         }
 
@@ -704,10 +713,15 @@ export default function Page() {
       };
     }
 
-    if (input.temporaryPassword.trim().length < 8) {
+    const passwordPolicyError = getPasswordPolicyError(
+      input.temporaryPassword,
+      "Temporary password",
+    );
+
+    if (passwordPolicyError) {
       return {
         ok: false,
-        message: "Temporary password must be at least 8 characters.",
+        message: passwordPolicyError,
       };
     }
 
@@ -844,10 +858,15 @@ export default function Page() {
       };
     }
 
-    if (temporaryPassword.trim().length < 8) {
+    const passwordPolicyError = getPasswordPolicyError(
+      temporaryPassword,
+      "Temporary password",
+    );
+
+    if (passwordPolicyError) {
       return {
         ok: false,
-        message: "Temporary password must be at least 8 characters.",
+        message: passwordPolicyError,
       };
     }
 
@@ -916,7 +935,7 @@ export default function Page() {
       const session = await getCurrentCognitoSession();
 
       if (!session) {
-        throw new Error("No valid Cognito session found.");
+        throw new Error("No valid session found.");
       }
 
       const idToken = session.getIdToken().getJwtToken();
@@ -982,8 +1001,13 @@ export default function Page() {
     event.preventDefault();
     setAccountMessage("");
 
-    if (newPasswordInput.trim().length < 8) {
-      setAccountMessage("New password must be at least 8 characters.");
+    const passwordPolicyError = getPasswordPolicyError(
+      newPasswordInput,
+      "New password",
+    );
+
+    if (passwordPolicyError) {
+      setAccountMessage(passwordPolicyError);
       return;
     }
 
@@ -1321,8 +1345,10 @@ export default function Page() {
             <h2 style={{ marginTop: 0 }}>Change Password</h2>
 
             <p style={{ lineHeight: 1.5, color: "rgba(255,255,255,0.72)" }}>
-              Enter your current password, then choose a new Cognito password.
+              Enter your current password, then choose a new password.
             </p>
+
+            <PasswordRequirementsNote />
 
             {accountMessage ? (
               <div

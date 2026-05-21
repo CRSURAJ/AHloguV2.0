@@ -41,13 +41,13 @@ export default function CognitoTestPage() {
       setChallengeUser(null);
       setPassword("");
       setStatus(
-        `Signed in successfully with Cognito. Token user: ${
+        `Signed in successfully. Token user: ${
           payload?.email ?? payload?.sub ?? "unknown"
         }`,
       );
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Cognito sign-in failed.";
+        error instanceof Error ? error.message : "Sign-in failed.";
 
       setStatus(message);
     } finally {
@@ -57,7 +57,7 @@ export default function CognitoTestPage() {
 
   async function handleCompleteNewPassword() {
     if (!challengeUser) {
-      setStatus("Missing Cognito challenge user. Sign in again.");
+      setStatus("Missing challenge user. Sign in again.");
       return;
     }
 
@@ -103,7 +103,7 @@ export default function CognitoTestPage() {
 
       if (!session) {
         setStatus(
-          `No valid Cognito session found. Cached user: ${
+          `No valid session found. Cached user: ${
             currentUser?.getUsername() ?? "none"
           }`,
         );
@@ -113,7 +113,7 @@ export default function CognitoTestPage() {
       const payload = session.getIdToken().decodePayload();
 
       setStatus(
-        `Valid Cognito session found for ${
+        `Valid session found for ${
           payload.email ?? payload.sub ?? "unknown user"
         }.`,
       );
@@ -138,8 +138,8 @@ export default function CognitoTestPage() {
   return (
     <main className={styles.page}>
       <section className={styles.card}>
-        <p className={styles.eyebrow}>AHlogu AWS Cognito Test</p>
-        <h1 className={styles.title}>Cognito Login Test</h1>
+        <p className={styles.eyebrow}>AHlogu Login Test</p>
+        <h1 className={styles.title}>Login Test</h1>
         <p className={styles.description}>
           Temporary test page only. This does not replace the current AHlogu
           local login yet.
@@ -166,7 +166,7 @@ export default function CognitoTestPage() {
               autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="Enter Cognito password"
+              placeholder="Enter password"
             />
           </label>
 

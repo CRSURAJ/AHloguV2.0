@@ -1,5 +1,9 @@
 "use client";
-
+import PasswordRequirementsNote from "@/components/PasswordRequirementsNote";
+import {
+  PASSWORD_REQUIREMENTS_TEXT,
+  getPasswordPolicyError,
+} from "@/lib/auth/passwordPolicy";
 import { useMemo, useState } from "react";
 import styles from "./UserManagementPanel.module.css";
 import {
@@ -163,9 +167,14 @@ export default function UserManagementPanel({
     }
 
     const label = user.fullName || user.email || user.username || "this user";
-    const temporaryPassword = window.prompt(
-      `Enter a temporary password for ${label}. The user will need to set a new password on next sign-in.`,
-    );
+const temporaryPassword = window.prompt(
+  `Enter a temporary password for ${label}.
+
+Password requirements:
+- ${PASSWORD_REQUIREMENTS_TEXT}
+
+The user will need to set a new password on next sign-in.`,
+);
 
     if (temporaryPassword === null) {
       return;
@@ -184,10 +193,14 @@ export default function UserManagementPanel({
       return;
     }
 
-    if (temporaryPassword.trim().length < 8) {
-      setLocalMessage("Temporary password must be at least 8 characters.");
-      return;
-    }
+const passwordPolicyError = getPasswordPolicyError(
+  temporaryPassword,
+  "Temporary password",
+);
+if (passwordPolicyError) {
+  setLocalMessage(passwordPolicyError);
+  return;
+}
 
     setResettingUserId(user.id);
 
@@ -209,7 +222,7 @@ export default function UserManagementPanel({
 
     const label = user.fullName || user.email || user.username || "this user";
     const confirmed = window.confirm(
-      `Delete ${label}? This will remove the user from Cognito and AHloguUsers.`,
+      `Delete ${label}? This will remove the user from AHlogu.`,
     );
 
     if (!confirmed) {
@@ -233,7 +246,7 @@ export default function UserManagementPanel({
           <div>
             <h3 className={styles.title}>User Management</h3>
             <p className={styles.subtitle}>
-              Create Cognito users, assign admin/user access and trade role,
+              Create users, assign admin/user access and trade role,
               then store the matching profile in AHloguUsers.
             </p>
           </div>
@@ -334,6 +347,7 @@ export default function UserManagementPanel({
               >
                 Confirm Temporary Password
               </label>
+<PasswordRequirementsNote compact />
               <input
                 id="user-temp-password-confirm"
                 className={styles.input}
