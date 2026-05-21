@@ -1026,8 +1026,13 @@ export default function Page() {
       setChangePasswordOpen(false);
       setAccountMessage("Password changed successfully.");
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Could not change password.";
+
       setAccountMessage(
-        error instanceof Error ? error.message : "Could not change password.",
+        errorMessage === "Incorrect username or password."
+          ? "Incorrect password."
+          : errorMessage,
       );
     } finally {
       setChangePasswordBusy(false);
@@ -1154,10 +1159,6 @@ export default function Page() {
               }}
             >
               <h2 style={{ marginTop: 0 }}>Change Password</h2>
-
-              <p style={{ lineHeight: 1.5, color: "rgba(255,255,255,0.72)" }}>
-                Enter your current password, then choose a new password.
-              </p>
 
               {accountMessage ? (
                 <div
@@ -1343,10 +1344,6 @@ export default function Page() {
             }}
           >
             <h2 style={{ marginTop: 0 }}>Change Password</h2>
-
-            <p style={{ lineHeight: 1.5, color: "rgba(255,255,255,0.72)" }}>
-              Enter your current password, then choose a new password.
-            </p>
 
             <PasswordRequirementsNote />
 
