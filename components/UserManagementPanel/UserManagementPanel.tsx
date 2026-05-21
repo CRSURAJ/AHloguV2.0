@@ -1,10 +1,7 @@
 "use client";
 import PasswordRequirementsNote from "@/components/PasswordRequirementsNote";
-import {
-  PASSWORD_REQUIREMENTS_TEXT,
-  getPasswordPolicyError,
-} from "@/lib/auth/passwordPolicy";
-import { useMemo, useState } from "react";
+import { getPasswordPolicyError } from "@/lib/auth/passwordPolicy";
+import { useMemo, useState, type FormEvent } from "react";
 import styles from "./UserManagementPanel.module.css";
 import {
   PERMISSION_LEVEL_OPTIONS,
@@ -88,6 +85,11 @@ export default function UserManagementPanel({
   const [updatingUserId, setUpdatingUserId] = useState("");
   const [resettingUserId, setResettingUserId] = useState("");
   const [deletingUserId, setDeletingUserId] = useState("");
+  const [resetTargetUser, setResetTargetUser] =
+    useState<AwsUserListItem | null>(null);
+  const [resetTemporaryPassword, setResetTemporaryPassword] = useState("");
+  const [resetConfirmTemporaryPassword, setResetConfirmTemporaryPassword] =
+    useState("");
 
   const sortedUsers = useMemo(
     () =>
@@ -158,7 +160,7 @@ export default function UserManagementPanel({
     }
   }
 
-  async function handleResetPassword(user: AwsUserListItem): Promise<void> {
+  function handleOpenResetPassword(user: AwsUserListItem): void {
     setLocalMessage("");
 
     if (user.id === currentUserId) {
@@ -166,47 +168,61 @@ export default function UserManagementPanel({
       return;
     }
 
-    const label = user.fullName || user.email || user.username || "this user";
-const temporaryPassword = window.prompt(
-  `Enter a temporary password for ${label}.
+    setResetTargetUser(user);
+    setResetTemporaryPassword("");
+    setResetConfirmTemporaryPassword("");
+  }
 
-Password requirements:
-- ${PASSWORD_REQUIREMENTS_TEXT}
-
-The user will need to set a new password on next sign-in.`,
-);
-
-    if (temporaryPassword === null) {
+  function handleCloseResetPassword(): void {
+    if (resettingUserId) {
       return;
     }
 
-    const confirmTemporaryPassword = window.prompt(
-      "Confirm the temporary password.",
-    );
+    setResetTargetUser(null);
+    setResetTemporaryPassword("");
+    setResetConfirmTemporaryPassword("");
+  }
 
-    if (confirmTemporaryPassword === null) {
+  async function handleSubmitResetPassword(
+    event: FormEvent<HTMLFormElement>,
+  ): Promise<void> {
+    event.preventDefault();
+    setLocalMessage("");
+
+    if (!resetTargetUser) {
       return;
     }
 
-    if (temporaryPassword !== confirmTemporaryPassword) {
+    if (resetTemporaryPassword !== resetConfirmTemporaryPassword) {
       setLocalMessage("Temporary passwords do not match.");
       return;
     }
 
-const passwordPolicyError = getPasswordPolicyError(
-  temporaryPassword,
-  "Temporary password",
-);
-if (passwordPolicyError) {
-  setLocalMessage(passwordPolicyError);
-  return;
-}
+    const passwordPolicyError = getPasswordPolicyError(
+      resetTemporaryPassword,
+      "Temporary password",
+    );
 
-    setResettingUserId(user.id);
+    if (passwordPolicyError) {
+      setLocalMessage(passwordPolicyError);
+      return;
+    }
+
+    setResettingUserId(resetTargetUser.id);
 
     try {
-      const result = await onResetPassword(user.id, temporaryPassword);
+      const result = await onResetPassword(
+        resetTargetUser.id,
+        resetTemporaryPassword,
+      );
+
       setLocalMessage(result.message);
+
+      if (result.ok) {
+        setResetTargetUser(null);
+        setResetTemporaryPassword("");
+        setResetConfirmTemporaryPassword("");
+      }
     } finally {
       setResettingUserId("");
     }
@@ -241,6 +257,76 @@ if (passwordPolicyError) {
 
   return (
     <div className={styles.backdrop}>
+      {resetTargetUser ? (
+        <div className={styles.modalBackdrop}>
+          <form
+            className={styles.modalCard}
+            onSubmit={(event) => void handleSubmitResetPassword(event)}
+          >
+            <h2 className={styles.modalTitle}>Reset Password</h2>
+
+            <p className={styles.modalDescription}>
+              Set a temporary password for{" "}
+              <strong>
+                {resetTargetUser.fullName ||
+                  resetTargetUser.email ||
+                  resetTargetUser.username ||
+                  "this user"}
+              </strong>
+              . They will be asked to choose a new password on next sign in.
+            </p>
+
+            <PasswordRequirementsNote compact />
+
+            <label className={styles.field}>
+              <span className={styles.label}>Temporary Password</span>
+              <input
+                className={styles.input}
+                type="password"
+                value={resetTemporaryPassword}
+                onChange={(event) =>
+                  setResetTemporaryPassword(event.target.value)
+                }
+                autoComplete="new-password"
+                required
+              />
+            </label>
+
+            <label className={styles.field}>
+              <span className={styles.label}>Confirm Temporary Password</span>
+              <input
+                className={styles.input}
+                type="password"
+                value={resetConfirmTemporaryPassword}
+                onChange={(event) =>
+                  setResetConfirmTemporaryPassword(event.target.value)
+                }
+                autoComplete="new-password"
+                required
+              />
+            </label>
+
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={handleCloseResetPassword}
+                disabled={Boolean(resettingUserId)}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                className={styles.primaryButton}
+                disabled={Boolean(resettingUserId)}
+              >
+                {resettingUserId ? "Resetting..." : "Reset Password"}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
       <div className={styles.panel}>
         <div className={styles.header}>
           <div>
@@ -442,7 +528,7 @@ if (passwordPolicyError) {
                     <button
                       type="button"
                       className={styles.secondaryButton}
-                      onClick={() => void handleResetPassword(user)}
+                      onClick={() => handleOpenResetPassword(user)}
                       disabled={isCurrentUser || isUpdatingUser || isResettingUser || isDeletingUser || !user.id}
                     >
                       {isResettingUser ? "Resetting..." : "Reset Password"}
