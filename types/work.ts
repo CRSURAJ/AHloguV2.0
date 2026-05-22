@@ -142,7 +142,8 @@ export type WorkerLiveStatusValue =
   | "available"
   | "working"
   | "on_break"
-  | "offline";
+  | "offline"
+  | "deactivated";
 
 export type WorkerLiveStatus = {
   userId: string;

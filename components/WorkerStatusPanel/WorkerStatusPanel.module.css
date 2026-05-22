@@ -355,3 +355,9 @@
 .syncCell span {
   color: rgba(238, 247, 243, 0.58);
 }
+
+.statusDeactivated {
+  background: rgba(226, 173, 63, 0.16);
+  color: #fff0c9;
+  border: 1px solid rgba(226, 173, 63, 0.28);
+}

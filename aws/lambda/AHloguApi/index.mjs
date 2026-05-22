@@ -411,7 +411,6 @@ async function listUsers(event) {
 
 async function updateUserActive(event, path) {
   const profile = await requireAdminUser(event);
-
   if (!profile.ok) {
     return profile.response;
   }
@@ -501,6 +500,20 @@ async function updateUserActive(event, path) {
       ReturnValues: "ALL_NEW",
     }),
   );
+
+  // Important:
+  // Clear stale live status whenever active state changes.
+  // Otherwise an old "available" row can stay in WORKER_STATUS_TABLE.
+  if (WORKER_STATUS_TABLE) {
+    await dynamo.send(
+      new DeleteCommand({
+        TableName: WORKER_STATUS_TABLE,
+        Key: {
+          id,
+        },
+      }),
+    );
+  }
 
   const user = updateResult.Attributes || {
     ...existingResult.Item,
@@ -618,7 +631,6 @@ async function resetUserPassword(event, path) {
 
 async function deleteUser(event, path) {
   const profile = await requireAdminUser(event);
-
   if (!profile.ok) {
     return profile.response;
   }
@@ -681,6 +693,19 @@ async function deleteUser(event, path) {
       },
     }),
   );
+
+  // Important:
+  // Deleted users must disappear from Worker Status completely.
+  if (WORKER_STATUS_TABLE) {
+    await dynamo.send(
+      new DeleteCommand({
+        TableName: WORKER_STATUS_TABLE,
+        Key: {
+          id,
+        },
+      }),
+    );
+  }
 
   await putSyncEvent({
     type: "user.delete",
@@ -1006,6 +1031,18 @@ function normalizeWorkerStatus(body, profile) {
   };
 }
 
+function isWorkerStatusVisibleUser(user) {
+  const permissionLevel = cleanString(user.permissionLevel).toLowerCase();
+  const permissionLevelSnake = cleanString(user.permission_level).toLowerCase();
+
+  if (permissionLevel === "admin") return false;
+  if (permissionLevelSnake === "admin") return false;
+  if (user.isAdmin === true) return false;
+  if (user.admin === true) return false;
+
+  return true;
+}
+
 async function listWorkerStatus(event) {
   const profile = await requireAdminUser(event);
 
@@ -1033,11 +1070,9 @@ async function listWorkerStatus(event) {
   ]);
 
   const nowMs = Date.now();
-
-  const statusItems = statusResult.Items ?? [];
   const statusByUserId = new Map();
 
-  for (const item of statusItems) {
+  for (const item of statusResult.Items ?? []) {
     const userId = cleanString(item.userId) || cleanString(item.id);
 
     if (!userId) continue;
@@ -1045,89 +1080,78 @@ async function listWorkerStatus(event) {
     statusByUserId.set(userId, item);
   }
 
-  const activeUsers = (usersResult.Items ?? []).filter((user) => {
-    if (user.isActive === false) return false;
-    if (user.status === "inactive") return false;
-    return true;
-  });
+  const statuses = (usersResult.Items ?? [])
+    .filter(isWorkerStatusVisibleUser)
+    .map((user) => {
+      const userId = cleanString(user.id) || cleanString(user.userId);
+      const statusItem = statusByUserId.get(userId);
 
-  const knownUserIds = new Set();
+      const isDeactivated =
+        user.isActive === false ||
+        cleanString(user.status).toLowerCase() === "inactive" ||
+        cleanString(user.status).toLowerCase() === "deactivated";
 
-  const statuses = activeUsers.map((user) => {
-    const userId = cleanString(user.id) || cleanString(user.userId);
-    knownUserIds.add(userId);
+      const lastSeenAt = cleanString(statusItem?.lastSeenAt || statusItem?.updatedAt);
+      const lastSeenMs = Date.parse(lastSeenAt);
+      const isStale =
+        !Number.isFinite(lastSeenMs) || nowMs - lastSeenMs > 15 * 60 * 1000;
 
-    const statusItem = statusByUserId.get(userId);
-    const lastSeenAt = cleanString(statusItem?.lastSeenAt || statusItem?.updatedAt);
-    const lastSeenMs = Date.parse(lastSeenAt);
-    const isStale =
-      !Number.isFinite(lastSeenMs) || nowMs - lastSeenMs > 15 * 60 * 1000;
+      const lastKnownStatus = cleanString(statusItem?.status) || "offline";
 
-    return {
-      userId,
-      fullName:
-        cleanString(statusItem?.fullName) ||
-        cleanString(user.fullName) ||
-        cleanString(user.name),
-      email:
-        cleanString(statusItem?.email) ||
-        cleanString(user.email) ||
-        cleanString(user.username),
-      role: cleanString(statusItem?.role) || cleanString(user.role) || "other",
-      status: statusItem ? (isStale ? "offline" : cleanString(statusItem.status) || "online") : "offline",
-      lastKnownStatus: cleanString(statusItem?.status) || "offline",
+      const liveStatus = isDeactivated
+        ? "deactivated"
+        : statusItem
+          ? isStale
+            ? "offline"
+            : lastKnownStatus || "online"
+          : "offline";
 
-      currentJobId: statusItem ? cleanString(statusItem.currentJobId) : "",
-      currentJobName: statusItem ? cleanString(statusItem.currentJobName) : "",
-      currentJobLocation: statusItem ? cleanString(statusItem.currentJobLocation) : "",
+      return {
+        userId,
+        fullName:
+          cleanString(statusItem?.fullName) ||
+          cleanString(user.fullName) ||
+          cleanString(user.name),
+        email:
+          cleanString(statusItem?.email) ||
+          cleanString(user.email) ||
+          cleanString(user.username),
+        role: cleanString(statusItem?.role) || cleanString(user.role) || "other",
+        status: liveStatus,
+        lastKnownStatus,
 
-      startedAt: statusItem ? cleanString(statusItem.startedAt) : "",
-      breakStartedAt: statusItem ? cleanString(statusItem.breakStartedAt) : "",
-      breakMinutes: Number(statusItem?.breakMinutes || 0),
+        currentJobId:
+          isDeactivated || !statusItem ? "" : cleanString(statusItem.currentJobId),
+        currentJobName:
+          isDeactivated || !statusItem ? "" : cleanString(statusItem.currentJobName),
+        currentJobLocation:
+          isDeactivated || !statusItem
+            ? ""
+            : cleanString(statusItem.currentJobLocation),
 
-      pendingSyncCount: Number(statusItem?.pendingSyncCount || 0),
-      failedSyncCount: Number(statusItem?.failedSyncCount || 0),
-      oldestPendingSyncAt: cleanString(statusItem?.oldestPendingSyncAt),
+        startedAt:
+          isDeactivated || !statusItem ? "" : cleanString(statusItem.startedAt),
+        breakStartedAt:
+          isDeactivated || !statusItem
+            ? ""
+            : cleanString(statusItem.breakStartedAt),
+        breakMinutes: isDeactivated ? 0 : Number(statusItem?.breakMinutes || 0),
 
-      lastSeenAt,
-      updatedAt: cleanString(statusItem?.updatedAt),
-    };
-  });
+        pendingSyncCount: isDeactivated
+          ? 0
+          : Number(statusItem?.pendingSyncCount || 0),
+        failedSyncCount: isDeactivated
+          ? 0
+          : Number(statusItem?.failedSyncCount || 0),
+        oldestPendingSyncAt: isDeactivated
+          ? ""
+          : cleanString(statusItem?.oldestPendingSyncAt),
 
-  for (const item of statusItems) {
-    const userId = cleanString(item.userId) || cleanString(item.id);
-
-    if (!userId || knownUserIds.has(userId)) continue;
-
-    const lastSeenAt = cleanString(item.lastSeenAt || item.updatedAt);
-    const lastSeenMs = Date.parse(lastSeenAt);
-    const isStale =
-      !Number.isFinite(lastSeenMs) || nowMs - lastSeenMs > 15 * 60 * 1000;
-
-    statuses.push({
-      userId,
-      fullName: cleanString(item.fullName),
-      email: cleanString(item.email),
-      role: cleanString(item.role) || "other",
-      status: isStale ? "offline" : cleanString(item.status) || "online",
-      lastKnownStatus: cleanString(item.status) || "offline",
-
-      currentJobId: cleanString(item.currentJobId),
-      currentJobName: cleanString(item.currentJobName),
-      currentJobLocation: cleanString(item.currentJobLocation),
-
-      startedAt: cleanString(item.startedAt),
-      breakStartedAt: cleanString(item.breakStartedAt),
-      breakMinutes: Number(item.breakMinutes || 0),
-
-      pendingSyncCount: Number(item.pendingSyncCount || 0),
-      failedSyncCount: Number(item.failedSyncCount || 0),
-      oldestPendingSyncAt: cleanString(item.oldestPendingSyncAt),
-
-      lastSeenAt,
-      updatedAt: cleanString(item.updatedAt),
-    });
-  }
+        lastSeenAt,
+        updatedAt: cleanString(statusItem?.updatedAt),
+      };
+    })
+    .filter((status) => status.userId);
 
   statuses.sort((a, b) => {
     const nameA = a.fullName || a.email || a.userId;
