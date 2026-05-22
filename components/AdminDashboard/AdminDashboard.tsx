@@ -132,10 +132,6 @@ export default function AdminDashboard({
               </div>
             </div>
 
-            <div className={workerStyles.banner}>
-              Admin users manage the system from here. Worker start, break, and
-              stop controls are hidden for admin accounts.
-            </div>
 
             <div className={styles.actionGrid}>
               <button
