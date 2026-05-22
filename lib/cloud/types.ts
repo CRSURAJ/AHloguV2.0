@@ -1,4 +1,4 @@
-import type { Job, LogItem, WorkerLiveStatus } from "@/types/work";
+import type { AdminWorkLog, Job, LogItem, WorkerLiveStatus } from "@/types/work";
 
 export type CloudSyncResult = {
   ok: boolean;
@@ -24,6 +24,8 @@ export type CloudProvider = {
   };
 
   workLogs: {
+    list: () => Promise<AdminWorkLog[]>;
+    update: (log: AdminWorkLog) => Promise<CloudSyncResult>;
     upload: (log: LogItem) => Promise<CloudSyncResult>;
     uploadMany: (logs: LogItem[]) => Promise<CloudSyncResult>;
   };

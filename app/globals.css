@@ -47,3 +47,34 @@ select,
 textarea {
   font: inherit;
 }
+
+/* Global AHlogu hover lift effect */
+:where(button:not(:disabled), a[href], [role="button"]) {
+  transition:
+    transform 150ms ease,
+    filter 150ms ease,
+    box-shadow 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+:where(button:not(:disabled), a[href], [role="button"]):hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+:where(button:not(:disabled), a[href], [role="button"]):active {
+  transform: translateY(0);
+  filter: brightness(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(button:not(:disabled), a[href], [role="button"]) {
+    transition: none;
+  }
+
+  :where(button:not(:disabled), a[href], [role="button"]):hover,
+  :where(button:not(:disabled), a[href], [role="button"]):active {
+    transform: none;
+  }
+}

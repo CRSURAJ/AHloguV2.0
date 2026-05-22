@@ -168,3 +168,22 @@ export type WorkerLiveStatus = {
   lastSeenAt: string;
   updatedAt: string;
 };
+
+export type AdminWorkLog = {
+  id: string;
+  uploadedAt: string;
+  syncedAt: string;
+  startedAt: string;
+  stoppedAt: string;
+  jobId: string;
+  fullname: string;
+  role: string;
+  description: string;
+  location: string;
+  workedMinutes: number;
+  breakMinutes: number;
+  stickyNote: string;
+  uploadedBy?: string;
+  uploadedByEmail?: string;
+  updatedAt?: string;
+};

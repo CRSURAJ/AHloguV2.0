@@ -361,3 +361,81 @@
   color: #fff0c9;
   border: 1px solid rgba(226, 173, 63, 0.28);
 }
+
+/* Worker Status hover effects */
+.summaryCard {
+  transition:
+    transform 150ms ease,
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.summaryCard:hover {
+  transform: translateY(-1px);
+  background: rgba(8, 34, 32, 0.72);
+  border-color: rgba(83, 188, 123, 0.24);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+}
+
+.table tbody tr {
+  transition:
+    background 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.table tbody tr:hover {
+  background: rgba(83, 188, 123, 0.075);
+  box-shadow: inset 3px 0 0 rgba(83, 188, 123, 0.8);
+}
+
+.table tbody tr:hover td {
+  border-bottom-color: rgba(83, 188, 123, 0.18);
+}
+
+.statusPill {
+  transition:
+    transform 150ms ease,
+    filter 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.table tbody tr:hover .statusPill {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.refreshButton,
+.closeButton {
+  transition:
+    transform 150ms ease,
+    filter 150ms ease,
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.refreshButton:hover,
+.closeButton:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .summaryCard,
+  .table tbody tr,
+  .statusPill,
+  .refreshButton,
+  .closeButton {
+    transition: none;
+  }
+
+  .summaryCard:hover,
+  .table tbody tr:hover .statusPill,
+  .refreshButton:hover,
+  .closeButton:hover {
+    transform: none;
+  }
+}

@@ -14,6 +14,7 @@ type AdminDashboardProps = {
   onOpenUserManagement: () => void;
   onOpenJobManagement: () => void;
   onOpenWorkerStatus: () => void;
+  onOpenWorkLogs: () => void;
   onSignOut: () => void;
 };
 
@@ -78,6 +79,7 @@ export default function AdminDashboard({
   onOpenUserManagement,
   onOpenJobManagement,
   onOpenWorkerStatus,
+  onOpenWorkLogs,
   onSignOut,
 }: AdminDashboardProps) {
   return (
@@ -183,7 +185,11 @@ export default function AdminDashboard({
                 <span className={styles.actionArrow}>→</span>
               </button>
 
-<button type="button" className={styles.actionCardMuted} disabled>
+<button
+            className={styles.actionCard}
+            type="button"
+            onClick={onOpenWorkLogs}
+          >
                 <span className={styles.iconBoxMuted}>
                   <LogsIcon />
                 </span>
@@ -195,8 +201,8 @@ export default function AdminDashboard({
                   </span>
                 </span>
 
-                <span className={styles.badge}>Later</span>
-              </button>
+            <span className={styles.actionArrow}>→</span>
+          </button>
 
 
 </div>

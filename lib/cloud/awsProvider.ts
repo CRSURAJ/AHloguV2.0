@@ -1,4 +1,4 @@
-import type { Job, LogItem, WorkerLiveStatus } from "@/types/work";
+import type { AdminWorkLog, Job, LogItem, WorkerLiveStatus } from "@/types/work";
 
 import type { CloudProvider, CloudSyncResult } from "./types";
 
@@ -238,6 +238,46 @@ export const awsCloudProvider: CloudProvider = {
   },
 
   workLogs: {
+    async list() {
+      const baseUrl = getAwsApiBaseUrl();
+
+      if (!baseUrl) {
+        throw new Error("Missing NEXT_PUBLIC_AHLOGU_API_URL.");
+      }
+
+      const response = await fetch(`${baseUrl}/work-logs`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
+
+      const data: unknown = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message =
+          data &&
+          typeof data === "object" &&
+          "error" in data &&
+          typeof data.error === "string"
+            ? data.error
+            : `AWS work logs list failed with status ${response.status}.`;
+
+        throw new Error(message);
+      }
+
+      if (!Array.isArray(data)) {
+        throw new Error("AWS work logs list returned an invalid response.");
+      }
+
+      return data as AdminWorkLog[];
+    },
+
+    async update(log: AdminWorkLog) {
+      return requestJson(`/work-logs/${encodeURIComponent(log.id)}`, {
+        method: "PUT",
+        payload: log,
+      });
+    },
+
     async upload(log: LogItem) {
       return requestJson("/work-logs", {
         method: "POST",

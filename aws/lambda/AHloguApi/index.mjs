@@ -893,6 +893,119 @@ async function putSyncEvent(item) {
   );
 }
 
+function normalizeWorkLogForAdmin(item) {
+  return {
+    id: String(item.id || ""),
+    uploadedAt: String(item.uploadedAt || item.syncedAt || item.ts || ""),
+    syncedAt: String(item.uploadedAt || item.syncedAt || item.ts || ""),
+    startedAt: String(item.startedAt || ""),
+    stoppedAt: String(item.stoppedAt || ""),
+    jobId: String(item.jobId || ""),
+    fullname: String(item.fullname || item.fullName || ""),
+    role: String(item.role || ""),
+    description: String(item.description || ""),
+    location: String(item.location || ""),
+    workedMinutes: Number(item.workedMinutes || 0),
+    breakMinutes: Number(item.breakMinutes || 0),
+    stickyNote: String(item.stickyNote || ""),
+    uploadedBy: String(item.uploadedBy || ""),
+    uploadedByEmail: String(item.uploadedByEmail || ""),
+    updatedAt: String(item.updatedAt || ""),
+  };
+}
+
+async function listWorkLogs(event) {
+  const profile = await requireAdminUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("WORK_LOGS_TABLE", WORK_LOGS_TABLE);
+
+  const result = await dynamo.send(
+    new ScanCommand({
+      TableName: tableName,
+    }),
+  );
+
+  const logs = (result.Items ?? [])
+    .map(normalizeWorkLogForAdmin)
+    .sort((a, b) =>
+      String(b.syncedAt || b.stoppedAt || b.startedAt).localeCompare(
+        String(a.syncedAt || a.stoppedAt || a.startedAt),
+      ),
+    );
+
+  return json(200, logs);
+}
+
+async function updateWorkLog(event, path) {
+  const profile = await requireAdminUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("WORK_LOGS_TABLE", WORK_LOGS_TABLE);
+  const id = decodeURIComponent(path.replace("/work-logs/", ""));
+
+  if (!id) {
+    return json(400, { error: "Missing work log id." });
+  }
+
+  const body = parseBody(event);
+  const now = new Date().toISOString();
+
+  const patch = {
+    uploadedAt: cleanString(body.uploadedAt || body.syncedAt),
+    syncedAt: cleanString(body.syncedAt || body.uploadedAt),
+    startedAt: cleanString(body.startedAt),
+    stoppedAt: cleanString(body.stoppedAt),
+    jobId: cleanString(body.jobId),
+    fullname: cleanString(body.fullname || body.fullName),
+    role: cleanString(body.role),
+    description: cleanString(body.description),
+    location: cleanString(body.location),
+    workedMinutes: Number.isFinite(Number(body.workedMinutes))
+      ? Number(body.workedMinutes)
+      : 0,
+    breakMinutes: Number.isFinite(Number(body.breakMinutes))
+      ? Number(body.breakMinutes)
+      : 0,
+    stickyNote: cleanString(body.stickyNote),
+    updatedAt: now,
+    updatedBy: profile.user.id,
+    updatedByEmail: profile.user.email || "",
+  };
+
+  await dynamo.send(
+    new PutCommand({
+      TableName: tableName,
+      Item: {
+        id,
+        ...patch,
+      },
+    }),
+  );
+
+  await putSyncEvent({
+    type: "workLog.update",
+    userId: profile.user.id,
+    email: profile.user.email || "",
+    entityId: id,
+  });
+
+  return json(200, {
+    ok: true,
+    cloudId: id,
+    log: {
+      id,
+      ...patch,
+    },
+  });
+}
+
 async function uploadWorkLog(event) {
   const profile = await requireActiveUser(event);
 
@@ -1256,6 +1369,15 @@ export const handler = async (event) => {
     if (method === "PUT" && path === "/worker-status/me") {
       return updateMyWorkerStatus(event);
     }
+    if (method === "GET" && path === "/work-logs") {
+      return listWorkLogs(event);
+    }
+
+    if (method === "PUT" && path.startsWith("/work-logs/")) {
+      return updateWorkLog(event, path);
+    }
+
+
 
 
 
