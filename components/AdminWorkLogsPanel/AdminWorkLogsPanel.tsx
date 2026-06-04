@@ -170,6 +170,15 @@ export default function AdminWorkLogsPanel({ onClose }: AdminWorkLogsPanelProps)
     setPage(1);
   }, [jobIdFilter, nameFilter, searchFilter, fromDate, toDate]);
 
+  function clearFilters() {
+    setJobIdFilter("");
+    setNameFilter("");
+    setSearchFilter("");
+    setFromDate("");
+    setToDate("");
+    setPage(1);
+  }
+
   const filteredLogs = useMemo(() => {
     const jobNeedle = jobIdFilter.trim().toLowerCase();
     const nameNeedle = nameFilter.trim().toLowerCase();
@@ -437,6 +446,13 @@ async function deleteWorkLog(log: AdminWorkLog) {
         </div>
 
         <div className={styles.filters}>
+        <button
+          className={styles.clearFiltersButton}
+          type="button"
+          onClick={clearFilters}
+        >
+          Clear Fields
+        </button>
           <label>
             <input
               value={jobIdFilter}
@@ -482,7 +498,7 @@ async function deleteWorkLog(log: AdminWorkLog) {
 
         <div className={styles.metaBar}>
           <span>
-            Showing {pagedLogs.length} of {filteredLogs.length} filtered logs
+            Showing {pagedLogs.length} of {filteredLogs.length} work logs
           </span>
           <strong>Total Worked Hours: {totalWorkedHours.toFixed(2)}</strong>
         </div>
