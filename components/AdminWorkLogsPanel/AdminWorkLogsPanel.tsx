@@ -392,34 +392,30 @@ export default function AdminWorkLogsPanel({ onClose }: AdminWorkLogsPanelProps)
 
         <div className={styles.filters}>
           <label>
-            <span>Job ID</span>
             <input
               value={jobIdFilter}
               onChange={(event) => setJobIdFilter(event.target.value)}
-              placeholder="Filter job ID"
+              placeholder="Search by Job ID"
             />
           </label>
 
           <label>
-            <span>Full name</span>
             <input
               value={nameFilter}
               onChange={(event) => setNameFilter(event.target.value)}
-              placeholder="Filter name"
+              placeholder="Search By Name"
             />
           </label>
 
           <label>
-            <span>Search all columns</span>
             <input
               value={searchFilter}
               onChange={(event) => setSearchFilter(event.target.value)}
-              placeholder="Search..."
+              placeholder="Search by Keyword"
             />
           </label>
 
           <label>
-            <span>From date</span>
             <input
               type="date"
               value={fromDate}
@@ -428,7 +424,6 @@ export default function AdminWorkLogsPanel({ onClose }: AdminWorkLogsPanelProps)
           </label>
 
           <label>
-            <span>To date</span>
             <input
               type="date"
               value={toDate}
@@ -443,7 +438,7 @@ export default function AdminWorkLogsPanel({ onClose }: AdminWorkLogsPanelProps)
           <span>
             Showing {pagedLogs.length} of {filteredLogs.length} filtered logs
           </span>
-          <strong>Displayed total worked hours: {totalWorkedHours.toFixed(2)}</strong>
+          <strong>Total Worked Hours: {totalWorkedHours.toFixed(2)}</strong>
         </div>
 
         {isLoading ? (

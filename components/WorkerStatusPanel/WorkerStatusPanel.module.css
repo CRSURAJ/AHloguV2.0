@@ -9,7 +9,7 @@
 }
 
 .panel {
-  width: min(700px, 100%);
+  width: min(1200px, 100%);
   margin: 0 auto;
   border-radius: 28px;
   padding: 22px;
