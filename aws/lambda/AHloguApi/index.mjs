@@ -1006,6 +1006,36 @@ async function updateWorkLog(event, path) {
   });
 }
 
+async function deleteWorkLog(event, path) {
+  const profile = await requireAdminUser(event);
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("WORK_LOGS_TABLE", WORK_LOGS_TABLE);
+  const id = decodeURIComponent(path.replace("/work-logs/", ""));
+
+  if (!id) {
+    return json(400, { error: "Missing work log id." });
+  }
+
+  await dynamo.send(
+    new DeleteCommand({
+      TableName: tableName,
+      Key: { id },
+    }),
+  );
+
+  await putSyncEvent({
+    type: "workLog.delete",
+    userId: profile.user.id,
+    email: profile.user.email || "",
+    entityId: id,
+  });
+
+  return json(200, { ok: true, cloudId: id });
+}
+
 async function uploadWorkLog(event) {
   const profile = await requireActiveUser(event);
 
@@ -1377,9 +1407,9 @@ export const handler = async (event) => {
       return updateWorkLog(event, path);
     }
 
-
-
-
+    if (method === "DELETE" && path.startsWith("/work-logs/")) {
+  return deleteWorkLog(event, path);
+}
 
     if (method === "POST" && path === "/work-logs") {
       return uploadWorkLog(event);

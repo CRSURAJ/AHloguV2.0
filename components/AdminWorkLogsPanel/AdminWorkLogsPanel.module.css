@@ -61,6 +61,11 @@
   border: 0;
   font-weight: 800;
   cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    filter 0.2s ease;
 }
 
 .primaryButton {
@@ -78,10 +83,25 @@
   border: 1px solid rgba(178, 223, 220, 0.16);
 }
 
+.primaryButton:hover,
+.secondaryButton:hover,
+.closeButton:hover,
+.pagination button:hover:not(:disabled),
+.rowActions button:hover:not(:disabled),
+.table td > button:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
 .primaryButton:disabled,
-.pagination button:disabled {
+.secondaryButton:disabled,
+.closeButton:disabled,
+.pagination button:disabled,
+.rowActions button:disabled,
+.table td > button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+  transform: none;
 }
 
 .filters {
@@ -110,20 +130,70 @@
   border: 1px solid rgba(178, 223, 220, 0.14);
   background: rgba(8, 34, 32, 0.72);
   color: #eef7f3;
-  padding: 10px 11px;
+  padding: 8px 9px;
   font: inherit;
+  font-size: 12px;
+  line-height: 1.25;
   outline: none;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    background 150ms ease;
 }
 
 .filters input:focus,
 .input:focus,
 .textarea:focus {
-  border-color: rgba(83, 188, 123, 0.62);
+  border-color: #53bc7b;
+  box-shadow:
+    0 0 0 2px rgba(83, 188, 123, 0.22),
+    0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.filters input:hover,
+.input:hover,
+.textarea:hover {
+  border-color: rgba(83, 188, 123, 0.42);
 }
 
 .textarea {
-  min-height: 68px;
+  min-height: 58px;
   resize: vertical;
+}
+
+.dateTimeInput {
+  width: 175px;
+  min-height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(178, 223, 220, 0.2);
+  background: #eef7f3;
+  color: #072c29;
+  padding: 6px 7px;
+  font-size: 11px;
+  line-height: 1.1;
+  font-weight: 700;
+  outline: none;
+  color-scheme: light;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    background 150ms ease;
+}
+
+.dateTimeInput:hover {
+  border-color: rgba(83, 188, 123, 0.42);
+}
+
+.dateTimeInput:focus {
+  border-color: #53bc7b;
+  box-shadow:
+    0 0 0 2px rgba(83, 188, 123, 0.22),
+    0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.dateTimeInput::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.9;
 }
 
 .message {
@@ -157,7 +227,7 @@
 
 .tableWrap {
   width: 100%;
-  overflow-x: auto;
+  overflow-x: hidden;
   border-radius: 20px;
   background: rgba(8, 34, 32, 0.6);
   border: 1px solid rgba(178, 223, 220, 0.12);
@@ -165,15 +235,16 @@
 
 .table {
   width: 100%;
-  min-width: 1450px;
+  min-width: 0;
+  table-layout: fixed;
   border-collapse: collapse;
   color: #eef7f3;
-  font-size: 12.5px;
+  font-size: 11.7px;
 }
 
 .table th,
 .table td {
-  padding: 10px;
+  padding: 10px 8px;
   text-align: left;
   border-bottom: 1px solid rgba(178, 223, 220, 0.1);
   vertical-align: top;
@@ -181,25 +252,170 @@
 
 .table th {
   color: rgba(238, 247, 243, 0.62);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
+  letter-spacing: 0.04em;
+  white-space: normal;
+  line-height: 1.2;
+}
+
+.table td {
+  word-break: normal;
+  overflow-wrap: normal;
+  line-height: 1.35;
 }
 
 .table tr:last-child td {
   border-bottom: 0;
 }
 
-.table td {
-  max-width: 220px;
-  word-break: break-word;
+.table tbody tr {
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.table tbody tr:hover {
+  background: rgba(83, 188, 123, 0.075);
+}
+
+.table tbody tr:hover td {
+  border-bottom-color: rgba(83, 188, 123, 0.18);
+}
+
+.table td:focus-within {
+  background: rgba(83, 188, 123, 0.09);
+}
+
+.editingRow {
+  background: rgba(83, 188, 123, 0.095);
+  box-shadow: inset 3px 0 0 #53bc7b;
+}
+
+.editingRow:hover {
+  background: rgba(83, 188, 123, 0.13);
+}
+
+.editingRow .input,
+.editingRow .textarea,
+.editingRow .dateTimeInput {
+  border-color: rgba(83, 188, 123, 0.34);
+}
+
+/* 1. Synced Time */
+.table th:nth-child(1),
+.table td:nth-child(1) {
+  width: 8.5%;
+  white-space: nowrap;
+}
+
+/* 2. Job Start Time */
+.table th:nth-child(2),
+.table td:nth-child(2) {
+  width: 8.5%;
+  white-space: nowrap;
+}
+
+/* 3. Job Stopped Time */
+.table th:nth-child(3),
+.table td:nth-child(3) {
+  width: 8.5%;
+  white-space: nowrap;
+}
+
+/* 4. Job ID */
+.table th:nth-child(4),
+.table td:nth-child(4) {
+  width: 8%;
+  overflow-wrap: anywhere;
+}
+
+/* 5. Full Name */
+.table th:nth-child(5),
+.table td:nth-child(5) {
+  width: 6.5%;
+}
+
+/* 6. Role */
+.table th:nth-child(6),
+.table td:nth-child(6) {
+  width: 5%;
+}
+
+/* 7. Work Description */
+.table th:nth-child(7),
+.table td:nth-child(7) {
+  width: 13%;
+  overflow-wrap: anywhere;
+}
+
+/* 8. Location */
+.table th:nth-child(8),
+.table td:nth-child(8) {
+  width: 7%;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+/* 9. Worked Minutes */
+.table th:nth-child(9),
+.table td:nth-child(9) {
+  width: 6%;
+  white-space: nowrap;
+}
+
+/* 10. Break Minutes */
+.table th:nth-child(10),
+.table td:nth-child(10) {
+  width: 6%;
+  white-space: nowrap;
+}
+
+/* 11. Sticky Note */
+.table th:nth-child(11),
+.table td:nth-child(11) {
+  width: 13%;
+  overflow-wrap: anywhere;
+}
+
+/* 12. Actions */
+.table th:nth-child(12),
+.table td:nth-child(12) {
+  width: 9%;
 }
 
 .rowActions {
-  display: grid;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.rowActions button {
+  min-width: 58px;
+  white-space: nowrap;
+  padding: 0 10px;
+}
+
+.rowActions .dangerButton {
+  border: 1px solid rgba(229, 57, 53, 0.2);
+  background: rgba(229, 57, 53, 0.08);
+  color: #ffb9b9;
+}
+
+.rowActions .dangerButton:hover:not(:disabled) {
+  background: rgba(229, 57, 53, 0.16);
+  border-color: rgba(229, 57, 53, 0.34);
+  color: #ffb9b9;
+}
+
+.rowActions .dangerButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  color: #ffb9b9;
+  border-color: rgba(229, 57, 53, 0.2);
 }
 
 .pagination {
@@ -241,167 +457,60 @@
   }
 }
 
+/* Final fix: stop edit date/time inputs from breaking table layout */
 .dateTimeInput {
-  width: 170px;
-  border-radius: 12px;
-  border: 1px solid rgba(178, 223, 220, 0.14);
-  background: rgba(8, 34, 32, 0.72);
-  color: #eef7f3;
-  padding: 9px 10px;
-  font: inherit;
-  outline: none;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  font-size: 10.5px;
+  padding: 6px 5px;
 }
 
-.rowActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 132px;
+/* Give editable job start/stop time columns a bit more room */
+.table th:nth-child(2),
+.table td:nth-child(2),
+.table th:nth-child(3),
+.table td:nth-child(3) {
+  width: 9.8%;
 }
 
-.rowActions button {
-  min-width: 58px;
-  white-space: nowrap;
-  padding: 0 10px;
+/* Slightly reduce less critical columns to make room */
+.table th:nth-child(5),
+.table td:nth-child(5) {
+  width: 6%;
 }
 
-.table td:last-child {
-  min-width: 140px;
+.table th:nth-child(6),
+.table td:nth-child(6) {
+  width: 4.5%;
 }
 
-/* Work log edit date/time input cleanup */
-
-.dateTimeInput {
-  width: 155px;
-  min-height: 34px;
-  border-radius: 10px;
-  border: 1px solid rgba(178, 223, 220, 0.2);
-  background: #eef7f3;
-  color: #072c29;
-  padding: 6px 7px;
-  font-size: 11px;
-  line-height: 1.1;
-  font-weight: 700;
-  outline: none;
-  color-scheme: light;
+.table th:nth-child(9),
+.table td:nth-child(9),
+.table th:nth-child(10),
+.table td:nth-child(10) {
+  width: 5.5%;
 }
 
-.dateTimeInput:focus {
-  border-color: #53bc7b;
-  box-shadow: 0 0 0 2px rgba(83, 188, 123, 0.2);
+/* Work Logs table readability bump */
+.table {
+  font-size: 13px;
 }
 
-.dateTimeInput::-webkit-calendar-picker-indicator {
-  cursor: pointer;
-  opacity: 0.9;
+.table th {
+  font-size: 11.5px;
 }
 
-
-
-/* Smaller edit controls so text does not get cut off */
-.input,
-.textarea {
-  font-size: 12px;
-  line-height: 1.25;
-  padding: 8px 9px;
-}
-
-.textarea {
-  min-height: 58px;
-}
-
-/* Date/time edit input: light and compact */
-.dateTimeInput {
-  width: 175px;
-  min-height: 34px;
-  border-radius: 10px;
-  border: 1px solid rgba(178, 223, 220, 0.2);
-  background: #eef7f3;
-  color: #072c29;
-  padding: 6px 7px;
-  font-size: 11px;
-  line-height: 1.1;
-  font-weight: 700;
-  outline: none;
-  color-scheme: light;
-}
-
-.dateTimeInput:focus {
-  border-color: #53bc7b;
-  box-shadow: 0 0 0 2px rgba(83, 188, 123, 0.2);
-}
-
-.dateTimeInput::-webkit-calendar-picker-indicator {
-  cursor: pointer;
-  opacity: 0.9;
-}
-
-/* Work logs table hover and edit focus effects */
-.table tbody tr {
-  transition:
-    background 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
-}
-
-.table tbody tr:hover {
-  background: rgba(83, 188, 123, 0.075);
-}
-
-.table tbody tr:hover td {
-  border-bottom-color: rgba(83, 188, 123, 0.18);
-}
-
-.editingRow {
-  background: rgba(83, 188, 123, 0.095);
-  box-shadow: inset 3px 0 0 #53bc7b;
-}
-
-.editingRow:hover {
-  background: rgba(83, 188, 123, 0.13);
-}
-
-.table td:focus-within {
-  background: rgba(83, 188, 123, 0.09);
+.table td {
+  line-height: 1.35;
 }
 
 .input,
-.textarea,
+.textarea {
+  font-size: 12.5px;
+}
+
 .dateTimeInput {
-  transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease,
-    background 150ms ease,
-    transform 150ms ease;
-}
-
-.input:hover,
-.textarea:hover,
-.dateTimeInput:hover {
-  border-color: rgba(83, 188, 123, 0.42);
-}
-
-.input:focus,
-.textarea:focus,
-.dateTimeInput:focus {
-  border-color: #53bc7b;
-  box-shadow:
-    0 0 0 2px rgba(83, 188, 123, 0.22),
-    0 8px 20px rgba(0, 0, 0, 0.12);
-}
-
-.editingRow .input,
-.editingRow .textarea,
-.editingRow .dateTimeInput {
-  border-color: rgba(83, 188, 123, 0.34);
-}
-
-.table td > button:hover,
-.rowActions button:hover,
-.primaryButton:hover,
-.secondaryButton:hover,
-.closeButton:hover,
-.pagination button:hover:not(:disabled) {
-  filter: brightness(1.06);
-  transform: translateY(-1px);
+  font-size: 11.5px;
 }

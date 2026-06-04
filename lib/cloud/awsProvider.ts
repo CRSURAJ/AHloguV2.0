@@ -277,7 +277,12 @@ export const awsCloudProvider: CloudProvider = {
         payload: log,
       });
     },
-
+    
+    async delete(logId: string) {
+  return requestJson(`/work-logs/${encodeURIComponent(logId)}`, {
+    method: "DELETE",
+  });
+},
     async upload(log: LogItem) {
       return requestJson("/work-logs", {
         method: "POST",

@@ -25,6 +25,16 @@ function formatDateTime(value: string): string {
   return formatMelbourneDateTime(value);
 }
 
+function formatMinutes(value: number | string | null | undefined): string {
+  const minutes = Number(value ?? 0);
+
+  if (!Number.isFinite(minutes)) {
+    return "0 min";
+  }
+
+  return `${Math.max(0, Math.round(minutes))} min`;
+}
+
 function toDateTimeLocalInput(value: string): string {
   if (!value) return "";
 
@@ -133,6 +143,7 @@ export default function AdminWorkLogsPanel({ onClose }: AdminWorkLogsPanelProps)
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<AdminWorkLog | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function loadWorkLogs() {
     try {
@@ -261,7 +272,38 @@ export default function AdminWorkLogsPanel({ onClose }: AdminWorkLogsPanelProps)
       setSavingId(null);
     }
   }
+async function deleteWorkLog(log: AdminWorkLog) {
+  const confirmed = window.confirm(
+    `Are you sure you want to delete this work log?\n\nWorker: ${log.fullname}\nJob ID: ${log.jobId}\nStarted: ${formatDateTime(log.startedAt)}`
+  );
 
+  if (!confirmed) return;
+
+  try {
+    setDeletingId(log.id);
+    setMessage("");
+
+    const result = await getCloudProvider().workLogs.delete(log.id);
+
+    if (!result.ok) {
+      throw new Error(result.message || "Could not delete work log.");
+    }
+
+    setLogs((current) => current.filter((item) => item.id !== log.id));
+
+    if (editingId === log.id) {
+      cancelEdit();
+    }
+
+    setMessage("Work log deleted.");
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Could not delete work log.";
+    setMessage(errorMessage);
+  } finally {
+    setDeletingId(null);
+  }
+}
   async function exportXlsx() {
     const XLSX = await import("xlsx");
 
@@ -306,6 +348,10 @@ export default function AdminWorkLogsPanel({ onClose }: AdminWorkLogsPanelProps)
     if (!isEditing) {
       if (field === "startedAt" || field === "stoppedAt") {
         return formatDateTime(String(log[field] || ""));
+      }
+
+      if (field === "breakMinutes") {
+        return formatMinutes(log.breakMinutes);
       }
 
       return String(log[field] ?? "");
@@ -459,10 +505,10 @@ export default function AdminWorkLogsPanel({ onClose }: AdminWorkLogsPanelProps)
                     <th>Role</th>
                     <th>Work description</th>
                     <th>Location</th>
-                    <th>Worked minutes</th>
-                    <th>Break minutes</th>
+                    <th>Worked</th>
+                    <th>Break</th>
                     <th>Sticky note</th>
-                    <th>Edit</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
 
@@ -483,29 +529,58 @@ export default function AdminWorkLogsPanel({ onClose }: AdminWorkLogsPanelProps)
                         <td>{log.role}</td>
                         <td>{renderEditableCell(log, "description")}</td>
                         <td>{renderEditableCell(log, "location")}</td>
-                        <td>{isEditing && draft ? draft.workedMinutes : log.workedMinutes}</td>
+                        <td>{formatMinutes(isEditing && draft ? draft.workedMinutes : log.workedMinutes)}</td>
                         <td>{renderEditableCell(log, "breakMinutes")}</td>
                         <td>{renderEditableCell(log, "stickyNote")}</td>
                         <td>
-                          {isEditing ? (
-                            <div className={styles.rowActions}>
-                              <button
-                                type="button"
-                                onClick={() => void saveEdit()}
-                                disabled={savingId === log.id}
-                              >
-                                Save
-                              </button>
-                              <button type="button" onClick={cancelEdit}>
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <button type="button" onClick={() => startEdit(log)}>
-                              Edit
-                            </button>
-                          )}
-                        </td>
+  {isEditing ? (
+    <div className={styles.rowActions}>
+      <button
+        type="button"
+        onClick={() => void saveEdit()}
+        disabled={savingId === log.id || deletingId === log.id}
+      >
+        Save
+      </button>
+
+      <button
+        type="button"
+        onClick={cancelEdit}
+        disabled={savingId === log.id || deletingId === log.id}
+      >
+        Cancel
+      </button>
+
+      <button
+        className={styles.dangerButton}
+        type="button"
+        onClick={() => void deleteWorkLog(log)}
+        disabled={savingId === log.id || deletingId === log.id}
+      >
+        {deletingId === log.id ? "Deleting..." : "Delete"}
+      </button>
+    </div>
+  ) : (
+    <div className={styles.rowActions}>
+      <button
+        type="button"
+        onClick={() => startEdit(log)}
+        disabled={deletingId === log.id}
+      >
+        Edit
+      </button>
+
+      <button
+        className={styles.dangerButton}
+        type="button"
+        onClick={() => void deleteWorkLog(log)}
+        disabled={deletingId === log.id}
+      >
+        {deletingId === log.id ? "Deleting..." : "Delete"}
+      </button>
+    </div>
+  )}
+</td>
                       </tr>
                     );
                   })}

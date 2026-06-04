@@ -26,6 +26,7 @@ export type CloudProvider = {
   workLogs: {
     list: () => Promise<AdminWorkLog[]>;
     update: (log: AdminWorkLog) => Promise<CloudSyncResult>;
+    delete: (logId: string) => Promise<CloudSyncResult>;
     upload: (log: LogItem) => Promise<CloudSyncResult>;
     uploadMany: (logs: LogItem[]) => Promise<CloudSyncResult>;
   };
