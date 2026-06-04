@@ -67,7 +67,7 @@ export function useLocalAuth(): UseLocalAuthReturn {
     };
   }, []);
 
-  const canManageUsers = currentUser?.permissionLevel === "admin";
+  const canManageUsers = currentUser?.permissionLevel === "admin" || currentUser?.permissionLevel === "manager";
 
   const securityLabel = useMemo(() => {
     if (!currentUser) return "Change Credential";

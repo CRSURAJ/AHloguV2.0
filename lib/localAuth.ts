@@ -25,7 +25,7 @@ const DEFAULT_USERS = [
     id: "suraj-dhungana",
     username: "suraj",
     fullName: "Suraj Dhungana",
-    permissionLevel: "user" as const,
+    permissionLevel: "worker" as const,
     role: "plumber" as const,
     credentialType: "pin" as const,
     secret: "1234",
@@ -77,7 +77,7 @@ function makeUuid(): string {
 }
 
 function isPermissionLevel(value: unknown): value is PermissionLevel {
-  return value === "admin" || value === "user";
+  return value === "admin" || value === "manager" || value === "worker" || value === "user";
 }
 
 function isWorkerRole(value: unknown): value is WorkerRole {
@@ -94,7 +94,10 @@ function isWorkerRole(value: unknown): value is WorkerRole {
 }
 
 function normalizePermissionLevel(value: unknown): PermissionLevel {
-  return value === "admin" ? "admin" : "user";
+  
+  if (value === "admin") return "admin";
+  if (value === "manager") return "manager";
+  return "worker";
 }
 
 function normalizeWorkerRole(
@@ -102,7 +105,7 @@ function normalizeWorkerRole(
   permissionLevel: PermissionLevel
 ): WorkerRole {
   if (isWorkerRole(value)) return value;
-  return permissionLevel === "admin" ? "supervisor" : "plumber";
+  return permissionLevel === "admin" || permissionLevel === "manager" ? "supervisor" : "plumber";
 }
 
 async function deriveCredentialHash(
@@ -292,7 +295,7 @@ export async function ensureSeedUsers(): Promise<void> {
       credentialType: item.credentialType,
       credentialHash,
       credentialSalt,
-      mustChangeCredential: item.permissionLevel === "admin",
+      mustChangeCredential: item.permissionLevel !== "worker",
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -314,7 +317,7 @@ export async function createOfflineUser(
     fullName: input.fullName.trim(),
     permissionLevel: input.permissionLevel,
     role: input.role,
-    credentialType: input.permissionLevel === "admin" ? "password" : input.credentialType,
+    credentialType: input.permissionLevel === "admin" || input.permissionLevel === "manager" ? "password" : input.credentialType,
     credentialHash,
     credentialSalt,
     mustChangeCredential: true,

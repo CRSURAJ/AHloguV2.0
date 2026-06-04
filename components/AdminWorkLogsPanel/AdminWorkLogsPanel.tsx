@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { getCloudProvider } from "@/lib/cloud/client";
 import { formatMelbourneDateTime } from "@/lib/melbourneTime";
-import type { AdminWorkLog } from "@/types/work";
+import type { AdminWorkLog, PermissionLevel} from "@/types/work";
 import styles from "./AdminWorkLogsPanel.module.css";
 
 const PAGE_SIZE = 50;
 
 type AdminWorkLogsPanelProps = {
   onClose: () => void;
+  currentPermissionLevel: PermissionLevel;
 };
 
 type EditableField =
@@ -130,7 +131,8 @@ function getEditableValue(log: AdminWorkLog, field: EditableField): string {
   return value ?? "";
 }
 
-export default function AdminWorkLogsPanel({ onClose }: AdminWorkLogsPanelProps) {
+export default function AdminWorkLogsPanel({ onClose, currentPermissionLevel }: AdminWorkLogsPanelProps) {
+  const canManageWorkLogs = currentPermissionLevel === "admin";
   const [logs, setLogs] = useState<AdminWorkLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -182,7 +184,7 @@ export default function AdminWorkLogsPanel({ onClose }: AdminWorkLogsPanelProps)
 
   const filteredLogs = useMemo(() => {
     const archiveModeLogs = logs.filter((log) =>
-      showArchivedJobLogs ? log.isJobArchived === true : log.isJobArchived !== true
+      canManageWorkLogs && showArchivedJobLogs ? log.isJobArchived === true : log.isJobArchived !== true
     );
     const jobNeedle = jobIdFilter.trim().toLowerCase();
     const nameNeedle = nameFilter.trim().toLowerCase();
@@ -203,7 +205,7 @@ export default function AdminWorkLogsPanel({ onClose }: AdminWorkLogsPanelProps)
 
       return matchesDateRange(log, fromDate, toDate);
     });
-  }, [fromDate, jobIdFilter, logs, nameFilter, searchFilter, toDate, showArchivedJobLogs]);
+  }, [fromDate, jobIdFilter, logs, nameFilter, searchFilter, toDate, showArchivedJobLogs, canManageWorkLogs]);
 
   const totalWorkedMinutes = useMemo(
     () =>
@@ -458,7 +460,8 @@ async function deleteWorkLog(log: AdminWorkLog) {
           Clear Fields
         </button>
 
-        <label className={styles.archiveSearchToggle}>
+        {canManageWorkLogs ? (
+<label className={styles.archiveSearchToggle}>
           <input
             type="checkbox"
             checked={showArchivedJobLogs}
@@ -466,6 +469,7 @@ async function deleteWorkLog(log: AdminWorkLog) {
           />
           <span>Search Archived Job Logs</span>
         </label>
+) : null}
           <label>
             <input
               value={jobIdFilter}
@@ -509,7 +513,7 @@ async function deleteWorkLog(log: AdminWorkLog) {
 
         {message ? <p className={styles.message}>{message}</p> : null}
 
-      {showArchivedJobLogs ? (
+      {canManageWorkLogs && showArchivedJobLogs ? (
         <p className={styles.archiveModeMessage}>
           Archived Job Logs Mode — showing logs linked to archived jobs only.
         </p>
@@ -543,7 +547,7 @@ async function deleteWorkLog(log: AdminWorkLog) {
                     <th>Worked</th>
                     <th>Break</th>
                     <th>Sticky note</th>
-                    <th>Actions</th>
+                    {canManageWorkLogs ? <th>Actions</th> : null}
                   </tr>
                 </thead>
 
@@ -567,7 +571,8 @@ async function deleteWorkLog(log: AdminWorkLog) {
                         <td>{formatMinutes(isEditing && draft ? draft.workedMinutes : log.workedMinutes)}</td>
                         <td>{renderEditableCell(log, "breakMinutes")}</td>
                         <td>{renderEditableCell(log, "stickyNote")}</td>
-                        <td>
+                        {canManageWorkLogs ? (
+<td>
   {isEditing ? (
     <div className={styles.rowActions}>
       <button
@@ -616,6 +621,7 @@ async function deleteWorkLog(log: AdminWorkLog) {
     </div>
   )}
 </td>
+) : null}
                       </tr>
                     );
                   })}

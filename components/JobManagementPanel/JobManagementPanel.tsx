@@ -5,12 +5,14 @@ import { useMemo, useRef, useState } from "react";
 import FeedbackMessage from "@/components/FeedbackMessage";
 import { useJobs } from "@/hooks/useJobs";
 import { WORKER_ROLE_OPTIONS } from "@/types/work";
-import type { Job, JobDrawing, WorkerRole } from "@/types/work";
+import type { Job,
+  PermissionLevel, JobDrawing, WorkerRole } from "@/types/work";
 
 import styles from "./JobManagementPanel.module.css";
 
 type JobManagementPanelProps = {
   onClose: () => void;
+  currentPermissionLevel: PermissionLevel;
 };
 
 type JobFormState = {
@@ -120,7 +122,8 @@ function isDuplicateJobIdMessage(message: string): boolean {
   );
 }
 
-export default function JobManagementPanel({ onClose }: JobManagementPanelProps) {
+export default function JobManagementPanel({ onClose, currentPermissionLevel }: JobManagementPanelProps) {
+  const canArchiveOrDeleteJobs = currentPermissionLevel === "admin";
   const {
     jobs,
     activeJobs,
@@ -759,13 +762,16 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
                     {job.isActive ? "Deactivate" : "Activate"}
                   </button>
 
-                                    <button
+                                    {canArchiveOrDeleteJobs ? (
+<button
                     type="button"
                     onClick={() => void handleArchive(job)}
                   >
                     Archive
                   </button>
+) : null}
 
+{canArchiveOrDeleteJobs ? (
 <button
                     className={styles.dangerButton}
                     type="button"
@@ -773,6 +779,7 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
                   >
                     Delete
                   </button>
+) : null}
                 </div>
               </article>
             ))}

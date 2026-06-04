@@ -151,6 +151,39 @@ async function requireActiveUser(event) {
   return profile;
 }
 
+function getUserPermissionLevel(user) {
+  const permissionLevel = cleanString(user?.permissionLevel).toLowerCase();
+
+  if (permissionLevel === "admin" || user?.isAdmin === true) {
+    return "admin";
+  }
+
+  if (permissionLevel === "manager") {
+    return "manager";
+  }
+
+  return "worker";
+}
+
+function isFullAdminUser(user) {
+  return getUserPermissionLevel(user) === "admin";
+}
+
+function isManagementUser(user) {
+  const permissionLevel = getUserPermissionLevel(user);
+  return permissionLevel === "admin" || permissionLevel === "manager";
+}
+
+function normalizeRequestedPermissionLevel(value, isAdminFlag = false) {
+  const permissionLevel = cleanString(value).toLowerCase();
+
+  if (permissionLevel === "admin") return "admin";
+  if (permissionLevel === "manager") return "manager";
+  if (permissionLevel === "worker" || permissionLevel === "user") return "worker";
+
+  return isAdminFlag === true ? "admin" : "worker";
+}
+
 async function requireAdminUser(event) {
   const profile = await getUserProfile(event);
 
@@ -158,7 +191,26 @@ async function requireAdminUser(event) {
     return profile;
   }
 
-  if (!profile.user.isAdmin) {
+  if (!isManagementUser(profile.user)) {
+    return {
+      ok: false,
+      response: json(403, {
+        error: "Admin or Manager access required.",
+      }),
+    };
+  }
+
+  return profile;
+}
+
+async function requireFullAdminUser(event) {
+  const profile = await getUserProfile(event);
+
+  if (!profile.ok) {
+    return profile;
+  }
+
+  if (!isFullAdminUser(profile.user)) {
     return {
       ok: false,
       response: json(403, {
@@ -184,7 +236,8 @@ async function getMe(event) {
     email: user.email || "",
     fullName: user.fullName || "",
     role: user.role || "",
-    isAdmin: Boolean(user.isAdmin),
+    permissionLevel: getUserPermissionLevel(user),
+    isAdmin: isFullAdminUser(user),
     isActive: user.isActive !== false,
   });
 }
@@ -279,9 +332,21 @@ async function createUser(event) {
   const email = cleanString(body.email || body.username).toLowerCase();
   const fullName = cleanString(body.fullName || body.name);
   const role = normalizeUserRole(body.role);
-  const permissionLevel = cleanString(body.permissionLevel).toLowerCase();
-  const isAdmin = permissionLevel === "admin" || body.isAdmin === true;
+  const requestedPermissionLevel = normalizeRequestedPermissionLevel(
+    body.permissionLevel,
+    body.isAdmin === true,
+  );
+  const isAdmin = requestedPermissionLevel === "admin";
   const temporaryPassword = cleanString(body.temporaryPassword || body.password);
+
+  if (
+    getUserPermissionLevel(profile.user) === "manager" &&
+    requestedPermissionLevel === "admin"
+  ) {
+    return json(403, {
+      error: "Managers cannot create admin users.",
+    });
+  }
 
   if (!email || !email.includes("@")) {
     return json(400, {
@@ -340,7 +405,7 @@ async function createUser(event) {
     username: email,
     fullName,
     role,
-    permissionLevel: isAdmin ? "admin" : "user",
+    permissionLevel: requestedPermissionLevel,
     isAdmin,
     isActive: true,
     createdAt: now,
@@ -378,6 +443,7 @@ async function listUsers(event) {
   }
 
   const tableName = requireEnv("USERS_TABLE", USERS_TABLE);
+  const actorPermissionLevel = getUserPermissionLevel(profile.user);
 
   const result = await dynamo.send(
     new ScanCommand({
@@ -392,15 +458,22 @@ async function listUsers(event) {
       username: String(user.email || user.username || ""),
       fullName: String(user.fullName || user.name || user.email || ""),
       role: String(user.role || "other"),
-      permissionLevel: user.isAdmin ? "admin" : "user",
-      isAdmin: Boolean(user.isAdmin),
+      permissionLevel: getUserPermissionLevel(user),
+      isAdmin: isFullAdminUser(user),
       isActive: user.isActive !== false,
       createdAt: String(user.createdAt || ""),
       updatedAt: String(user.updatedAt || ""),
     }))
+    .filter((user) => actorPermissionLevel === "admin" || user.permissionLevel !== "admin")
     .sort((a, b) => {
+      const permissionRank = {
+        admin: 0,
+        manager: 1,
+        worker: 2,
+      };
+
       if (a.permissionLevel !== b.permissionLevel) {
-        return a.permissionLevel === "admin" ? -1 : 1;
+        return permissionRank[a.permissionLevel] - permissionRank[b.permissionLevel];
       }
 
       return a.email.localeCompare(b.email);
@@ -451,6 +524,15 @@ async function updateUserActive(event, path) {
     return json(404, {
       error: "User not found.",
       id,
+    });
+  }
+
+  if (
+    getUserPermissionLevel(profile.user) === "manager" &&
+    getUserPermissionLevel(existingResult.Item) === "admin"
+  ) {
+    return json(403, {
+      error: "Managers cannot activate or deactivate admin users.",
     });
   }
 
@@ -537,8 +619,8 @@ async function updateUserActive(event, path) {
       username: String(user.email || user.username || ""),
       fullName: String(user.fullName || user.name || user.email || ""),
       role: String(user.role || "other"),
-      permissionLevel: user.isAdmin ? "admin" : "user",
-      isAdmin: Boolean(user.isAdmin),
+      permissionLevel: getUserPermissionLevel(user),
+      isAdmin: isFullAdminUser(user),
       isActive: user.isActive !== false,
       createdAt: String(user.createdAt || ""),
       updatedAt: String(user.updatedAt || ""),
@@ -596,6 +678,15 @@ async function resetUserPassword(event, path) {
     });
   }
 
+  if (
+    getUserPermissionLevel(profile.user) === "manager" &&
+    getUserPermissionLevel(existingResult.Item) === "admin"
+  ) {
+    return json(403, {
+      error: "Managers cannot reset admin passwords.",
+    });
+  }
+
   const cognitoUsername = cleanString(
     existingResult.Item.email || existingResult.Item.username,
   );
@@ -630,7 +721,7 @@ async function resetUserPassword(event, path) {
 }
 
 async function deleteUser(event, path) {
-  const profile = await requireAdminUser(event);
+  const profile = await requireFullAdminUser(event);
   if (!profile.ok) {
     return profile.response;
   }
@@ -816,6 +907,43 @@ async function updateJob(event, path) {
     });
   }
 
+  const existingResult = await dynamo.send(
+    new GetCommand({
+      TableName: tableName,
+      Key: {
+        id,
+      },
+    }),
+  );
+
+  if (!existingResult.Item) {
+    return json(404, {
+      error: "Job not found.",
+      id,
+    });
+  }
+
+  if (
+    existingResult.Item.isArchived === true ||
+    existingResult.Item.isArchived === "true"
+  ) {
+    return json(400, {
+      error: "Archived jobs cannot be edited.",
+    });
+  }
+
+  if (
+    getUserPermissionLevel(profile.user) === "manager" &&
+    (body.isArchived === true ||
+      body.isArchived === "true" ||
+      cleanString(body.archivedAt) ||
+      cleanString(body.archivedBy))
+  ) {
+    return json(403, {
+      error: "Managers cannot archive jobs.",
+    });
+  }
+
   const duplicateJob = await findDuplicateJobByJobId(tableName, jobId, id);
 
   if (duplicateJob) {
@@ -828,6 +956,9 @@ async function updateJob(event, path) {
     ...body,
     id,
     jobId,
+    isArchived: false,
+    archivedAt: undefined,
+    archivedBy: undefined,
     updatedAt: new Date().toISOString(),
   };
 
@@ -847,7 +978,7 @@ async function updateJob(event, path) {
 
 
 async function archiveJob(event, path) {
-  const profile = await requireAdminUser(event);
+  const profile = await requireFullAdminUser(event);
   if (!profile.ok) {
     return profile.response;
   }
@@ -946,7 +1077,7 @@ async function archiveJob(event, path) {
 }
 
 async function deleteJob(event, path) {
-  const profile = await requireAdminUser(event);
+  const profile = await requireFullAdminUser(event);
 
   if (!profile.ok) {
     return profile.response;
@@ -1032,8 +1163,11 @@ async function listWorkLogs(event) {
     }),
   );
 
+  const canViewArchivedWorkLogs = isFullAdminUser(profile.user);
+
   const logs = (result.Items ?? [])
     .map(normalizeWorkLogForAdmin)
+    .filter((log) => canViewArchivedWorkLogs || log.isJobArchived !== true)
     .sort((a, b) =>
       String(b.syncedAt || b.stoppedAt || b.startedAt).localeCompare(
         String(a.syncedAt || a.stoppedAt || a.startedAt),
@@ -1044,7 +1178,7 @@ async function listWorkLogs(event) {
 }
 
 async function updateWorkLog(event, path) {
-  const profile = await requireAdminUser(event);
+  const profile = await requireFullAdminUser(event);
 
   if (!profile.ok) {
     return profile.response;
@@ -1113,7 +1247,7 @@ async function updateWorkLog(event, path) {
 }
 
 async function deleteWorkLog(event, path) {
-  const profile = await requireAdminUser(event);
+  const profile = await requireFullAdminUser(event);
   if (!profile.ok) {
     return profile.response;
   }
@@ -1330,7 +1464,7 @@ async function listWorkerStatus(event) {
   }
 
   const statuses = (usersResult.Items ?? [])
-    .filter(isWorkerStatusVisibleUser)
+    .filter((user) => getUserPermissionLevel(user) === "worker" && isWorkerStatusVisibleUser(user))
     .map((user) => {
       const userId = cleanString(user.id) || cleanString(user.userId);
       const statusItem = statusByUserId.get(userId);
@@ -1416,6 +1550,12 @@ async function updateMyWorkerStatus(event) {
 
   if (!profile.ok) {
     return profile.response;
+  }
+
+  if (getUserPermissionLevel(profile.user) !== "worker") {
+    return json(403, {
+      error: "Only worker users can publish worker status.",
+    });
   }
 
   const tableName = requireEnv("WORKER_STATUS_TABLE", WORKER_STATUS_TABLE);

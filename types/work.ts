@@ -1,6 +1,6 @@
 export type SyncStatus = "pending" | "syncing" | "synced" | "failed";
 export type CredentialType = "pin" | "password";
-export type PermissionLevel = "admin" | "user";
+export type PermissionLevel = "admin" | "manager" | "worker";
 
 export type WorkerRole =
   | "plumber"
@@ -17,7 +17,8 @@ export const PERMISSION_LEVEL_OPTIONS: ReadonlyArray<{
   label: string;
 }> = [
   { value: "admin", label: "Admin" },
-  { value: "user", label: "User" },
+  { value: "manager", label: "Manager" },
+  { value: "worker", label: "Worker" },
 ];
 
 export const WORKER_ROLE_OPTIONS: ReadonlyArray<{

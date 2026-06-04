@@ -144,7 +144,7 @@ export default function UserManagementPanel({
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [permissionLevel, setPermissionLevel] =
-    useState<PermissionLevel>("user");
+    useState<PermissionLevel>("worker");
   const [role, setRole] = useState<WorkerRole>("plumber");
   const [temporaryPassword, setTemporaryPassword] = useState("");
   const [confirmTemporaryPassword, setConfirmTemporaryPassword] = useState("");
@@ -170,16 +170,38 @@ export default function UserManagementPanel({
   const userFeedbackRef = useRef<HTMLDivElement>(null);
   const resetPasswordCardRef = useRef<HTMLFormElement>(null);
 
+  const currentUser = users.find((user) => user.id === currentUserId);
+  const currentPermissionLevel = currentUser?.permissionLevel ?? "admin";
+  const isAdminActor = currentPermissionLevel === "admin";
+  const isManagerActor = currentPermissionLevel === "manager";
+
+  const createPermissionOptions = useMemo(
+    () =>
+      isManagerActor
+        ? PERMISSION_LEVEL_OPTIONS.filter((item) => item.value !== "admin")
+        : PERMISSION_LEVEL_OPTIONS,
+    [isManagerActor],
+  );
+
   const sortedUsers = useMemo(
     () =>
-      [...users].filter((user) => user.id !== currentUserId).sort((a, b) => {
-        if (a.permissionLevel !== b.permissionLevel) {
-          return a.permissionLevel === "admin" ? -1 : 1;
-        }
+      [...users]
+        .filter((user) => user.id !== currentUserId)
+        .filter((user) => !isManagerActor || user.permissionLevel !== "admin")
+        .sort((a, b) => {
+          const permissionRank: Record<PermissionLevel, number> = {
+            admin: 0,
+            manager: 1,
+            worker: 2,
+          };
 
-        return (a.email || a.username).localeCompare(b.email || b.username);
-      }),
-    [users, currentUserId],
+          if (a.permissionLevel !== b.permissionLevel) {
+            return permissionRank[a.permissionLevel] - permissionRank[b.permissionLevel];
+          }
+
+          return (a.email || a.username).localeCompare(b.email || b.username);
+        }),
+    [users, currentUserId, isManagerActor],
   );
 
   const displayMessage = localMessage || message;
@@ -285,6 +307,16 @@ export default function UserManagementPanel({
       return;
     }
 
+    if (isManagerActor && permissionLevel === "admin") {
+      markCreateError(
+        "permissionLevel",
+        "Managers cannot create admin users.",
+        permissionLevelInputRef,
+      );
+      return;
+    }
+
+
     if (!role) {
       markCreateError("role", "Role is required.", roleInputRef);
       return;
@@ -351,7 +383,7 @@ export default function UserManagementPanel({
       if (result.ok) {
         setFullName("");
         setEmail("");
-        setPermissionLevel("user");
+        setPermissionLevel("worker");
         setRole("plumber");
         setTemporaryPassword("");
         setConfirmTemporaryPassword("");
@@ -580,7 +612,7 @@ export default function UserManagementPanel({
           <div>
             <h3 className={styles.title}>User Management</h3>
             <p className={styles.subtitle}>
-              Create users, assign admin/user access and trade role,
+              Create users, assign Admin/Manager/Worker access and trade role,
               then store the matching profile in AHloguUsers.
             </p>
           </div>
@@ -652,7 +684,7 @@ export default function UserManagementPanel({
                 }}
                 aria-invalid={createErrorField === "permissionLevel"}
               >
-                {PERMISSION_LEVEL_OPTIONS.map((item) => (
+                {createPermissionOptions.map((item) => (
                   <option key={item.value} value={item.value}>
                     {item.label}
                   </option>
@@ -764,6 +796,10 @@ export default function UserManagementPanel({
               const isUpdatingUser = updatingUserId === user.id;
               const isResettingUser = resettingUserId === user.id;
               const isDeletingUser = deletingUserId === user.id;
+              const canManageUser =
+                isAdminActor ||
+                (isManagerActor && user.permissionLevel !== "admin");
+              const canDeleteUser = isAdminActor;
 
               return (
                 <div key={user.id || user.email} className={styles.userCard}>
@@ -802,41 +838,53 @@ export default function UserManagementPanel({
                             ADMIN
                           </span>
                         ) : null}
+
+                        {user.permissionLevel === "manager" ? (
+                          <span className={styles.badge}>
+                            MANAGER
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   </div>
 
                   <div className={styles.actions}>
-                    <button
-                      type="button"
-                      className={styles.secondaryButton}
-                      onClick={() => handleOpenResetPassword(user)}
-                      disabled={isCurrentUser || isUpdatingUser || isResettingUser || isDeletingUser || !user.id}
-                    >
-                      {isResettingUser ? "Resetting..." : "Reset Password"}
-                    </button>
+                    {canManageUser ? (
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={() => handleOpenResetPassword(user)}
+                        disabled={isCurrentUser || isUpdatingUser || isResettingUser || isDeletingUser || !user.id}
+                      >
+                        {isResettingUser ? "Resetting..." : "Reset Password"}
+                      </button>
+                    ) : null}
 
-                    <button
-                      type="button"
-                      className={styles.secondaryButton}
-                      onClick={() => void handleToggleActive(user)}
-                      disabled={isCurrentUser || isUpdatingUser || isResettingUser || isDeletingUser || !user.id}
-                    >
-                      {isUpdatingUser
-                        ? "Updating..."
-                        : user.isActive
-                          ? "Deactivate"
-                          : "Activate"}
-                    </button>
+                    {canManageUser ? (
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={() => void handleToggleActive(user)}
+                        disabled={isCurrentUser || isUpdatingUser || isResettingUser || isDeletingUser || !user.id}
+                      >
+                        {isUpdatingUser
+                          ? "Updating..."
+                          : user.isActive
+                            ? "Deactivate"
+                            : "Activate"}
+                      </button>
+                    ) : null}
 
-                    <button
-                      type="button"
-                      className={styles.dangerButton}
-                      onClick={() => void handleDeleteUser(user)}
-                      disabled={isCurrentUser || isUpdatingUser || isResettingUser || isDeletingUser || !user.id}
-                    >
-                      {isDeletingUser ? "Deleting..." : "Delete"}
-                    </button>
+                    {canDeleteUser ? (
+                      <button
+                        type="button"
+                        className={styles.dangerButton}
+                        onClick={() => void handleDeleteUser(user)}
+                        disabled={isCurrentUser || isUpdatingUser || isResettingUser || isDeletingUser || !user.id}
+                      >
+                        {isDeletingUser ? "Deleting..." : "Delete"}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               );

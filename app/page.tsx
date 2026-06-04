@@ -145,7 +145,11 @@ function normalizeWorkerRole(value: string): WorkerRole {
   return "other";
 }
 
-function normalizePermissionLevel(profile: ProfileRecord): PermissionLevel {
+function isManagementPermission(permissionLevel: PermissionLevel | undefined): boolean {
+  return permissionLevel === "admin" || permissionLevel === "manager";
+}
+
+function normalizePermissionLevel(profile: Record<string, unknown>): PermissionLevel {
   const permissionLevel = getStringValue(profile, [
     "permissionLevel",
     "permission_level",
@@ -153,15 +157,30 @@ function normalizePermissionLevel(profile: ProfileRecord): PermissionLevel {
     "access_level",
   ]).toLowerCase();
 
-  const role = getStringValue(profile, ["role", "userRole", "user_role"]).toLowerCase();
-
-  const isAdmin = getBooleanValue(profile, ["isAdmin", "is_admin", "admin"]);
-
-  if (isAdmin || permissionLevel === "admin" || role === "admin") {
+  if (permissionLevel === "admin") {
     return "admin";
   }
 
-  return "user";
+  if (permissionLevel === "manager") {
+    return "manager";
+  }
+
+  if (permissionLevel === "worker" || permissionLevel === "user") {
+    return "worker";
+  }
+
+  const role = getStringValue(profile, ["role", "userRole", "user_role"]).toLowerCase();
+  const isAdmin = getBooleanValue(profile, ["isAdmin", "is_admin", "admin"]);
+
+  if (isAdmin || role === "admin") {
+    return "admin";
+  }
+
+  if (role === "manager") {
+    return "manager";
+  }
+
+  return "worker";
 }
 
 function convertProfileToCurrentUser(
@@ -277,9 +296,13 @@ async function fetchAwsUsersFromCloud(): Promise<AwsUserListItem[]> {
   return responseJson.map((item) => {
     const record = item && typeof item === "object" ? (item as ProfileRecord) : {};
 
-    const permissionLevel = getStringValue(record, ["permissionLevel"]) === "admin"
-      ? "admin"
-      : "user";
+    const rawPermissionLevel = getStringValue(record, ["permissionLevel"]).toLowerCase();
+    const permissionLevel: PermissionLevel =
+      rawPermissionLevel === "admin"
+        ? "admin"
+        : rawPermissionLevel === "manager"
+          ? "manager"
+          : "worker";
 
     return {
       id: getStringValue(record, ["id"]),
@@ -580,7 +603,7 @@ export default function Page() {
   const [workerStatusOpen, setWorkerStatusOpen] = useState(false);
   const [workLogsOpen, setWorkLogsOpen] = useState(false);
 
-  const canManageUsers = currentUser?.permissionLevel === "admin";
+  const canManageUsers = isManagementPermission(currentUser?.permissionLevel);
 
   useEffect(() => {
     let isMounted = true;
@@ -1351,7 +1374,7 @@ export default function Page() {
         ) : null}
 
         {workLogsOpen ? (
-        <AdminWorkLogsPanel onClose={() => setWorkLogsOpen(false)} />
+        <AdminWorkLogsPanel onClose={() => setWorkLogsOpen(false)} currentPermissionLevel={currentUser?.permissionLevel ?? "worker"} />
       ) : null}
 
       {workerStatusOpen ? (
@@ -1359,7 +1382,7 @@ export default function Page() {
       ) : null}
 
       {jobManagementOpen ? (
-          <JobManagementPanel onClose={() => setJobManagementOpen(false)} />
+          <JobManagementPanel onClose={() => setJobManagementOpen(false)} currentPermissionLevel={currentUser?.permissionLevel ?? "worker"} />
         ) : null}
       </>
     );
