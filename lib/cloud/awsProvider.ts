@@ -235,6 +235,12 @@ export const awsCloudProvider: CloudProvider = {
         method: "DELETE",
       });
     },
+
+    async archive(jobId: string) {
+      return requestJson(`/jobs/${encodeURIComponent(jobId)}/archive`, {
+        method: "POST",
+      });
+    },
   },
 
   workLogs: {

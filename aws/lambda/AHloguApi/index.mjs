@@ -845,6 +845,106 @@ async function updateJob(event, path) {
   });
 }
 
+
+async function archiveJob(event, path) {
+  const profile = await requireAdminUser(event);
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const jobsTableName = requireEnv("JOBS_TABLE", JOBS_TABLE);
+  const workLogsTableName = requireEnv("WORK_LOGS_TABLE", WORK_LOGS_TABLE);
+  const id = decodeURIComponent(path.replace("/jobs/", "").replace("/archive", ""));
+
+  if (!id) {
+    return json(400, { error: "Missing job id." });
+  }
+
+  const now = new Date().toISOString();
+  const archivedBy = profile.user.email || profile.user.id || "";
+
+  const updatedJob = await dynamo.send(
+    new UpdateCommand({
+      TableName: jobsTableName,
+      Key: { id },
+      UpdateExpression:
+        "SET isArchived = :isArchived, isActive = :isActive, archivedAt = :archivedAt, archivedBy = :archivedBy, updatedAt = :updatedAt",
+      ExpressionAttributeValues: {
+        ":isArchived": true,
+        ":isActive": false,
+        ":archivedAt": now,
+        ":archivedBy": archivedBy,
+        ":updatedAt": now,
+      },
+      ReturnValues: "ALL_NEW",
+    }),
+  );
+
+  const archivedJob = updatedJob.Attributes || null;
+  const jobId = archivedJob?.jobId || "";
+
+  let updatedLogCount = 0;
+
+  if (jobId) {
+    let ExclusiveStartKey;
+
+    do {
+      const scanResult = await dynamo.send(
+        new ScanCommand({
+          TableName: workLogsTableName,
+          FilterExpression: "#jobId = :jobId",
+          ExpressionAttributeNames: {
+            "#jobId": "jobId",
+          },
+          ExpressionAttributeValues: {
+            ":jobId": jobId,
+          },
+          ExclusiveStartKey,
+        }),
+      );
+
+      const logs = scanResult.Items || [];
+
+      await Promise.all(
+        logs
+          .filter((log) => log?.id)
+          .map((log) =>
+            dynamo.send(
+              new UpdateCommand({
+                TableName: workLogsTableName,
+                Key: { id: log.id },
+                UpdateExpression:
+                  "SET isJobArchived = :isJobArchived, jobArchivedAt = :jobArchivedAt, jobArchivedBy = :jobArchivedBy, updatedAt = :updatedAt",
+                ExpressionAttributeValues: {
+                  ":isJobArchived": true,
+                  ":jobArchivedAt": now,
+                  ":jobArchivedBy": archivedBy,
+                  ":updatedAt": now,
+                },
+              }),
+            ),
+          ),
+      );
+
+      updatedLogCount += logs.length;
+      ExclusiveStartKey = scanResult.LastEvaluatedKey;
+    } while (ExclusiveStartKey);
+  }
+
+  await putSyncEvent({
+    type: "job.archive",
+    userId: profile.user.id,
+    email: profile.user.email || "",
+    entityId: id,
+  });
+
+  return json(200, {
+    ok: true,
+    cloudId: id,
+    message: `Job archived. ${updatedLogCount} work log(s) moved to archived job logs.`,
+  });
+}
+
 async function deleteJob(event, path) {
   const profile = await requireAdminUser(event);
 
@@ -908,6 +1008,9 @@ function normalizeWorkLogForAdmin(item) {
     workedMinutes: Number(item.workedMinutes || 0),
     breakMinutes: Number(item.breakMinutes || 0),
     stickyNote: String(item.stickyNote || ""),
+    isJobArchived: item.isJobArchived === true || item.isJobArchived === "true",
+    jobArchivedAt: cleanString(item.jobArchivedAt),
+    jobArchivedBy: cleanString(item.jobArchivedBy),
     uploadedBy: String(item.uploadedBy || ""),
     uploadedByEmail: String(item.uploadedByEmail || ""),
     updatedAt: String(item.updatedAt || ""),
@@ -974,6 +1077,9 @@ async function updateWorkLog(event, path) {
       ? Number(body.breakMinutes)
       : 0,
     stickyNote: cleanString(body.stickyNote),
+    isJobArchived: body.isJobArchived === true || body.isJobArchived === "true",
+    jobArchivedAt: cleanString(body.jobArchivedAt),
+    jobArchivedBy: cleanString(body.jobArchivedBy),
     updatedAt: now,
     updatedBy: profile.user.id,
     updatedByEmail: profile.user.email || "",
@@ -1384,6 +1490,11 @@ export const handler = async (event) => {
     if (method === "POST" && path === "/jobs") {
       return createJob(event);
     }
+    if (method === "POST" && path.startsWith("/jobs/") && path.endsWith("/archive")) {
+      return archiveJob(event, path);
+    }
+
+
 
     if (method === "PUT" && path.startsWith("/jobs/")) {
       return updateJob(event, path);

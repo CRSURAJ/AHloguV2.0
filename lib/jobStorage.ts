@@ -289,6 +289,33 @@ export async function updateJob(
   return updatedJob;
 }
 
+export async function archiveJob(id: string): Promise<Job | null> {
+  const jobs = await loadJobs();
+  const existingJob = jobs.find((job) => job.id === id);
+
+  if (!existingJob) return null;
+
+  const now = new Date().toISOString();
+  const archivedJob: Job = {
+    ...existingJob,
+    isActive: false,
+    isArchived: true,
+    archivedAt: now,
+    updatedAt: now,
+  };
+
+  if (shouldUseAwsJobs()) {
+    const result = await getCloud().jobs.archive(id);
+    if (!result.ok) {
+      throw new Error(result.message || "Could not archive job in AWS.");
+    }
+    clearCloudJobsCache();
+  }
+
+  await saveJobs(jobs.map((job) => (job.id === id ? archivedJob : job)));
+  return archivedJob;
+}
+
 export async function deleteJob(id: string): Promise<void> {
   const jobs = await loadJobs();
 
@@ -308,7 +335,7 @@ export async function deleteJob(id: string): Promise<void> {
 export async function getActiveJobs(): Promise<Job[]> {
   const jobs = await loadJobs();
 
-  return jobs.filter((job) => job.isActive);
+  return jobs.filter((job) => job.isActive && job.isArchived !== true);
 }
 
 export async function getJobsForRole(role: WorkerRole): Promise<Job[]> {

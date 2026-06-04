@@ -106,7 +106,7 @@
 
 .filters {
   display: grid;
-  grid-template-columns: auto repeat(5, minmax(0, 1fr));
+  grid-template-columns: auto auto repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -551,4 +551,78 @@
   white-space: nowrap;
   justify-self: start;
   padding: 0 14px;
+}
+
+.archiveSearchToggle {
+  align-self: end;
+  min-height: 39px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  white-space: nowrap;
+  border-radius: 12px;
+  padding: 0 12px;
+  border: 1px solid rgba(217, 205, 199, 0.22);
+  background: rgba(217, 205, 199, 0.08);
+  color: #d9cdc7;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.archiveSearchToggle input {
+  width: 15px;
+  height: 15px;
+  accent-color: #53bc7b;
+}
+
+.archiveModeMessage {
+  margin: 0 0 14px;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(217, 205, 199, 0.11);
+  border: 1px solid rgba(217, 205, 199, 0.22);
+  color: #f2e9e5;
+  font-size: 13px;
+  font-weight: 800;
+}
+/* Archive search toggle cleanup */
+.filters .archiveSearchToggle {
+  align-self: end;
+  min-height: 39px;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: fit-content;
+  white-space: nowrap;
+  border-radius: 12px;
+  padding: 0 14px;
+  border: 1px solid rgba(178, 223, 220, 0.16);
+  background: rgba(8, 34, 32, 0.8);
+  color: #eef7f3;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.filters .archiveSearchToggle:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.filters .archiveSearchToggle input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: #53bc7b;
+  cursor: pointer;
+}
+
+.filters .archiveSearchToggle span {
+  color: #eef7f3;
+  font-size: 12.5px;
+  font-weight: 800;
+  line-height: 1;
 }

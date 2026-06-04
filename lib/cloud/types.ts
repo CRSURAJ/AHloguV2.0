@@ -20,7 +20,7 @@ export type CloudProvider = {
     list: () => Promise<Job[]>;
     create: (job: Job) => Promise<CloudSyncResult>;
     update: (job: Job) => Promise<CloudSyncResult>;
-    delete: (jobId: string) => Promise<CloudSyncResult>;
+    delete: (jobId: string) => Promise<CloudSyncResult>; archive: (jobId: string) => Promise<CloudSyncResult>;
   };
 
   workLogs: {

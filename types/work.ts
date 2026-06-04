@@ -67,6 +67,9 @@ export type OfflineUser = CurrentUser & {
   credentialHash: string;
   credentialSalt: string;
   isActive: boolean;
+  isArchived?: boolean;
+  archivedAt?: string;
+  archivedBy?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -133,6 +136,9 @@ export type Job = {
   assignedRoles: WorkerRole[];
   jobDrawings: JobDrawing[];
   isActive: boolean;
+  isArchived?: boolean;
+  archivedAt?: string;
+  archivedBy?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -186,4 +192,7 @@ export type AdminWorkLog = {
   uploadedBy?: string;
   uploadedByEmail?: string;
   updatedAt?: string;
+  isJobArchived?: boolean;
+  jobArchivedAt?: string;
+  jobArchivedBy?: string;
 };

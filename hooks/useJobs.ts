@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
+  archiveJob,
   createJob,
   deleteJob,
   loadJobs,
@@ -23,7 +24,7 @@ export type UseJobsReturn = {
     id: string,
     updates: UpdateJobInput
   ) => Promise<AuthActionResult>;
-  handleDeleteJob: (id: string) => Promise<AuthActionResult>;
+  handleDeleteJob: (id: string) => Promise<AuthActionResult>; handleArchiveJob: (id: string) => Promise<AuthActionResult>;
   handleToggleJobActive: (id: string) => Promise<AuthActionResult>;
   getJobById: (id: string) => Job | undefined;
   clearJobMessage: () => void;
@@ -136,12 +137,12 @@ export function useJobs(): UseJobsReturn {
   }, []);
 
   const activeJobs = useMemo(
-    () => jobs.filter((job) => job.isActive),
+    () => jobs.filter((job) => job.isActive && job.isArchived !== true),
     [jobs]
   );
 
   const inactiveJobs = useMemo(
-    () => jobs.filter((job) => !job.isActive),
+    () => jobs.filter((job) => !job.isActive && job.isArchived !== true),
     [jobs]
   );
 
@@ -249,6 +250,40 @@ export function useJobs(): UseJobsReturn {
     [jobs, refreshJobs]
   );
 
+  const handleArchiveJob = useCallback(
+    async (id: string): Promise<AuthActionResult> => {
+      const job = jobs.find((item) => item.id === id);
+
+      if (!job) {
+        const message = "Job could not be found.";
+        setJobMessage(message);
+        return { ok: false, message };
+      }
+
+      try {
+        const archivedJob = await archiveJob(id);
+
+        if (!archivedJob) {
+          const message = "Job could not be archived.";
+          setJobMessage(message);
+          return { ok: false, message };
+        }
+
+        await refreshJobs();
+
+        const message = `${getJobLabel(job)} archived successfully.`;
+        setJobMessage(message);
+        return { ok: true, message };
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Could not archive job.";
+        setJobMessage(message);
+        return { ok: false, message };
+      }
+    },
+    [jobs, refreshJobs]
+  );
+
   const handleToggleJobActive = useCallback(
     async (id: string): Promise<AuthActionResult> => {
       const job = jobs.find((item) => item.id === id);
@@ -309,6 +344,7 @@ export function useJobs(): UseJobsReturn {
     handleCreateJob,
     handleUpdateJob,
     handleDeleteJob,
+    handleArchiveJob,
     handleToggleJobActive,
     getJobById,
     clearJobMessage,

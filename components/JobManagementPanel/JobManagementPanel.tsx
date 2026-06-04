@@ -130,6 +130,7 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
     handleCreateJob,
     handleUpdateJob,
     handleDeleteJob,
+    handleArchiveJob,
     handleToggleJobActive,
     clearJobMessage,
   } = useJobs();
@@ -150,14 +151,19 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
   const jobFeedbackRef = useRef<HTMLDivElement>(null);
   const jobFormCardRef = useRef<HTMLDivElement>(null);
 
+  const visibleJobs = useMemo(
+    () => jobs.filter((job) => job.isArchived !== true),
+    [jobs]
+  );
+
   const sortedJobs = useMemo(
     () =>
-      [...jobs].sort((a, b) => {
+      [...visibleJobs].sort((a, b) => {
         if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
 
         return getJobTitle(a).localeCompare(getJobTitle(b));
       }),
-    [jobs]
+    [visibleJobs]
   );
 
   function getJobInputClass(field: JobFormField): string {
@@ -429,6 +435,22 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
     focusJobFeedbackMessage();
   }
 
+  async function handleArchive(job: Job): Promise<void> {
+    const confirmed = window.confirm(
+      `Archive ${getJobTitle(job)}?\n\nThis will remove the job from workers, normal job lists, and normal work logs.\nAll existing work logs for this job will move to archived work logs.\n\nThis cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    const result = await handleArchiveJob(job.id);
+
+    if (result.ok && editingJobId === job.id) {
+      resetForm();
+    }
+
+    focusJobFeedbackMessage();
+  }
+
   async function handleDelete(job: Job): Promise<void> {
     const confirmed = window.confirm(
       `Delete ${getJobTitle(job)}? This cannot be undone.`
@@ -465,7 +487,7 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
         <div className={styles.statsGrid}>
           <div className={styles.statCard}>
             <span>Total Jobs</span>
-            <strong>{jobs.length}</strong>
+            <strong>{visibleJobs.length}</strong>
           </div>
 
           <div className={styles.statCard}>
@@ -737,7 +759,14 @@ export default function JobManagementPanel({ onClose }: JobManagementPanelProps)
                     {job.isActive ? "Deactivate" : "Activate"}
                   </button>
 
-                  <button
+                                    <button
+                    type="button"
+                    onClick={() => void handleArchive(job)}
+                  >
+                    Archive
+                  </button>
+
+<button
                     className={styles.dangerButton}
                     type="button"
                     onClick={() => void handleDelete(job)}

@@ -139,6 +139,7 @@ export default function AdminWorkLogsPanel({ onClose }: AdminWorkLogsPanelProps)
   const [searchFilter, setSearchFilter] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [showArchivedJobLogs, setShowArchivedJobLogs] = useState(false);
   const [page, setPage] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<AdminWorkLog | null>(null);
@@ -168,7 +169,7 @@ export default function AdminWorkLogsPanel({ onClose }: AdminWorkLogsPanelProps)
 
   useEffect(() => {
     setPage(1);
-  }, [jobIdFilter, nameFilter, searchFilter, fromDate, toDate]);
+  }, [jobIdFilter, nameFilter, searchFilter, fromDate, toDate, showArchivedJobLogs]);
 
   function clearFilters() {
     setJobIdFilter("");
@@ -180,11 +181,14 @@ export default function AdminWorkLogsPanel({ onClose }: AdminWorkLogsPanelProps)
   }
 
   const filteredLogs = useMemo(() => {
+    const archiveModeLogs = logs.filter((log) =>
+      showArchivedJobLogs ? log.isJobArchived === true : log.isJobArchived !== true
+    );
     const jobNeedle = jobIdFilter.trim().toLowerCase();
     const nameNeedle = nameFilter.trim().toLowerCase();
     const searchNeedle = searchFilter.trim().toLowerCase();
 
-    return logs.filter((log) => {
+    return archiveModeLogs.filter((log) => {
       if (jobNeedle && !log.jobId.toLowerCase().includes(jobNeedle)) {
         return false;
       }
@@ -199,7 +203,7 @@ export default function AdminWorkLogsPanel({ onClose }: AdminWorkLogsPanelProps)
 
       return matchesDateRange(log, fromDate, toDate);
     });
-  }, [fromDate, jobIdFilter, logs, nameFilter, searchFilter, toDate]);
+  }, [fromDate, jobIdFilter, logs, nameFilter, searchFilter, toDate, showArchivedJobLogs]);
 
   const totalWorkedMinutes = useMemo(
     () =>
@@ -453,6 +457,15 @@ async function deleteWorkLog(log: AdminWorkLog) {
         >
           Clear Fields
         </button>
+
+        <label className={styles.archiveSearchToggle}>
+          <input
+            type="checkbox"
+            checked={showArchivedJobLogs}
+            onChange={(event) => setShowArchivedJobLogs(event.target.checked)}
+          />
+          <span>Search Archived Job Logs</span>
+        </label>
           <label>
             <input
               value={jobIdFilter}
@@ -496,6 +509,12 @@ async function deleteWorkLog(log: AdminWorkLog) {
 
         {message ? <p className={styles.message}>{message}</p> : null}
 
+      {showArchivedJobLogs ? (
+        <p className={styles.archiveModeMessage}>
+          Archived Job Logs Mode — showing logs linked to archived jobs only.
+        </p>
+      ) : null}
+
         <div className={styles.metaBar}>
           <span>
             Showing {pagedLogs.length} of {filteredLogs.length} work logs
@@ -506,7 +525,7 @@ async function deleteWorkLog(log: AdminWorkLog) {
         {isLoading ? (
           <p className={styles.emptyText}>Loading work logs...</p>
         ) : filteredLogs.length === 0 ? (
-          <p className={styles.emptyText}>No work logs match the filters.</p>
+          <p className={styles.emptyText}>No work logs found.</p>
         ) : (
           <>
             <div className={styles.tableWrap}>
