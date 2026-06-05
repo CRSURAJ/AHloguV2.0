@@ -13,7 +13,7 @@ export type CloudHealthResult = {
 };
 
 export type CloudProvider = {
-  providerName: string;
+  providerName: "aws";
   healthCheck: () => Promise<CloudHealthResult>;
 
   jobs: {

@@ -17,7 +17,7 @@ export default function CloudSyncStatus() {
   } = useCloudSync();
 
   const statusText = isOnline ? "Cloud ready" : "Local mode";
-  const providerText = provider === "noop" ? "Offline/local only" : provider;
+  const providerText = provider;
 
   return (
     <section className={styles.card} aria-label="Cloud sync status">
