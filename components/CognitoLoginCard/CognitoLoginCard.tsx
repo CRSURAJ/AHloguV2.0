@@ -101,7 +101,7 @@ export function CognitoLoginCard({
             src="/AHlogu.png"
             alt="AH LOGU"
             width={160}
-            height={48}
+            height={40}
             priority
             style={{ width: "160px", height: "auto", objectFit: "contain", marginBottom: "18px" }}
           />

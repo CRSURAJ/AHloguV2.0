@@ -76,7 +76,7 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
                 src="/AHlogu.png"
                 alt="AH LOGU"
                 width={160}
-                height={48}
+                height={40}
                 className={styles.logoImage}
                 style={{ width: "160px", height: "auto" }}
                 priority

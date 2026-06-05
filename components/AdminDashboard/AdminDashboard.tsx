@@ -90,7 +90,7 @@ export default function AdminDashboard({
                 src="/AHlogu.png"
                 alt="AH LOGU"
                 width={160}
-                height={48}
+                height={40}
                 className={workerStyles.logoImage}
                 style={{ width: "160px", height: "auto" }}
                 priority
