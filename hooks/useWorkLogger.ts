@@ -27,8 +27,6 @@ import type {
   WorkerLiveStatus,
 } from "@/types/work";
 
-const TB_URL = process.env.NEXT_PUBLIC_PROJECT_LOGU_SYNC_URL ?? "";
-
 export type WorkLoggerState = {
   currentUserFullName: string;
   jobId: string;
@@ -623,49 +621,13 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
 
     const cloud = getCloudProvider();
 
-    if (cloud.providerName === "aws") {
-      const result = await cloud.workLogs.upload(item);
-
-      if (!result.ok) {
-        throw new Error(result.message || "AWS work log upload failed.");
-      }
-
-      return Date.now();
+    if (cloud.providerName !== "aws") {
+      throw new Error("AWS cloud provider is required for work log sync.");
     }
 
-    if (!TB_URL) {
-      throw new Error(
-        "No AWS cloud provider selected and NEXT_PUBLIC_PROJECT_LOGU_SYNC_URL is not configured.",
-      );
-    }
-
-    const payload = {
-      id: item.id,
-      loguId: item.loguId,
-      ts: item.ts,
-      fullname: item.fullname,
-      jobId: item.jobId,
-      stickyNote: item.stickyNote ?? "",
-      location: item.location,
-      role: item.role,
-      jobDocs: item.jobDocs,
-      description: item.description,
-      startedAt: item.startedAt,
-      stoppedAt: item.stoppedAt,
-      breakMinutes: item.breakMinutes,
-      workedMinutes: item.workedMinutes,
-    };
-
-    const res = await fetch(TB_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      throw new Error(`Sync failed with status ${res.status}`);
+    const result = await cloud.workLogs.upload(item);
+    if (!result.ok) {
+      throw new Error(result.message || "AWS work log upload failed.");
     }
 
     return Date.now();

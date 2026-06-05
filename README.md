@@ -1,47 +1,44 @@
 # AHlogu
 
-AHlogu is an offline-first work logging web app for field teams. It is built for shared devices and supports local offline sign-in, active job sessions, breaks, saved drafts, and manual sync to a remote endpoint.
+AHlogu is an offline-first work logging web app for Automatic Heating field teams.
 
-## What this version includes
+The app uses AWS Cognito for sign-in and AWS API Gateway/Lambda/DynamoDB for cloud data. Local browser storage is still used as an offline cache for worker logs, drafts, active sessions, and job data.
 
-- local offline authentication per device
-- clear separation between:
-  - `permissionLevel` for access control (`admin` / `user`)
-  - `role` for worker trade or job type (`plumber`, `electrician`, etc.)
-- per-user work logs, drafts, and active sessions
-- IndexedDB-backed offline storage for logs, drafts, and sessions
-- localStorage fallback where IndexedDB is unavailable
-- basic service worker for offline app-shell caching
-- admin user management on the device
-- PIN/password reset flow
-- manual sync to `NEXT_PUBLIC_PROJECT_LOGU_SYNC_URL`
+## Current architecture
 
-## Current auth model
+- Frontend: Next.js / React / TypeScript
+- Authentication: AWS Cognito
+- Backend: AWS API Gateway + Lambda
+- Database: DynamoDB
+- Cloud provider: AWS
+- Offline cache: IndexedDB/local browser storage
 
-This version still uses device-local offline auth.
+## Main features
 
-That means:
+- Cognito email/password sign-in
+- First-login new password flow
+- Admin, Manager, and Worker permission levels
+- User management
+- Job management
+- Worker time logging
+- Save & Switch Job
+- Break tracking
+- Manual work-log sync to AWS
+- Worker live status
+- Admin work log view and export
+- Offline-first local cache for worker activity
 
-- users are stored locally on the device
-- credentials are stored as salted PBKDF2 hashes
-- sign-in works without internet
-- admin/user lifecycle is device-local for now
+## Environment variables
 
-This is intentional so the app can keep working offline. The auth layer is now abstracted so cloud auth can replace it later with less UI churn.
+Create a `.env.local` file based on `.env.example`.
 
-## Local data storage
+Required frontend values:
 
-Work logs, active sessions, and drafts are stored in IndexedDB first.
+```env
+NEXT_PUBLIC_AHLOGU_CLOUD_PROVIDER=aws
+NEXT_PUBLIC_AHLOGU_API_URL=https://YOUR_API_ID.execute-api.ap-southeast-4.amazonaws.com
+NEXT_PUBLIC_AWS_REGION=ap-southeast-4
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=ap-southeast-4_XXXXXXXXX
+NEXT_PUBLIC_COGNITO_APP_CLIENT_ID=YOUR_COGNITO_APP_CLIENT_ID
 
-Fallback behavior:
 
-- if IndexedDB is not available, localStorage is used
-- old localStorage log/session/draft data is migrated into IndexedDB on load
-
-## Environment variable
-
-Create a `.env.local` file with:
-
-```bash
-NEXT_PUBLIC_PROJECT_LOGU_SYNC_URL=https://your-endpoint.example.com
-```
