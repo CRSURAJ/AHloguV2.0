@@ -23,9 +23,12 @@ import { getPasswordPolicyError } from "@/lib/auth/passwordPolicy";
 import type { AuthActionResult, CurrentUser, PermissionLevel, WorkerRole } from "@/types/work";
 import { isManagementPermission, normalizeLoginErrorMessage } from "@/lib/auth/currentUserProfile";
 import {
+  createAwsUserInCloud,
+  deleteAwsUserFromCloud,
   fetchAwsUsersFromCloud,
   fetchCurrentUserFromCloud,
-  getApiBaseUrl,
+  resetAwsUserPasswordInCloud,
+  updateAwsUserActiveInCloud,
   type AwsUserListItem,
 } from "@/lib/cloud/awsUsersApi";
 
@@ -213,42 +216,13 @@ export default function Page() {
     }
 
     try {
-      const session = await getCurrentCognitoSession();
-
-      if (!session) {
-        throw new Error("No valid session found.");
-      }
-
-      const idToken = session.getIdToken().getJwtToken();
-
-      const response = await fetch(`${getApiBaseUrl()}/users`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: input.email,
-          fullName: input.fullName,
-          role: input.role,
-          permissionLevel: input.permissionLevel,
-          temporaryPassword: input.temporaryPassword,
-        }),
+      await createAwsUserInCloud({
+        email: input.email,
+        fullName: input.fullName,
+        role: input.role,
+        permissionLevel: input.permissionLevel,
+        temporaryPassword: input.temporaryPassword,
       });
-
-      const responseJson = (await response.json().catch(() => null)) as unknown;
-
-      if (!response.ok) {
-        const errorMessage =
-          responseJson &&
-          typeof responseJson === "object" &&
-          "error" in responseJson &&
-          typeof responseJson.error === "string"
-            ? responseJson.error
-            : `Could not create user. Status ${response.status}.`;
-
-        throw new Error(errorMessage);
-      }
 
       const users = await fetchAwsUsersFromCloud();
       setAwsUsers(users);
@@ -280,38 +254,7 @@ export default function Page() {
     }
 
     try {
-      const session = await getCurrentCognitoSession();
-
-      if (!session) {
-        throw new Error("No valid session found.");
-      }
-
-      const idToken = session.getIdToken().getJwtToken();
-
-      const response = await fetch(`${getApiBaseUrl()}/users/${encodeURIComponent(userId)}`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          isActive,
-        }),
-      });
-
-      const responseJson = (await response.json().catch(() => null)) as unknown;
-
-      if (!response.ok) {
-        const errorMessage =
-          responseJson &&
-          typeof responseJson === "object" &&
-          "error" in responseJson &&
-          typeof responseJson.error === "string"
-            ? responseJson.error
-            : `Could not update user. Status ${response.status}.`;
-
-        throw new Error(errorMessage);
-      }
+      await updateAwsUserActiveInCloud(userId, isActive);
 
       const users = await fetchAwsUsersFromCloud();
       setAwsUsers(users);
@@ -351,41 +294,7 @@ export default function Page() {
     }
 
     try {
-      const session = await getCurrentCognitoSession();
-
-      if (!session) {
-        throw new Error("No valid session found.");
-      }
-
-      const idToken = session.getIdToken().getJwtToken();
-
-      const response = await fetch(
-        `${getApiBaseUrl()}/users/${encodeURIComponent(userId)}/reset-password`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${idToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            temporaryPassword,
-          }),
-        },
-      );
-
-      const responseJson = (await response.json().catch(() => null)) as unknown;
-
-      if (!response.ok) {
-        const errorMessage =
-          responseJson &&
-          typeof responseJson === "object" &&
-          "error" in responseJson &&
-          typeof responseJson.error === "string"
-            ? responseJson.error
-            : `Could not reset password. Status ${response.status}.`;
-
-        throw new Error(errorMessage);
-      }
+      await resetAwsUserPasswordInCloud(userId, temporaryPassword);
 
       return {
         ok: true,
@@ -410,35 +319,7 @@ export default function Page() {
     }
 
     try {
-      const session = await getCurrentCognitoSession();
-
-      if (!session) {
-        throw new Error("No valid session found.");
-      }
-
-      const idToken = session.getIdToken().getJwtToken();
-
-      const response = await fetch(`${getApiBaseUrl()}/users/${encodeURIComponent(userId)}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      const responseJson = (await response.json().catch(() => null)) as unknown;
-
-      if (!response.ok) {
-        const errorMessage =
-          responseJson &&
-          typeof responseJson === "object" &&
-          "error" in responseJson &&
-          typeof responseJson.error === "string"
-            ? responseJson.error
-            : `Could not delete user. Status ${response.status}.`;
-
-        throw new Error(errorMessage);
-      }
+      await deleteAwsUserFromCloud(userId);
 
       const users = await fetchAwsUsersFromCloud();
       setAwsUsers(users);
