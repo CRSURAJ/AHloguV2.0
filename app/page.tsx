@@ -2,15 +2,14 @@
 
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
-import FeedbackMessage from "@/components/FeedbackMessage";
 import AccountMessageDialog from "@/components/AccountMessageDialog/AccountMessageDialog";
+import ChangePasswordDialog from "@/components/ChangePasswordDialog/ChangePasswordDialog";
 import AdminDashboard from "@/components/AdminDashboard";
 import JobManagementPanel from "@/components/JobManagementPanel/JobManagementPanel";
 import UserManagementPanel from "@/components/UserManagementPanel/UserManagementPanel";
 import WorkerStatusPanel from "@/components/WorkerStatusPanel/WorkerStatusPanel";
 import AdminWorkLogsPanel from "@/components/AdminWorkLogsPanel/AdminWorkLogsPanel";
 import WorkLogger from "@/components/WorkLogger/WorkLogger";
-import PasswordRequirementsNote from "@/components/PasswordRequirementsNote";
 import { CognitoLoginCard, LoadingScreen } from "@/components/CognitoLoginCard/CognitoLoginCard";
 import {
   changeCurrentCognitoPassword,
@@ -596,154 +595,19 @@ export default function Page() {
 
         <AccountMessageDialog message={accountMessage} onClose={() => setAccountMessage("")} />
 
-        {changePasswordOpen ? (
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              display: "grid",
-              placeItems: "center",
-              padding: "20px",
-              background: "rgba(0,0,0,0.48)",
-              zIndex: 100,
-            }}
-          >
-            <form
-              onSubmit={(event) => void handleChangePasswordSubmit(event)}
-              style={{
-                width: "min(460px, 100%)",
-                borderRadius: "24px",
-                padding: "24px",
-                background: "#11302D",
-                color: "#eef7f3",
-                border: "1px solid rgba(255,255,255,0.14)",
-                boxShadow: "0 24px 70px rgba(0,0,0,0.3)",
-              }}
-            >
-              <h2 style={{ marginTop: 0 }}>Change Password</h2>
-
-              <PasswordRequirementsNote />
-
-              {accountMessage ? <FeedbackMessage message={accountMessage} /> : null}
-
-              <label
-                style={{
-                  display: "grid",
-                  gap: "8px",
-                  marginBottom: "14px",
-                  fontWeight: 700,
-                }}
-              >
-                Current password
-                <input
-                  type="password"
-                  value={currentPasswordInput}
-                  onChange={(event) => setCurrentPasswordInput(event.target.value)}
-                  autoComplete="current-password"
-                  required
-                  style={{
-                    width: "100%",
-                    border: "1px solid rgba(255,255,255,0.14)",
-                    borderRadius: "16px",
-                    padding: "14px 16px",
-                    background: "rgba(255,255,255,0.08)",
-                    color: "#eef7f3",
-                    font: "inherit",
-                  }}
-                />
-              </label>
-
-              <label
-                style={{
-                  display: "grid",
-                  gap: "8px",
-                  marginBottom: "14px",
-                  fontWeight: 700,
-                }}
-              >
-                New password
-                <input
-                  type="password"
-                  value={newPasswordInput}
-                  onChange={(event) => setNewPasswordInput(event.target.value)}
-                  autoComplete="new-password"
-                  required
-                  style={{
-                    width: "100%",
-                    border: "1px solid rgba(255,255,255,0.14)",
-                    borderRadius: "16px",
-                    padding: "14px 16px",
-                    background: "rgba(255,255,255,0.08)",
-                    color: "#eef7f3",
-                    font: "inherit",
-                  }}
-                />
-              </label>
-
-              <label
-                style={{
-                  display: "grid",
-                  gap: "8px",
-                  marginBottom: "18px",
-                  fontWeight: 700,
-                }}
-              >
-                Confirm new password
-                <input
-                  type="password"
-                  value={confirmPasswordInput}
-                  onChange={(event) => setConfirmPasswordInput(event.target.value)}
-                  autoComplete="new-password"
-                  required
-                  style={{
-                    width: "100%",
-                    border: "1px solid rgba(255,255,255,0.14)",
-                    borderRadius: "16px",
-                    padding: "14px 16px",
-                    background: "rgba(255,255,255,0.08)",
-                    color: "#eef7f3",
-                    font: "inherit",
-                  }}
-                />
-              </label>
-
-              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                <button
-                  type="submit"
-                  disabled={changePasswordBusy}
-                  style={{
-                    border: 0,
-                    borderRadius: "14px",
-                    padding: "12px 16px",
-                    background: changePasswordBusy ? "rgba(83,188,123,0.5)" : "#53BC7B",
-                    color: "#11302D",
-                    fontWeight: 800,
-                    cursor: changePasswordBusy ? "not-allowed" : "pointer",
-                  }}
-                >
-                  {changePasswordBusy ? "Changing..." : "Change Password"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleCloseChangePassword}
-                  disabled={changePasswordBusy}
-                  style={{
-                    border: "1px solid rgba(255,255,255,0.14)",
-                    borderRadius: "14px",
-                    padding: "12px 16px",
-                    background: "rgba(255,255,255,0.08)",
-                    color: "#eef7f3",
-                    fontWeight: 800,
-                    cursor: changePasswordBusy ? "not-allowed" : "pointer",
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        ) : null}
+        <ChangePasswordDialog
+          open={changePasswordOpen}
+          message={accountMessage}
+          currentPassword={currentPasswordInput}
+          newPassword={newPasswordInput}
+          confirmPassword={confirmPasswordInput}
+          isBusy={changePasswordBusy}
+          onSubmit={(event) => void handleChangePasswordSubmit(event)}
+          onClose={handleCloseChangePassword}
+          onCurrentPasswordChange={setCurrentPasswordInput}
+          onNewPasswordChange={setNewPasswordInput}
+          onConfirmPasswordChange={setConfirmPasswordInput}
+        />
 
         {userManagementOpen ? (
           <UserManagementPanel
@@ -781,154 +645,19 @@ export default function Page() {
 
   return (
     <>
-      {changePasswordOpen ? (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            display: "grid",
-            placeItems: "center",
-            padding: "20px",
-            background: "rgba(0,0,0,0.48)",
-            zIndex: 100,
-          }}
-        >
-          <form
-            onSubmit={(event) => void handleChangePasswordSubmit(event)}
-            style={{
-              width: "min(460px, 100%)",
-              borderRadius: "24px",
-              padding: "24px",
-              background: "#11302D",
-              color: "#eef7f3",
-              border: "1px solid rgba(255,255,255,0.14)",
-              boxShadow: "0 24px 70px rgba(0,0,0,0.3)",
-            }}
-          >
-            <h2 style={{ marginTop: 0 }}>Change Password</h2>
-
-            <PasswordRequirementsNote />
-
-            <FeedbackMessage message={accountMessage} />
-
-            <label
-              style={{
-                display: "grid",
-                gap: "8px",
-                marginBottom: "14px",
-                fontWeight: 700,
-              }}
-            >
-              Current password
-              <input
-                type="password"
-                value={currentPasswordInput}
-                onChange={(event) => setCurrentPasswordInput(event.target.value)}
-                autoComplete="current-password"
-                required
-                style={{
-                  width: "100%",
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  borderRadius: "16px",
-                  padding: "14px 16px",
-                  background: "rgba(255,255,255,0.08)",
-                  color: "#eef7f3",
-                  font: "inherit",
-                }}
-              />
-            </label>
-
-            <label
-              style={{
-                display: "grid",
-                gap: "8px",
-                marginBottom: "14px",
-                fontWeight: 700,
-              }}
-            >
-              New password
-              <input
-                type="password"
-                value={newPasswordInput}
-                onChange={(event) => setNewPasswordInput(event.target.value)}
-                autoComplete="new-password"
-                required
-                style={{
-                  width: "100%",
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  borderRadius: "16px",
-                  padding: "14px 16px",
-                  background: "rgba(255,255,255,0.08)",
-                  color: "#eef7f3",
-                  font: "inherit",
-                }}
-              />
-            </label>
-
-            <label
-              style={{
-                display: "grid",
-                gap: "8px",
-                marginBottom: "18px",
-                fontWeight: 700,
-              }}
-            >
-              Confirm new password
-              <input
-                type="password"
-                value={confirmPasswordInput}
-                onChange={(event) => setConfirmPasswordInput(event.target.value)}
-                autoComplete="new-password"
-                required
-                style={{
-                  width: "100%",
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  borderRadius: "16px",
-                  padding: "14px 16px",
-                  background: "rgba(255,255,255,0.08)",
-                  color: "#eef7f3",
-                  font: "inherit",
-                }}
-              />
-            </label>
-
-            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-              <button
-                type="submit"
-                disabled={changePasswordBusy}
-                style={{
-                  border: 0,
-                  borderRadius: "14px",
-                  padding: "12px 16px",
-                  background: changePasswordBusy ? "rgba(83,188,123,0.5)" : "#53BC7B",
-                  color: "#11302D",
-                  fontWeight: 800,
-                  cursor: changePasswordBusy ? "not-allowed" : "pointer",
-                }}
-              >
-                {changePasswordBusy ? "Changing..." : "Change Password"}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleCloseChangePassword}
-                disabled={changePasswordBusy}
-                style={{
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  borderRadius: "14px",
-                  padding: "12px 16px",
-                  background: "rgba(255,255,255,0.08)",
-                  color: "#eef7f3",
-                  fontWeight: 800,
-                  cursor: changePasswordBusy ? "not-allowed" : "pointer",
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+      <ChangePasswordDialog
+        open={changePasswordOpen}
+        message={accountMessage}
+        currentPassword={currentPasswordInput}
+        newPassword={newPasswordInput}
+        confirmPassword={confirmPasswordInput}
+        isBusy={changePasswordBusy}
+        onSubmit={(event) => void handleChangePasswordSubmit(event)}
+        onClose={handleCloseChangePassword}
+        onCurrentPasswordChange={setCurrentPasswordInput}
+        onNewPasswordChange={setNewPasswordInput}
+        onConfirmPasswordChange={setConfirmPasswordInput}
+      />
 
       <AccountMessageDialog
         message={!changePasswordOpen ? accountMessage : ""}
