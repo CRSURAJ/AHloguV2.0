@@ -1,0 +1,78 @@
+[35mapp/page.tsx[m[36m:[m[32m7[m[36m:[mimport [1;31mAdminDashboard[m from "@/components/[1;31mAdminDashboard[m";
+[35mapp/page.tsx[m[36m:[m[32m8[m[36m:[mimport [1;31mJobManagementPanel[m from "@/components/[1;31mJobManagementPanel[m/[1;31mJobManagementPanel[m";
+[35mapp/page.tsx[m[36m:[m[32m9[m[36m:[mimport [1;31mUserManagementPanel[m from "@/components/[1;31mUserManagementPanel[m/[1;31mUserManagementPanel[m";
+[35mapp/page.tsx[m[36m:[m[32m10[m[36m:[mimport [1;31mWorkerStatusPanel[m from "@/components/[1;31mWorkerStatusPanel[m/[1;31mWorkerStatusPanel[m";
+[35mapp/page.tsx[m[36m:[m[32m11[m[36m:[mimport [1;31mAdminWorkLogsPanel[m from "@/components/[1;31mAdminWorkLogsPanel[m/[1;31mAdminWorkLogsPanel[m";
+[35mapp/page.tsx[m[36m:[m[32m12[m[36m:[mimport [1;31mWorkLogger[m from "@/components/[1;31mWorkLogger[m/[1;31mWorkLogger[m";
+[35mapp/page.tsx[m[36m:[m[32m1100[m[36m:[m        <[1;31mAdminDashboard[m
+[35mapp/page.tsx[m[36m:[m[32m1303[m[36m:[m          <[1;31mUserManagementPanel[m
+[35mapp/page.tsx[m[36m:[m[32m1318[m[36m:[m          <[1;31mAdminWorkLogsPanel[m
+[35mapp/page.tsx[m[36m:[m[32m1324[m[36m:[m        {workerStatusOpen ? <[1;31mWorkerStatusPanel[m onClose={() => setWorkerStatusOpen(false)} /> : null}
+[35mapp/page.tsx[m[36m:[m[32m1327[m[36m:[m          <[1;31mJobManagementPanel[m
+[35mapp/page.tsx[m[36m:[m[32m1529[m[36m:[m      <[1;31mWorkLogger[m
+[35mcomponents/ActionButtons/ActionButtons.tsx[m[36m:[m[32m1[m[36m:[mimport styles from "./[1;31mActionButtons[m.module.css";
+[35mcomponents/ActionButtons/ActionButtons.tsx[m[36m:[m[32m3[m[36m:[mtype [1;31mActionButtons[mProps = {
+[35mcomponents/ActionButtons/ActionButtons.tsx[m[36m:[m[32m15[m[36m:[mexport default function [1;31mActionButtons[m({
+[35mcomponents/ActionButtons/ActionButtons.tsx[m[36m:[m[32m25[m[36m:[m}: [1;31mActionButtons[mProps) {
+[35mcomponents/AdminDashboard/AdminDashboard.tsx[m[36m:[m[32m6[m[36m:[mimport workerStyles from "@/components/[1;31mWorkLoggerView[m/[1;31mWorkLoggerView[m.module.css";
+[35mcomponents/AdminDashboard/AdminDashboard.tsx[m[36m:[m[32m7[m[36m:[mimport styles from "./[1;31mAdminDashboard[m.module.css";
+[35mcomponents/AdminDashboard/AdminDashboard.tsx[m[36m:[m[32m9[m[36m:[mtype [1;31mAdminDashboard[mProps = {
+[35mcomponents/AdminDashboard/AdminDashboard.tsx[m[36m:[m[32m73[m[36m:[mexport default function [1;31mAdminDashboard[m({
+[35mcomponents/AdminDashboard/AdminDashboard.tsx[m[36m:[m[32m82[m[36m:[m}: [1;31mAdminDashboard[mProps) {
+[35mcomponents/AdminDashboard/index.ts[m[36m:[m[32m1[m[36m:[mexport { default } from "./[1;31mAdminDashboard[m";
+[35mcomponents/AdminWorkLogsPanel/AdminWorkLogsPanel.tsx[m[36m:[m[32m7[m[36m:[mimport styles from "./[1;31mAdminWorkLogsPanel[m.module.css";
+[35mcomponents/AdminWorkLogsPanel/AdminWorkLogsPanel.tsx[m[36m:[m[32m11[m[36m:[mtype [1;31mAdminWorkLogsPanel[mProps = {
+[35mcomponents/AdminWorkLogsPanel/AdminWorkLogsPanel.tsx[m[36m:[m[32m132[m[36m:[mexport default function [1;31mAdminWorkLogsPanel[m({
+[35mcomponents/AdminWorkLogsPanel/AdminWorkLogsPanel.tsx[m[36m:[m[32m135[m[36m:[m}: [1;31mAdminWorkLogsPanel[mProps) {
+[35mcomponents/CloudSyncStatus/CloudSyncStatus.tsx[m[36m:[m[32m5[m[36m:[mimport styles from "./[1;31mCloudSyncStatus[m.module.css";
+[35mcomponents/CloudSyncStatus/CloudSyncStatus.tsx[m[36m:[m[32m7[m[36m:[mexport default function [1;31mCloudSyncStatus[m() {
+[35mcomponents/JobManagementPanel/JobManagementPanel.tsx[m[36m:[m[32m10[m[36m:[mimport styles from "./[1;31mJobManagementPanel[m.module.css";
+[35mcomponents/JobManagementPanel/JobManagementPanel.tsx[m[36m:[m[32m12[m[36m:[mtype [1;31mJobManagementPanel[mProps = {
+[35mcomponents/JobManagementPanel/JobManagementPanel.tsx[m[36m:[m[32m116[m[36m:[mexport default function [1;31mJobManagementPanel[m({
+[35mcomponents/JobManagementPanel/JobManagementPanel.tsx[m[36m:[m[32m119[m[36m:[m}: [1;31mJobManagementPanel[mProps) {
+[35mcomponents/LoginScreen/LoginScreen.tsx[m[36m:[m[32m4[m[36m:[mimport styles from "./[1;31mLoginScreen[m.module.css";
+[35mcomponents/LoginScreen/LoginScreen.tsx[m[36m:[m[32m6[m[36m:[mtype [1;31mLoginScreen[mProps = {
+[35mcomponents/LoginScreen/LoginScreen.tsx[m[36m:[m[32m15[m[36m:[mexport default function [1;31mLoginScreen[m({
+[35mcomponents/LoginScreen/LoginScreen.tsx[m[36m:[m[32m22[m[36m:[m}: [1;31mLoginScreen[mProps) {
+[35mcomponents/LogsList/LogsList.tsx[m[36m:[m[32m6[m[36m:[mimport styles from "./[1;31mLogsList[m.module.css";
+[35mcomponents/LogsList/LogsList.tsx[m[36m:[m[32m8[m[36m:[mtype [1;31mLogsList[mProps = {
+[35mcomponents/LogsList/LogsList.tsx[m[36m:[m[32m38[m[36m:[mexport default function [1;31mLogsList[m({
+[35mcomponents/LogsList/LogsList.tsx[m[36m:[m[32m45[m[36m:[m}: [1;31mLogsList[mProps) {
+[35mcomponents/SecurityPanel/SecurityPanel.tsx[m[36m:[m[32m5[m[36m:[mimport styles from "./[1;31mSecurityPanel[m.module.css";
+[35mcomponents/SecurityPanel/SecurityPanel.tsx[m[36m:[m[32m7[m[36m:[mtype [1;31mSecurityPanel[mProps = {
+[35mcomponents/SecurityPanel/SecurityPanel.tsx[m[36m:[m[32m18[m[36m:[mexport default function [1;31mSecurityPanel[m({
+[35mcomponents/SecurityPanel/SecurityPanel.tsx[m[36m:[m[32m23[m[36m:[m}: [1;31mSecurityPanel[mProps) {
+[35mcomponents/UserManagementPanel/UserManagementPanel.tsx[m[36m:[m[32m6[m[36m:[mimport styles from "./[1;31mUserManagementPanel[m.module.css";
+[35mcomponents/UserManagementPanel/UserManagementPanel.tsx[m[36m:[m[32m40[m[36m:[mtype [1;31mUserManagementPanel[mProps = {
+[35mcomponents/UserManagementPanel/UserManagementPanel.tsx[m[36m:[m[32m121[m[36m:[mexport default function [1;31mUserManagementPanel[m({
+[35mcomponents/UserManagementPanel/UserManagementPanel.tsx[m[36m:[m[32m132[m[36m:[m}: [1;31mUserManagementPanel[mProps) {
+[35mcomponents/WorkLogger/WorkLogger.tsx[m[36m:[m[32m3[m[36m:[mimport { [1;31mWorkLoggerView[m } from "@/components";
+[35mcomponents/WorkLogger/WorkLogger.tsx[m[36m:[m[32m4[m[36m:[mimport { use[1;31mWorkLogger[m } from "@/hooks/use[1;31mWorkLogger[m";
+[35mcomponents/WorkLogger/WorkLogger.tsx[m[36m:[m[32m7[m[36m:[mtype [1;31mWorkLogger[mProps = {
+[35mcomponents/WorkLogger/WorkLogger.tsx[m[36m:[m[32m16[m[36m:[mexport default function [1;31mWorkLogger[m({
+[35mcomponents/WorkLogger/WorkLogger.tsx[m[36m:[m[32m23[m[36m:[m}: [1;31mWorkLogger[mProps) {
+[35mcomponents/WorkLogger/WorkLogger.tsx[m[36m:[m[32m24[m[36m:[m  const workLogger = use[1;31mWorkLogger[m(currentUser);
+[35mcomponents/WorkLogger/WorkLogger.tsx[m[36m:[m[32m27[m[36m:[m    <[1;31mWorkLoggerView[m
+[35mcomponents/WorkLoggerView/WorkLoggerView.tsx[m[36m:[m[32m5[m[36m:[mimport { [1;31mActionButtons[m, [1;31mLogsList[m, [1;31mWorkerForm[m } from "@/components";
+[35mcomponents/WorkLoggerView/WorkLoggerView.tsx[m[36m:[m[32m6[m[36m:[mimport type { [1;31mWorkLogger[mState } from "@/hooks/use[1;31mWorkLogger[m";
+[35mcomponents/WorkLoggerView/WorkLoggerView.tsx[m[36m:[m[32m8[m[36m:[mimport styles from "./[1;31mWorkLoggerView[m.module.css";
+[35mcomponents/WorkLoggerView/WorkLoggerView.tsx[m[36m:[m[32m12[m[36m:[mtype [1;31mWorkLoggerView[mProps = [1;31mWorkLogger[mState & {
+[35mcomponents/WorkLoggerView/WorkLoggerView.tsx[m[36m:[m[32m21[m[36m:[mexport default function [1;31mWorkLoggerView[m(props: [1;31mWorkLoggerView[mProps) {
+[35mcomponents/WorkLoggerView/WorkLoggerView.tsx[m[36m:[m[32m123[m[36m:[m            <[1;31mWorkerForm[m
+[35mcomponents/WorkLoggerView/WorkLoggerView.tsx[m[36m:[m[32m141[m[36m:[m            <[1;31mActionButtons[m
+[35mcomponents/WorkLoggerView/WorkLoggerView.tsx[m[36m:[m[32m269[m[36m:[m            <[1;31mLogsList[m
+[35mcomponents/WorkerForm/WorkerForm.tsx[m[36m:[m[32m6[m[36m:[mimport styles from "./[1;31mWorkerForm[m.module.css";
+[35mcomponents/WorkerForm/WorkerForm.tsx[m[36m:[m[32m8[m[36m:[mtype [1;31mWorkerForm[mProps = {
+[35mcomponents/WorkerForm/WorkerForm.tsx[m[36m:[m[32m36[m[36m:[mexport default function [1;31mWorkerForm[m({
+[35mcomponents/WorkerForm/WorkerForm.tsx[m[36m:[m[32m52[m[36m:[m}: [1;31mWorkerForm[mProps) {
+[35mcomponents/WorkerStatusPanel/WorkerStatusPanel.tsx[m[36m:[m[32m6[m[36m:[mimport styles from "./[1;31mWorkerStatusPanel[m.module.css";
+[35mcomponents/WorkerStatusPanel/WorkerStatusPanel.tsx[m[36m:[m[32m74[m[36m:[mtype [1;31mWorkerStatusPanel[mProps = {
+[35mcomponents/WorkerStatusPanel/WorkerStatusPanel.tsx[m[36m:[m[32m78[m[36m:[mexport default function [1;31mWorkerStatusPanel[m({ onClose }: [1;31mWorkerStatusPanel[mProps) {
+[35mcomponents/index.ts[m[36m:[m[32m1[m[36m:[mexport { default as [1;31mActionButtons[m } from "./[1;31mActionButtons[m/[1;31mActionButtons[m";
+[35mcomponents/index.ts[m[36m:[m[32m2[m[36m:[mexport { default as [1;31mLogsList[m } from "./[1;31mLogsList[m/[1;31mLogsList[m";
+[35mcomponents/index.ts[m[36m:[m[32m3[m[36m:[mexport { default as [1;31mWorkLogger[m } from "./[1;31mWorkLogger[m/[1;31mWorkLogger[m";
+[35mcomponents/index.ts[m[36m:[m[32m4[m[36m:[mexport { default as [1;31mWorkLoggerView[m } from "./[1;31mWorkLoggerView[m/[1;31mWorkLoggerView[m";
+[35mcomponents/index.ts[m[36m:[m[32m5[m[36m:[mexport { default as [1;31mWorkerForm[m } from "./[1;31mWorkerForm[m/[1;31mWorkerForm[m";
+[35mcomponents/index.ts[m[36m:[m[32m6[m[36m:[mexport { default as [1;31mCloudSyncStatus[m } from "./[1;31mCloudSyncStatus[m/[1;31mCloudSyncStatus[m";
+[35mhooks/useWorkLogger.ts[m[36m:[m[32m30[m[36m:[mexport type [1;31mWorkLogger[mState = {
+[35mhooks/useWorkLogger.ts[m[36m:[m[32m78[m[36m:[mexport function use[1;31mWorkLogger[m(currentUser: CurrentUser): [1;31mWorkLogger[mState {
