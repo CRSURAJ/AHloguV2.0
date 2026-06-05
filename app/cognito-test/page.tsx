@@ -124,7 +124,7 @@ export default function CognitoTestPage() {
         <p className={styles.eyebrow}>AHlogu Login Test</p>
         <h1 className={styles.title}>Login Test</h1>
         <p className={styles.description}>
-          Temporary test page only. This does not replace the current AHlogu local login yet.
+          Temporary Cognito test page only. The main AHlogu app now uses AWS Cognito sign-in.
         </p>
 
         <div className={styles.form}>
