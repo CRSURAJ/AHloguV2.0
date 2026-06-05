@@ -3,6 +3,7 @@
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import FeedbackMessage from "@/components/FeedbackMessage";
+import AccountMessageDialog from "@/components/AccountMessageDialog/AccountMessageDialog";
 import AdminDashboard from "@/components/AdminDashboard";
 import JobManagementPanel from "@/components/JobManagementPanel/JobManagementPanel";
 import UserManagementPanel from "@/components/UserManagementPanel/UserManagementPanel";
@@ -593,47 +594,7 @@ export default function Page() {
           onSignOut={handleSignOut}
         />
 
-        {accountMessage ? (
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              display: "grid",
-              placeItems: "center",
-              padding: "20px",
-              background: "rgba(0,0,0,0.48)",
-              zIndex: 100,
-            }}
-          >
-            <div
-              style={{
-                width: "min(460px, 100%)",
-                borderRadius: "24px",
-                padding: "24px",
-                background: "#11302D",
-                color: "#eef7f3",
-                border: "1px solid rgba(255,255,255,0.14)",
-              }}
-            >
-              <FeedbackMessage message={accountMessage} />
-              <button
-                type="button"
-                onClick={() => setAccountMessage("")}
-                style={{
-                  border: 0,
-                  borderRadius: "14px",
-                  padding: "12px 16px",
-                  background: "#53BC7B",
-                  color: "#11302D",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        ) : null}
+        <AccountMessageDialog message={accountMessage} onClose={() => setAccountMessage("")} />
 
         {changePasswordOpen ? (
           <div
@@ -969,47 +930,10 @@ export default function Page() {
         </div>
       ) : null}
 
-      {accountMessage && !changePasswordOpen ? (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            display: "grid",
-            placeItems: "center",
-            padding: "20px",
-            background: "rgba(0,0,0,0.48)",
-            zIndex: 100,
-          }}
-        >
-          <div
-            style={{
-              width: "min(460px, 100%)",
-              borderRadius: "24px",
-              padding: "24px",
-              background: "#11302D",
-              color: "#eef7f3",
-              border: "1px solid rgba(255,255,255,0.14)",
-            }}
-          >
-            <FeedbackMessage message={accountMessage} />
-            <button
-              type="button"
-              onClick={() => setAccountMessage("")}
-              style={{
-                border: 0,
-                borderRadius: "14px",
-                padding: "12px 16px",
-                background: "#53BC7B",
-                color: "#11302D",
-                fontWeight: 800,
-                cursor: "pointer",
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <AccountMessageDialog
+        message={!changePasswordOpen ? accountMessage : ""}
+        onClose={() => setAccountMessage("")}
+      />
 
       <WorkLogger
         currentUser={currentUser}
