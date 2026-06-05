@@ -16,6 +16,7 @@ import {
 import { getJobsForRole, JOBS_CHANGED_EVENT } from "@/lib/jobStorage";
 import { getCloudProvider } from "@/lib/cloud/client";
 import { getWorkingStatusText, minutesBetween } from "@/lib/workUtils";
+import { uploadWorkLogToAws } from "@/lib/workLogger/workLogSync";
 import type {
   ActiveSession,
   AuthActionResult,
@@ -619,18 +620,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       ),
     );
 
-    const cloud = getCloudProvider();
-
-    if (cloud.providerName !== "aws") {
-      throw new Error("AWS cloud provider is required for work log sync.");
-    }
-
-    const result = await cloud.workLogs.upload(item);
-    if (!result.ok) {
-      throw new Error(result.message || "AWS work log upload failed.");
-    }
-
-    return Date.now();
+    return uploadWorkLogToAws(item);
   }
 
   async function handleSync(): Promise<void> {
