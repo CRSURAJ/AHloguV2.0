@@ -23,6 +23,8 @@
 
 .logoImage {
   display: block;
+  width: 160px;
+  height: auto;
   object-fit: contain;
 }
 
