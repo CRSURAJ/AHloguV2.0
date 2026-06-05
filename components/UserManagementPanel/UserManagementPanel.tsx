@@ -5,6 +5,7 @@ import { getPasswordPolicyError } from "@/lib/auth/passwordPolicy";
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import styles from "./UserManagementPanel.module.css";
 import { getPermissionLabel, getRoleLabel, isValidEmailAddress } from "./userManagementHelpers";
+import ResetPasswordDialog from "./ResetPasswordDialog";
 import { PERMISSION_LEVEL_OPTIONS, WORKER_ROLE_OPTIONS } from "@/types/work";
 import type { AuthActionResult, PermissionLevel, WorkerRole } from "@/types/work";
 
@@ -434,76 +435,19 @@ export default function UserManagementPanel({
 
   return (
     <div className={styles.backdrop}>
-      {resetTargetUser ? (
-        <div className={styles.modalBackdrop}>
-          <form
-            ref={resetPasswordCardRef}
-            tabIndex={-1}
-            className={styles.modalCard}
-            onSubmit={(event) => void handleSubmitResetPassword(event)}
-          >
-            <h2 className={styles.modalTitle}>Reset Password</h2>
+      <ResetPasswordDialog
+        targetUser={resetTargetUser}
+        temporaryPassword={resetTemporaryPassword}
+        confirmTemporaryPassword={resetConfirmTemporaryPassword}
+        message={resetPasswordMessage}
+        isResetting={Boolean(resettingUserId)}
+        cardRef={resetPasswordCardRef}
+        onTemporaryPasswordChange={setResetTemporaryPassword}
+        onConfirmTemporaryPasswordChange={setResetConfirmTemporaryPassword}
+        onClose={handleCloseResetPassword}
+        onSubmit={(event) => void handleSubmitResetPassword(event)}
+      />
 
-            <p className={styles.modalDescription}>
-              Set a temporary password for{" "}
-              <strong>
-                {resetTargetUser.fullName ||
-                  resetTargetUser.email ||
-                  resetTargetUser.username ||
-                  "this user"}
-              </strong>
-              . They will be asked to choose a new password on next sign in.
-            </p>
-
-            <FeedbackMessage message={resetPasswordMessage} />
-
-            <label className={styles.field}>
-              <span className={styles.label}>Temporary Password</span>
-              <input
-                className={styles.input}
-                type="password"
-                value={resetTemporaryPassword}
-                onChange={(event) => setResetTemporaryPassword(event.target.value)}
-                autoComplete="new-password"
-                required
-              />
-            </label>
-
-            <label className={styles.field}>
-              <span className={styles.label}>Confirm Temporary Password</span>
-              <input
-                className={styles.input}
-                type="password"
-                value={resetConfirmTemporaryPassword}
-                onChange={(event) => setResetConfirmTemporaryPassword(event.target.value)}
-                autoComplete="new-password"
-                required
-              />
-            </label>
-
-            <PasswordRequirementsNote compact />
-
-            <div className={styles.modalActions}>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                onClick={handleCloseResetPassword}
-                disabled={Boolean(resettingUserId)}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                className={styles.primaryButton}
-                disabled={Boolean(resettingUserId)}
-              >
-                {resettingUserId ? "Resetting..." : "Reset Password"}
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
       <div className={styles.panel}>
         <div className={styles.header}>
           <div>
