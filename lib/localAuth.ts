@@ -58,10 +58,7 @@ function base64ToArrayBuffer(value: string): ArrayBuffer {
     bytes[i] = binary.charCodeAt(i);
   }
 
-  return bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength
-  ) as ArrayBuffer;
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
 function normalizeUsername(username: string): string {
@@ -94,24 +91,17 @@ function isWorkerRole(value: unknown): value is WorkerRole {
 }
 
 function normalizePermissionLevel(value: unknown): PermissionLevel {
-  
   if (value === "admin") return "admin";
   if (value === "manager") return "manager";
   return "worker";
 }
 
-function normalizeWorkerRole(
-  value: unknown,
-  permissionLevel: PermissionLevel
-): WorkerRole {
+function normalizeWorkerRole(value: unknown, permissionLevel: PermissionLevel): WorkerRole {
   if (isWorkerRole(value)) return value;
   return permissionLevel === "admin" || permissionLevel === "manager" ? "supervisor" : "plumber";
 }
 
-async function deriveCredentialHash(
-  secret: string,
-  saltBase64: string
-): Promise<string> {
+async function deriveCredentialHash(secret: string, saltBase64: string): Promise<string> {
   const encoder = new TextEncoder();
 
   const keyMaterial = await crypto.subtle.importKey(
@@ -119,7 +109,7 @@ async function deriveCredentialHash(
     encoder.encode(secret),
     { name: "PBKDF2" },
     false,
-    ["deriveBits"]
+    ["deriveBits"],
   );
 
   const derivedBits = await crypto.subtle.deriveBits(
@@ -130,7 +120,7 @@ async function deriveCredentialHash(
       hash: "SHA-256",
     },
     keyMaterial,
-    256
+    256,
   );
 
   return bufferToHex(derivedBits);
@@ -149,18 +139,12 @@ export async function buildCredential(secret: string): Promise<{
   return { credentialSalt, credentialHash };
 }
 
-export async function verifyCredential(
-  user: OfflineUser,
-  secret: string
-): Promise<boolean> {
+export async function verifyCredential(user: OfflineUser, secret: string): Promise<boolean> {
   const hash = await deriveCredentialHash(secret, user.credentialSalt);
   return hash === user.credentialHash;
 }
 
-export function validateSecret(
-  credentialType: CredentialType,
-  secret: string
-): string {
+export function validateSecret(credentialType: CredentialType, secret: string): string {
   const trimmed = secret.trim();
 
   if (credentialType === "pin") {
@@ -183,20 +167,13 @@ function migrateStoredUser(item: unknown): OfflineUser | null {
   const raw = item as Record<string, unknown>;
 
   const id = typeof raw.id === "string" ? raw.id : makeUuid();
-  const username =
-    typeof raw.username === "string" ? normalizeUsername(raw.username) : "";
-  const fullName =
-    typeof raw.fullName === "string" ? raw.fullName.trim() : "";
-  const credentialType =
-    raw.credentialType === "password" ? "password" : "pin";
-  const credentialHash =
-    typeof raw.credentialHash === "string" ? raw.credentialHash : "";
-  const credentialSalt =
-    typeof raw.credentialSalt === "string" ? raw.credentialSalt : "";
+  const username = typeof raw.username === "string" ? normalizeUsername(raw.username) : "";
+  const fullName = typeof raw.fullName === "string" ? raw.fullName.trim() : "";
+  const credentialType = raw.credentialType === "password" ? "password" : "pin";
+  const credentialHash = typeof raw.credentialHash === "string" ? raw.credentialHash : "";
+  const credentialSalt = typeof raw.credentialSalt === "string" ? raw.credentialSalt : "";
 
-  const permissionLevel = normalizePermissionLevel(
-    raw.permissionLevel ?? raw.role
-  );
+  const permissionLevel = normalizePermissionLevel(raw.permissionLevel ?? raw.role);
 
   const role = normalizeWorkerRole(raw.role, permissionLevel);
 
@@ -215,14 +192,8 @@ function migrateStoredUser(item: unknown): OfflineUser | null {
     credentialSalt,
     mustChangeCredential: Boolean(raw.mustChangeCredential),
     isActive: raw.isActive !== false,
-    createdAt:
-      typeof raw.createdAt === "string"
-        ? raw.createdAt
-        : new Date().toISOString(),
-    updatedAt:
-      typeof raw.updatedAt === "string"
-        ? raw.updatedAt
-        : new Date().toISOString(),
+    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date().toISOString(),
+    updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date().toISOString(),
   };
 }
 
@@ -249,10 +220,7 @@ export function loadOfflineUsers(): OfflineUser[] {
 
         const legacy = item as Record<string, unknown>;
 
-        if (
-          !isPermissionLevel(legacy.permissionLevel) ||
-          !isWorkerRole(legacy.role)
-        ) {
+        if (!isPermissionLevel(legacy.permissionLevel) || !isWorkerRole(legacy.role)) {
           needsRewrite = true;
         }
 
@@ -305,9 +273,7 @@ export async function ensureSeedUsers(): Promise<void> {
   saveOfflineUsers(seededUsers);
 }
 
-export async function createOfflineUser(
-  input: CreateLocalUserInput
-): Promise<OfflineUser> {
+export async function createOfflineUser(input: CreateLocalUserInput): Promise<OfflineUser> {
   const { credentialHash, credentialSalt } = await buildCredential(input.secret);
   const now = new Date().toISOString();
 
@@ -317,7 +283,10 @@ export async function createOfflineUser(
     fullName: input.fullName.trim(),
     permissionLevel: input.permissionLevel,
     role: input.role,
-    credentialType: input.permissionLevel === "admin" || input.permissionLevel === "manager" ? "password" : input.credentialType,
+    credentialType:
+      input.permissionLevel === "admin" || input.permissionLevel === "manager"
+        ? "password"
+        : input.credentialType,
     credentialHash,
     credentialSalt,
     mustChangeCredential: true,
@@ -336,10 +305,7 @@ export function loadLocalAuthSession(): LocalAuthSession | null {
   try {
     const parsed = JSON.parse(raw) as LocalAuthSession;
 
-    if (
-      typeof parsed?.userId === "string" &&
-      typeof parsed?.signedInAt === "string"
-    ) {
+    if (typeof parsed?.userId === "string" && typeof parsed?.signedInAt === "string") {
       return parsed;
     }
 
@@ -373,39 +339,26 @@ export function toCurrentUser(user: OfflineUser): CurrentUser {
 
 export function restoreCurrentUserFromSession(
   users: OfflineUser[],
-  session: LocalAuthSession | null
+  session: LocalAuthSession | null,
 ): CurrentUser | null {
   if (!session) return null;
 
-  const matched = users.find(
-    (user) => user.id === session.userId && user.isActive
-  );
+  const matched = users.find((user) => user.id === session.userId && user.isActive);
 
   return matched ? toCurrentUser(matched) : null;
 }
 
-export function findUserByUsername(
-  users: OfflineUser[],
-  username: string
-): OfflineUser | null {
+export function findUserByUsername(users: OfflineUser[], username: string): OfflineUser | null {
   const normalized = normalizeUsername(username);
 
   return (
-    users.find(
-      (user) => normalizeUsername(user.username) === normalized && user.isActive
-    ) ?? null
+    users.find((user) => normalizeUsername(user.username) === normalized && user.isActive) ?? null
   );
 }
 
-export function hasAnotherActiveAdmin(
-  users: OfflineUser[],
-  userIdToExclude: string
-): boolean {
+export function hasAnotherActiveAdmin(users: OfflineUser[], userIdToExclude: string): boolean {
   return users.some(
-    (user) =>
-      user.id !== userIdToExclude &&
-      user.permissionLevel === "admin" &&
-      user.isActive
+    (user) => user.id !== userIdToExclude && user.permissionLevel === "admin" && user.isActive,
   );
 }
 

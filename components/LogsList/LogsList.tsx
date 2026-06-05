@@ -46,12 +46,12 @@ export default function LogsList({
   const [isOpen, setIsOpen] = useState(false);
   const [openStickyEditors, setOpenStickyEditors] = useState<Record<string, boolean>>({});
 
-function toggleStickyEditor(id: string) {
-  setOpenStickyEditors((prev) => ({
-    ...prev,
-    [id]: !prev[id],
-  }));
-}
+  function toggleStickyEditor(id: string) {
+    setOpenStickyEditors((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  }
   return (
     <section className={styles.logsCard}>
       <button
@@ -83,15 +83,12 @@ function toggleStickyEditor(id: string) {
               {logs.map((item) => {
                 const isExpanded = expandedLogId === item.id;
                 const canExpand =
-                  (item.description ?? "").length > 120 ||
-                  (item.description ?? "").includes("\n");
+                  (item.description ?? "").length > 120 || (item.description ?? "").includes("\n");
 
                 const badgeClassKey = getSyncBadgeClass(item.syncStatus);
-                const badgeClass =
-                  styles[badgeClassKey as keyof typeof styles] ?? "";
-                const stickyLocked =
-                  item.syncStatus === "synced" || item.syncStatus === "syncing";
-                const stickyValue = item.stickyNote ?? "";  
+                const badgeClass = styles[badgeClassKey as keyof typeof styles] ?? "";
+                const stickyLocked = item.syncStatus === "synced" || item.syncStatus === "syncing";
+                const stickyValue = item.stickyNote ?? "";
                 const stickyOpen = openStickyEditors[item.id] ?? false;
                 const hasStickyNote = stickyValue.trim().length > 0;
                 return (
@@ -102,8 +99,7 @@ function toggleStickyEditor(id: string) {
                           {item.fullname} · {item.jobId}
                         </div>
                         <div className={styles.logMeta}>
-                          {formatDateTime(item.startedAt)} →{" "}
-                          {formatDateTime(item.stoppedAt)}
+                          {formatDateTime(item.startedAt)} → {formatDateTime(item.stoppedAt)}
                         </div>
                       </div>
 
@@ -115,12 +111,8 @@ function toggleStickyEditor(id: string) {
                     <div className={styles.metaChips}>
                       <span className={styles.metaChip}>{item.role}</span>
                       <span className={styles.metaChip}>{item.location}</span>
-                      <span className={styles.metaChip}>
-                        {item.workedMinutes} min worked
-                      </span>
-                      <span className={styles.metaChip}>
-                        {item.breakMinutes} min break
-                      </span>
+                      <span className={styles.metaChip}>{item.workedMinutes} min worked</span>
+                      <span className={styles.metaChip}>{item.breakMinutes} min break</span>
                       {item.jobDocs ? (
                         <span className={styles.metaChip}>{item.jobDocs}</span>
                       ) : null}
@@ -144,37 +136,37 @@ function toggleStickyEditor(id: string) {
                       </button>
                     ) : null}
                     <div className={styles.stickyNoteSection}>
-  <button
-    type="button"
-    className={`${styles.stickyToggleButton} ${hasStickyNote ? styles.stickyToggleButtonFilled : ""}`}
-    onClick={() => toggleStickyEditor(item.id)}
-  >
-    <span className={styles.stickyToggleLabel}>Sticky Note</span>
-    <span className={styles.stickyToggleStatus}>
-      {hasStickyNote ? "↑" : "+"}
-    </span>
-  </button>
+                      <button
+                        type="button"
+                        className={`${styles.stickyToggleButton} ${hasStickyNote ? styles.stickyToggleButtonFilled : ""}`}
+                        onClick={() => toggleStickyEditor(item.id)}
+                      >
+                        <span className={styles.stickyToggleLabel}>Sticky Note</span>
+                        <span className={styles.stickyToggleStatus}>
+                          {hasStickyNote ? "↑" : "+"}
+                        </span>
+                      </button>
 
-  {stickyOpen ? (
-    <div className={styles.stickyNoteCard}>
-      <div className={styles.stickyNoteHeader}>
-        <span className={styles.stickyNoteTitle}>Sticky note</span>
-        <span className={styles.stickyNoteState}>
-          {stickyLocked ? "Read only after sync" : ""}
-        </span>
-      </div>
+                      {stickyOpen ? (
+                        <div className={styles.stickyNoteCard}>
+                          <div className={styles.stickyNoteHeader}>
+                            <span className={styles.stickyNoteTitle}>Sticky note</span>
+                            <span className={styles.stickyNoteState}>
+                              {stickyLocked ? "Read only after sync" : ""}
+                            </span>
+                          </div>
 
-      <textarea
-        className={styles.stickyNoteInput}
-        value={stickyValue}
-        onChange={(e) => onStickyNoteChange(item.id, e.target.value)}
-        placeholder="Add anything you forgot before syncing..."
-        rows={3}
-        disabled={stickyLocked}
-      />
-    </div>
-  ) : null}
-</div>
+                          <textarea
+                            className={styles.stickyNoteInput}
+                            value={stickyValue}
+                            onChange={(e) => onStickyNoteChange(item.id, e.target.value)}
+                            placeholder="Add anything you forgot before syncing..."
+                            rows={3}
+                            disabled={stickyLocked}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
                     <div className={styles.logFooter}>
                       <div className={styles.logMessage}>{item.syncMessage}</div>
 
@@ -183,9 +175,7 @@ function toggleStickyEditor(id: string) {
                           type="button"
                           className={styles.deleteButton}
                           onClick={() => {
-                            const confirmed = window.confirm(
-                              "Delete this saved log?"
-                            );
+                            const confirmed = window.confirm("Delete this saved log?");
                             if (confirmed) {
                               onDelete(item.id);
                             }

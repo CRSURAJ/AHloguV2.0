@@ -28,9 +28,7 @@ const SITE_ADDRESS_PLACEHOLDER = "Enter Site Address Here";
 const CUSTOM_JOB_OPTION = "__custom_job__";
 
 function getJobOptionLabel(job: Job): string {
-  const parts = [job.jobId, job.jobName].filter(
-    (part) => part.trim() !== ""
-  );
+  const parts = [job.jobId, job.jobName].filter((part) => part.trim() !== "");
 
   return parts.length > 0 ? parts.join(" · ") : "Untitled job";
 }
@@ -52,17 +50,14 @@ export default function WorkerForm({
   handleStart,
   handleBreak,
 }: WorkerFormProps) {
-  const [locationPlaceholder, setLocationPlaceholder] = useState(
-    DEFAULT_LOCATION_PLACEHOLDER
-  );
+  const [locationPlaceholder, setLocationPlaceholder] = useState(DEFAULT_LOCATION_PLACEHOLDER);
   const [customJobMode, setCustomJobMode] = useState(false);
 
   const descriptionDisabled = !isWorking || isOnBreak;
   const hasAvailableJobs = availableJobs.length > 0;
   const selectedJobIsAssigned = availableJobs.some((job) => job.jobId === jobId);
   const showCustomJobInput =
-    hasAvailableJobs &&
-    (customJobMode || (jobId.trim() !== "" && !selectedJobIsAssigned));
+    hasAvailableJobs && (customJobMode || (jobId.trim() !== "" && !selectedJobIsAssigned));
   const jobSelectValue = showCustomJobInput ? CUSTOM_JOB_OPTION : jobId;
   const isWarehouseSelected = location === "Warehouse";
   const isSiteAddressMode =

@@ -2,13 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import {
-  archiveJob,
-  createJob,
-  deleteJob,
-  loadJobs,
-  updateJob,
-} from "@/lib/jobStorage";
+import { archiveJob, createJob, deleteJob, loadJobs, updateJob } from "@/lib/jobStorage";
 import type { CreateJobInput, UpdateJobInput } from "@/lib/jobStorage";
 import type { AuthActionResult, Job } from "@/types/work";
 
@@ -20,11 +14,9 @@ export type UseJobsReturn = {
   jobMessage: string;
   refreshJobs: () => Promise<void>;
   handleCreateJob: (input: CreateJobInput) => Promise<AuthActionResult>;
-  handleUpdateJob: (
-    id: string,
-    updates: UpdateJobInput
-  ) => Promise<AuthActionResult>;
-  handleDeleteJob: (id: string) => Promise<AuthActionResult>; handleArchiveJob: (id: string) => Promise<AuthActionResult>;
+  handleUpdateJob: (id: string, updates: UpdateJobInput) => Promise<AuthActionResult>;
+  handleDeleteJob: (id: string) => Promise<AuthActionResult>;
+  handleArchiveJob: (id: string) => Promise<AuthActionResult>;
   handleToggleJobActive: (id: string) => Promise<AuthActionResult>;
   getJobById: (id: string) => Job | undefined;
   clearJobMessage: () => void;
@@ -75,11 +67,7 @@ function validateCreateJob(input: CreateJobInput, jobs: Job[]): string {
   return "";
 }
 
-function validateUpdateJob(
-  id: string,
-  updates: UpdateJobInput,
-  jobs: Job[],
-): string {
+function validateUpdateJob(id: string, updates: UpdateJobInput, jobs: Job[]): string {
   if (updates.jobId !== undefined && updates.jobId.trim() === "") {
     return "Job ID is required.";
   }
@@ -88,10 +76,7 @@ function validateUpdateJob(
     return "Job name is required.";
   }
 
-  if (
-    updates.customerName !== undefined &&
-    updates.customerName.trim() === ""
-  ) {
+  if (updates.customerName !== undefined && updates.customerName.trim() === "") {
     return "Customer / site is required.";
   }
 
@@ -138,12 +123,12 @@ export function useJobs(): UseJobsReturn {
 
   const activeJobs = useMemo(
     () => jobs.filter((job) => job.isActive && job.isArchived !== true),
-    [jobs]
+    [jobs],
   );
 
   const inactiveJobs = useMemo(
     () => jobs.filter((job) => !job.isActive && job.isArchived !== true),
-    [jobs]
+    [jobs],
   );
 
   const refreshJobs = useCallback(async () => {
@@ -173,21 +158,17 @@ export function useJobs(): UseJobsReturn {
 
         return { ok: true, message };
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Could not create job.";
+        const message = error instanceof Error ? error.message : "Could not create job.";
         setJobMessage(message);
 
         return { ok: false, message };
       }
     },
-    [jobs, refreshJobs]
+    [jobs, refreshJobs],
   );
 
   const handleUpdateJob = useCallback(
-    async (
-      id: string,
-      updates: UpdateJobInput
-    ): Promise<AuthActionResult> => {
+    async (id: string, updates: UpdateJobInput): Promise<AuthActionResult> => {
       const validationError = validateUpdateJob(id, updates, jobs);
 
       if (validationError) {
@@ -211,14 +192,13 @@ export function useJobs(): UseJobsReturn {
 
         return { ok: true, message };
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Could not update job.";
+        const message = error instanceof Error ? error.message : "Could not update job.";
         setJobMessage(message);
 
         return { ok: false, message };
       }
     },
-    [jobs, refreshJobs]
+    [jobs, refreshJobs],
   );
 
   const handleDeleteJob = useCallback(
@@ -240,14 +220,13 @@ export function useJobs(): UseJobsReturn {
 
         return { ok: true, message };
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Could not delete job.";
+        const message = error instanceof Error ? error.message : "Could not delete job.";
         setJobMessage(message);
 
         return { ok: false, message };
       }
     },
-    [jobs, refreshJobs]
+    [jobs, refreshJobs],
   );
 
   const handleArchiveJob = useCallback(
@@ -275,13 +254,12 @@ export function useJobs(): UseJobsReturn {
         setJobMessage(message);
         return { ok: true, message };
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Could not archive job.";
+        const message = error instanceof Error ? error.message : "Could not archive job.";
         setJobMessage(message);
         return { ok: false, message };
       }
     },
-    [jobs, refreshJobs]
+    [jobs, refreshJobs],
   );
 
   const handleToggleJobActive = useCallback(
@@ -315,20 +293,16 @@ export function useJobs(): UseJobsReturn {
 
         return { ok: true, message };
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Could not update job.";
+        const message = error instanceof Error ? error.message : "Could not update job.";
         setJobMessage(message);
 
         return { ok: false, message };
       }
     },
-    [jobs, refreshJobs]
+    [jobs, refreshJobs],
   );
 
-  const getJobById = useCallback(
-    (id: string) => jobs.find((job) => job.id === id),
-    [jobs]
-  );
+  const getJobById = useCallback((id: string) => jobs.find((job) => job.id === id), [jobs]);
 
   const clearJobMessage = useCallback(() => {
     setJobMessage("");

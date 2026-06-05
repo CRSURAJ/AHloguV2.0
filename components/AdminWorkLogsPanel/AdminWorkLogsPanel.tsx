@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getCloudProvider } from "@/lib/cloud/client";
 import { formatMelbourneDateTime } from "@/lib/melbourneTime";
-import type { AdminWorkLog, PermissionLevel} from "@/types/work";
+import type { AdminWorkLog, PermissionLevel } from "@/types/work";
 import styles from "./AdminWorkLogsPanel.module.css";
 
 const PAGE_SIZE = 50;
@@ -53,8 +53,7 @@ function toDateTimeLocalInput(value: string): string {
     hour12: false,
   }).formatToParts(date);
 
-  const getPart = (type: string) =>
-    parts.find((part) => part.type === type)?.value ?? "";
+  const getPart = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
 
   return `${getPart("year")}-${getPart("month")}-${getPart("day")}T${getPart("hour")}:${getPart("minute")}`;
 }
@@ -72,7 +71,7 @@ function fromDateTimeLocalInput(value: string): string {
 function calculateWorkedMinutes(
   startedAt: string,
   stoppedAt: string,
-  breakMinutes: number
+  breakMinutes: number,
 ): number {
   const startMs = Date.parse(startedAt);
   const stopMs = Date.parse(stoppedAt);
@@ -83,7 +82,6 @@ function calculateWorkedMinutes(
 
   return Math.max(0, grossMinutes - Math.max(0, Number(breakMinutes || 0)));
 }
-
 
 function matchesDateRange(log: AdminWorkLog, fromDate: string, toDate: string) {
   if (!fromDate && !toDate) return true;
@@ -131,7 +129,10 @@ function getEditableValue(log: AdminWorkLog, field: EditableField): string {
   return value ?? "";
 }
 
-export default function AdminWorkLogsPanel({ onClose, currentPermissionLevel }: AdminWorkLogsPanelProps) {
+export default function AdminWorkLogsPanel({
+  onClose,
+  currentPermissionLevel,
+}: AdminWorkLogsPanelProps) {
   const canManageWorkLogs = currentPermissionLevel === "admin";
   const [logs, setLogs] = useState<AdminWorkLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -156,8 +157,7 @@ export default function AdminWorkLogsPanel({ onClose, currentPermissionLevel }: 
       const data = await getCloudProvider().workLogs.list();
       setLogs(data);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Could not load work logs.";
+      const errorMessage = error instanceof Error ? error.message : "Could not load work logs.";
 
       setMessage(errorMessage);
     } finally {
@@ -184,7 +184,9 @@ export default function AdminWorkLogsPanel({ onClose, currentPermissionLevel }: 
 
   const filteredLogs = useMemo(() => {
     const archiveModeLogs = logs.filter((log) =>
-      canManageWorkLogs && showArchivedJobLogs ? log.isJobArchived === true : log.isJobArchived !== true
+      canManageWorkLogs && showArchivedJobLogs
+        ? log.isJobArchived === true
+        : log.isJobArchived !== true,
     );
     const jobNeedle = jobIdFilter.trim().toLowerCase();
     const nameNeedle = nameFilter.trim().toLowerCase();
@@ -205,15 +207,20 @@ export default function AdminWorkLogsPanel({ onClose, currentPermissionLevel }: 
 
       return matchesDateRange(log, fromDate, toDate);
     });
-  }, [fromDate, jobIdFilter, logs, nameFilter, searchFilter, toDate, showArchivedJobLogs, canManageWorkLogs]);
+  }, [
+    fromDate,
+    jobIdFilter,
+    logs,
+    nameFilter,
+    searchFilter,
+    toDate,
+    showArchivedJobLogs,
+    canManageWorkLogs,
+  ]);
 
   const totalWorkedMinutes = useMemo(
-    () =>
-      filteredLogs.reduce(
-        (total, log) => total + Number(log.workedMinutes || 0),
-        0
-      ),
-    [filteredLogs]
+    () => filteredLogs.reduce((total, log) => total + Number(log.workedMinutes || 0), 0),
+    [filteredLogs],
   );
 
   const totalWorkedHours = totalWorkedMinutes / 60;
@@ -253,7 +260,7 @@ export default function AdminWorkLogsPanel({ onClose, currentPermissionLevel }: 
       next.workedMinutes = calculateWorkedMinutes(
         next.startedAt,
         next.stoppedAt,
-        next.breakMinutes
+        next.breakMinutes,
       );
 
       return next;
@@ -273,52 +280,48 @@ export default function AdminWorkLogsPanel({ onClose, currentPermissionLevel }: 
         throw new Error(result.message || "Could not update work log.");
       }
 
-      setLogs((current) =>
-        current.map((item) => (item.id === draft.id ? { ...draft } : item))
-      );
+      setLogs((current) => current.map((item) => (item.id === draft.id ? { ...draft } : item)));
       cancelEdit();
       setMessage("Work log updated.");
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Could not update work log.";
+      const errorMessage = error instanceof Error ? error.message : "Could not update work log.";
 
       setMessage(errorMessage);
     } finally {
       setSavingId(null);
     }
   }
-async function deleteWorkLog(log: AdminWorkLog) {
-  const confirmed = window.confirm(
-    `Are you sure you want to delete this work log?\n\nWorker: ${log.fullname}\nJob ID: ${log.jobId}\nStarted: ${formatDateTime(log.startedAt)}`
-  );
+  async function deleteWorkLog(log: AdminWorkLog) {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete this work log?\n\nWorker: ${log.fullname}\nJob ID: ${log.jobId}\nStarted: ${formatDateTime(log.startedAt)}`,
+    );
 
-  if (!confirmed) return;
+    if (!confirmed) return;
 
-  try {
-    setDeletingId(log.id);
-    setMessage("");
+    try {
+      setDeletingId(log.id);
+      setMessage("");
 
-    const result = await getCloudProvider().workLogs.delete(log.id);
+      const result = await getCloudProvider().workLogs.delete(log.id);
 
-    if (!result.ok) {
-      throw new Error(result.message || "Could not delete work log.");
+      if (!result.ok) {
+        throw new Error(result.message || "Could not delete work log.");
+      }
+
+      setLogs((current) => current.filter((item) => item.id !== log.id));
+
+      if (editingId === log.id) {
+        cancelEdit();
+      }
+
+      setMessage("Work log deleted.");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Could not delete work log.";
+      setMessage(errorMessage);
+    } finally {
+      setDeletingId(null);
     }
-
-    setLogs((current) => current.filter((item) => item.id !== log.id));
-
-    if (editingId === log.id) {
-      cancelEdit();
-    }
-
-    setMessage("Work log deleted.");
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Could not delete work log.";
-    setMessage(errorMessage);
-  } finally {
-    setDeletingId(null);
   }
-}
   async function exportXlsx() {
     const XLSX = await import("xlsx");
 
@@ -422,9 +425,7 @@ async function deleteWorkLog(log: AdminWorkLog) {
         <div className={styles.header}>
           <div>
             <h2 className={styles.title}>Work Logs</h2>
-            <p className={styles.subtitle}>
-              Review, filter, edit, and export synced worker logs.
-            </p>
+            <p className={styles.subtitle}>Review, filter, edit, and export synced worker logs.</p>
           </div>
 
           <div className={styles.headerActions}>
@@ -452,24 +453,20 @@ async function deleteWorkLog(log: AdminWorkLog) {
         </div>
 
         <div className={styles.filters}>
-        <button
-          className={styles.clearFiltersButton}
-          type="button"
-          onClick={clearFilters}
-        >
-          Clear Fields
-        </button>
+          <button className={styles.clearFiltersButton} type="button" onClick={clearFilters}>
+            Clear Fields
+          </button>
 
-        {canManageWorkLogs ? (
-<label className={styles.archiveSearchToggle}>
-          <input
-            type="checkbox"
-            checked={showArchivedJobLogs}
-            onChange={(event) => setShowArchivedJobLogs(event.target.checked)}
-          />
-          <span>Search Archived Job Logs</span>
-        </label>
-) : null}
+          {canManageWorkLogs ? (
+            <label className={styles.archiveSearchToggle}>
+              <input
+                type="checkbox"
+                checked={showArchivedJobLogs}
+                onChange={(event) => setShowArchivedJobLogs(event.target.checked)}
+              />
+              <span>Search Archived Job Logs</span>
+            </label>
+          ) : null}
           <label>
             <input
               value={jobIdFilter}
@@ -503,21 +500,17 @@ async function deleteWorkLog(log: AdminWorkLog) {
           </label>
 
           <label>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(event) => setToDate(event.target.value)}
-            />
+            <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
           </label>
         </div>
 
         {message ? <p className={styles.message}>{message}</p> : null}
 
-      {canManageWorkLogs && showArchivedJobLogs ? (
-        <p className={styles.archiveModeMessage}>
-          Archived Job Logs Mode — showing logs linked to archived jobs only.
-        </p>
-      ) : null}
+        {canManageWorkLogs && showArchivedJobLogs ? (
+          <p className={styles.archiveModeMessage}>
+            Archived Job Logs Mode — showing logs linked to archived jobs only.
+          </p>
+        ) : null}
 
         <div className={styles.metaBar}>
           <span>
@@ -556,10 +549,7 @@ async function deleteWorkLog(log: AdminWorkLog) {
                     const isEditing = editingId === log.id;
 
                     return (
-                      <tr
-                        key={log.id}
-                        className={isEditing ? styles.editingRow : undefined}
-                      >
+                      <tr key={log.id} className={isEditing ? styles.editingRow : undefined}>
                         <td>{formatDateTime(log.syncedAt)}</td>
                         <td>{renderEditableCell(log, "startedAt")}</td>
                         <td>{renderEditableCell(log, "stoppedAt")}</td>
@@ -568,60 +558,64 @@ async function deleteWorkLog(log: AdminWorkLog) {
                         <td>{log.role}</td>
                         <td>{renderEditableCell(log, "description")}</td>
                         <td>{renderEditableCell(log, "location")}</td>
-                        <td>{formatMinutes(isEditing && draft ? draft.workedMinutes : log.workedMinutes)}</td>
+                        <td>
+                          {formatMinutes(
+                            isEditing && draft ? draft.workedMinutes : log.workedMinutes,
+                          )}
+                        </td>
                         <td>{renderEditableCell(log, "breakMinutes")}</td>
                         <td>{renderEditableCell(log, "stickyNote")}</td>
                         {canManageWorkLogs ? (
-<td>
-  {isEditing ? (
-    <div className={styles.rowActions}>
-      <button
-        type="button"
-        onClick={() => void saveEdit()}
-        disabled={savingId === log.id || deletingId === log.id}
-      >
-        Save
-      </button>
+                          <td>
+                            {isEditing ? (
+                              <div className={styles.rowActions}>
+                                <button
+                                  type="button"
+                                  onClick={() => void saveEdit()}
+                                  disabled={savingId === log.id || deletingId === log.id}
+                                >
+                                  Save
+                                </button>
 
-      <button
-        type="button"
-        onClick={cancelEdit}
-        disabled={savingId === log.id || deletingId === log.id}
-      >
-        Cancel
-      </button>
+                                <button
+                                  type="button"
+                                  onClick={cancelEdit}
+                                  disabled={savingId === log.id || deletingId === log.id}
+                                >
+                                  Cancel
+                                </button>
 
-      <button
-        className={styles.dangerButton}
-        type="button"
-        onClick={() => void deleteWorkLog(log)}
-        disabled={savingId === log.id || deletingId === log.id}
-      >
-        {deletingId === log.id ? "Deleting..." : "Delete"}
-      </button>
-    </div>
-  ) : (
-    <div className={styles.rowActions}>
-      <button
-        type="button"
-        onClick={() => startEdit(log)}
-        disabled={deletingId === log.id}
-      >
-        Edit
-      </button>
+                                <button
+                                  className={styles.dangerButton}
+                                  type="button"
+                                  onClick={() => void deleteWorkLog(log)}
+                                  disabled={savingId === log.id || deletingId === log.id}
+                                >
+                                  {deletingId === log.id ? "Deleting..." : "Delete"}
+                                </button>
+                              </div>
+                            ) : (
+                              <div className={styles.rowActions}>
+                                <button
+                                  type="button"
+                                  onClick={() => startEdit(log)}
+                                  disabled={deletingId === log.id}
+                                >
+                                  Edit
+                                </button>
 
-      <button
-        className={styles.dangerButton}
-        type="button"
-        onClick={() => void deleteWorkLog(log)}
-        disabled={deletingId === log.id}
-      >
-        {deletingId === log.id ? "Deleting..." : "Delete"}
-      </button>
-    </div>
-  )}
-</td>
-) : null}
+                                <button
+                                  className={styles.dangerButton}
+                                  type="button"
+                                  onClick={() => void deleteWorkLog(log)}
+                                  disabled={deletingId === log.id}
+                                >
+                                  {deletingId === log.id ? "Deleting..." : "Delete"}
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        ) : null}
                       </tr>
                     );
                   })}
@@ -644,9 +638,7 @@ async function deleteWorkLog(log: AdminWorkLog) {
 
               <button
                 type="button"
-                onClick={() =>
-                  setPage((current) => Math.min(totalPages, current + 1))
-                }
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
                 disabled={page >= totalPages}
               >
                 Next

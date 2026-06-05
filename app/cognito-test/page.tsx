@@ -41,13 +41,10 @@ export default function CognitoTestPage() {
       setChallengeUser(null);
       setPassword("");
       setStatus(
-        `Signed in successfully. Token user: ${
-          payload?.email ?? payload?.sub ?? "unknown"
-        }`,
+        `Signed in successfully. Token user: ${payload?.email ?? payload?.sub ?? "unknown"}`,
       );
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Sign-in failed.";
+      const message = error instanceof Error ? error.message : "Sign-in failed.";
 
       setStatus(message);
     } finally {
@@ -65,10 +62,7 @@ export default function CognitoTestPage() {
     setStatus("Setting new password...");
 
     try {
-      const session = await completeNewCognitoPassword(
-        challengeUser,
-        newPassword,
-      );
+      const session = await completeNewCognitoPassword(challengeUser, newPassword);
 
       const payload = session.getIdToken().decodePayload();
 
@@ -83,9 +77,7 @@ export default function CognitoTestPage() {
       );
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to complete new password challenge.";
+        error instanceof Error ? error.message : "Failed to complete new password challenge.";
 
       setStatus(message);
     } finally {
@@ -102,24 +94,15 @@ export default function CognitoTestPage() {
       const session = await getCurrentCognitoSession();
 
       if (!session) {
-        setStatus(
-          `No valid session found. Cached user: ${
-            currentUser?.getUsername() ?? "none"
-          }`,
-        );
+        setStatus(`No valid session found. Cached user: ${currentUser?.getUsername() ?? "none"}`);
         return;
       }
 
       const payload = session.getIdToken().decodePayload();
 
-      setStatus(
-        `Valid session found for ${
-          payload.email ?? payload.sub ?? "unknown user"
-        }.`,
-      );
+      setStatus(`Valid session found for ${payload.email ?? payload.sub ?? "unknown user"}.`);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Session check failed.";
+      const message = error instanceof Error ? error.message : "Session check failed.";
 
       setStatus(message);
     } finally {
@@ -141,8 +124,7 @@ export default function CognitoTestPage() {
         <p className={styles.eyebrow}>AHlogu Login Test</p>
         <h1 className={styles.title}>Login Test</h1>
         <p className={styles.description}>
-          Temporary test page only. This does not replace the current AHlogu
-          local login yet.
+          Temporary test page only. This does not replace the current AHlogu local login yet.
         </p>
 
         <div className={styles.form}>

@@ -4,15 +4,8 @@ import FeedbackMessage from "@/components/FeedbackMessage";
 import { getPasswordPolicyError } from "@/lib/auth/passwordPolicy";
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import styles from "./UserManagementPanel.module.css";
-import {
-  PERMISSION_LEVEL_OPTIONS,
-  WORKER_ROLE_OPTIONS,
-} from "@/types/work";
-import type {
-  AuthActionResult,
-  PermissionLevel,
-  WorkerRole,
-} from "@/types/work";
+import { PERMISSION_LEVEL_OPTIONS, WORKER_ROLE_OPTIONS } from "@/types/work";
+import type { AuthActionResult, PermissionLevel, WorkerRole } from "@/types/work";
 
 export type AwsUserListItem = {
   id: string;
@@ -58,15 +51,13 @@ type UserManagementPanelProps = {
 };
 
 function getRoleLabel(role: string): string {
-  return (
-    WORKER_ROLE_OPTIONS.find((item) => item.value === role)?.label ?? role
-  );
+  return WORKER_ROLE_OPTIONS.find((item) => item.value === role)?.label ?? role;
 }
 
 function getPermissionLabel(permissionLevel: PermissionLevel): string {
   return (
-    PERMISSION_LEVEL_OPTIONS.find((item) => item.value === permissionLevel)
-      ?.label ?? permissionLevel
+    PERMISSION_LEVEL_OPTIONS.find((item) => item.value === permissionLevel)?.label ??
+    permissionLevel
   );
 }
 
@@ -127,7 +118,6 @@ function isValidEmailAddress(email: string): boolean {
   return /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(value);
 }
 
-
 export default function UserManagementPanel({
   users,
   currentUserId,
@@ -143,8 +133,7 @@ export default function UserManagementPanel({
   const [localMessage, setLocalMessage] = useState("");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [permissionLevel, setPermissionLevel] =
-    useState<PermissionLevel>("worker");
+  const [permissionLevel, setPermissionLevel] = useState<PermissionLevel>("worker");
   const [role, setRole] = useState<WorkerRole>("plumber");
   const [temporaryPassword, setTemporaryPassword] = useState("");
   const [confirmTemporaryPassword, setConfirmTemporaryPassword] = useState("");
@@ -152,11 +141,9 @@ export default function UserManagementPanel({
   const [updatingUserId, setUpdatingUserId] = useState("");
   const [resettingUserId, setResettingUserId] = useState("");
   const [deletingUserId, setDeletingUserId] = useState("");
-  const [resetTargetUser, setResetTargetUser] =
-    useState<AwsUserListItem | null>(null);
+  const [resetTargetUser, setResetTargetUser] = useState<AwsUserListItem | null>(null);
   const [resetTemporaryPassword, setResetTemporaryPassword] = useState("");
-  const [resetConfirmTemporaryPassword, setResetConfirmTemporaryPassword] =
-    useState("");
+  const [resetConfirmTemporaryPassword, setResetConfirmTemporaryPassword] = useState("");
   const [resetPasswordMessage, setResetPasswordMessage] = useState("");
   const [createErrorField, setCreateErrorField] = useState<CreateUserField | "">("");
   const [createShakeField, setCreateShakeField] = useState<CreateUserField | "">("");
@@ -299,11 +286,7 @@ export default function UserManagementPanel({
     }
 
     if (!permissionLevel) {
-      markCreateError(
-        "permissionLevel",
-        "Permission level is required.",
-        permissionLevelInputRef,
-      );
+      markCreateError("permissionLevel", "Permission level is required.", permissionLevelInputRef);
       return;
     }
 
@@ -315,7 +298,6 @@ export default function UserManagementPanel({
       );
       return;
     }
-
 
     if (!role) {
       markCreateError("role", "Role is required.", roleInputRef);
@@ -331,17 +313,10 @@ export default function UserManagementPanel({
       return;
     }
 
-    const passwordPolicyError = getPasswordPolicyError(
-      temporaryPassword,
-      "Temporary password",
-    );
+    const passwordPolicyError = getPasswordPolicyError(temporaryPassword, "Temporary password");
 
     if (passwordPolicyError) {
-      markCreateError(
-        "temporaryPassword",
-        passwordPolicyError,
-        temporaryPasswordInputRef,
-      );
+      markCreateError("temporaryPassword", passwordPolicyError, temporaryPasswordInputRef);
       return;
     }
 
@@ -442,9 +417,7 @@ export default function UserManagementPanel({
     setResetPasswordMessage("");
   }
 
-  async function handleSubmitResetPassword(
-    event: FormEvent<HTMLFormElement>,
-  ): Promise<void> {
+  async function handleSubmitResetPassword(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setResetPasswordMessage("");
     setLocalMessage("");
@@ -481,10 +454,7 @@ export default function UserManagementPanel({
     setResettingUserId(resetTargetUser.id);
 
     try {
-      const result = await onResetPassword(
-        resetTargetUser.id,
-        resetTemporaryPassword,
-      );
+      const result = await onResetPassword(resetTargetUser.id, resetTemporaryPassword);
 
       if (result.ok) {
         setResetTargetUser(null);
@@ -512,9 +482,7 @@ export default function UserManagementPanel({
     }
 
     const label = user.fullName || user.email || user.username || "this user";
-    const confirmed = window.confirm(
-      `Delete ${label}? This will remove the user from AHlogu.`,
-    );
+    const confirmed = window.confirm(`Delete ${label}? This will remove the user from AHlogu.`);
 
     if (!confirmed) {
       return;
@@ -562,9 +530,7 @@ export default function UserManagementPanel({
                 className={styles.input}
                 type="password"
                 value={resetTemporaryPassword}
-                onChange={(event) =>
-                  setResetTemporaryPassword(event.target.value)
-                }
+                onChange={(event) => setResetTemporaryPassword(event.target.value)}
                 autoComplete="new-password"
                 required
               />
@@ -576,9 +542,7 @@ export default function UserManagementPanel({
                 className={styles.input}
                 type="password"
                 value={resetConfirmTemporaryPassword}
-                onChange={(event) =>
-                  setResetConfirmTemporaryPassword(event.target.value)
-                }
+                onChange={(event) => setResetConfirmTemporaryPassword(event.target.value)}
                 autoComplete="new-password"
                 required
               />
@@ -612,8 +576,8 @@ export default function UserManagementPanel({
           <div>
             <h3 className={styles.title}>User Management</h3>
             <p className={styles.subtitle}>
-              Create users, assign Admin/Manager/Worker access and trade role,
-              then store the matching profile in AHloguUsers.
+              Create users, assign Admin/Manager/Worker access and trade role, then store the
+              matching profile in AHloguUsers.
             </p>
           </div>
 
@@ -622,11 +586,7 @@ export default function UserManagementPanel({
           </button>
         </div>
 
-        <div
-          ref={userFeedbackRef}
-          tabIndex={-1}
-          className={styles.feedbackFocusTarget}
-        >
+        <div ref={userFeedbackRef} tabIndex={-1} className={styles.feedbackFocusTarget}>
           <FeedbackMessage message={displayMessage} />
         </div>
 
@@ -734,10 +694,7 @@ export default function UserManagementPanel({
             </div>
 
             <div className={styles.field}>
-              <label
-                className={styles.label}
-                htmlFor="user-temp-password-confirm"
-              >
+              <label className={styles.label} htmlFor="user-temp-password-confirm">
                 Confirm Temporary Password
               </label>
 
@@ -755,19 +712,19 @@ export default function UserManagementPanel({
               />
             </div>
 
-<div className={styles.passwordRequirementsRow}>
-  <PasswordRequirementsNote compact />
-</div>
-</div>
+            <div className={styles.passwordRequirementsRow}>
+              <PasswordRequirementsNote compact />
+            </div>
+          </div>
 
-<button
-  type="button"
-  className={styles.primaryButton}
-  onClick={() => void handleCreate()}
-  disabled={creating}
->
-  {creating ? "Creating User..." : "Create User"}
-</button>
+          <button
+            type="button"
+            className={styles.primaryButton}
+            onClick={() => void handleCreate()}
+            disabled={creating}
+          >
+            {creating ? "Creating User..." : "Create User"}
+          </button>
         </section>
 
         <section className={styles.section}>
@@ -797,8 +754,7 @@ export default function UserManagementPanel({
               const isResettingUser = resettingUserId === user.id;
               const isDeletingUser = deletingUserId === user.id;
               const canManageUser =
-                isAdminActor ||
-                (isManagerActor && user.permissionLevel !== "admin");
+                isAdminActor || (isManagerActor && user.permissionLevel !== "admin");
               const canDeleteUser = isAdminActor;
 
               return (
@@ -809,40 +765,31 @@ export default function UserManagementPanel({
                         {user.fullName || user.email || "Unnamed user"}
                       </div>
                       <div className={styles.userMeta}>
-                        {user.email || user.username} ·{" "}
-                        {getPermissionLabel(user.permissionLevel)} ·{" "}
+                        {user.email || user.username} · {getPermissionLabel(user.permissionLevel)} ·{" "}
                         {getRoleLabel(user.role)}
                       </div>
                     </div>
 
                     <div className={styles.topRight}>
                       {isCurrentUser ? (
-                        <span className={styles.selfUserBadge}>
-                          Current admin
-                        </span>
+                        <span className={styles.selfUserBadge}>Current admin</span>
                       ) : null}
 
                       <div className={styles.badges}>
                         <span
                           className={`${styles.badge} ${
-                            user.isActive
-                              ? styles.badgeActive
-                              : styles.badgeInactive
+                            user.isActive ? styles.badgeActive : styles.badgeInactive
                           }`}
                         >
                           {user.isActive ? "ACTIVE" : "INACTIVE"}
                         </span>
 
                         {user.permissionLevel === "admin" ? (
-                          <span className={`${styles.badge} ${styles.badgeWarn}`}>
-                            ADMIN
-                          </span>
+                          <span className={`${styles.badge} ${styles.badgeWarn}`}>ADMIN</span>
                         ) : null}
 
                         {user.permissionLevel === "manager" ? (
-                          <span className={styles.badge}>
-                            MANAGER
-                          </span>
+                          <span className={styles.badge}>MANAGER</span>
                         ) : null}
                       </div>
                     </div>
@@ -854,7 +801,13 @@ export default function UserManagementPanel({
                         type="button"
                         className={styles.secondaryButton}
                         onClick={() => handleOpenResetPassword(user)}
-                        disabled={isCurrentUser || isUpdatingUser || isResettingUser || isDeletingUser || !user.id}
+                        disabled={
+                          isCurrentUser ||
+                          isUpdatingUser ||
+                          isResettingUser ||
+                          isDeletingUser ||
+                          !user.id
+                        }
                       >
                         {isResettingUser ? "Resetting..." : "Reset Password"}
                       </button>
@@ -865,13 +818,15 @@ export default function UserManagementPanel({
                         type="button"
                         className={styles.secondaryButton}
                         onClick={() => void handleToggleActive(user)}
-                        disabled={isCurrentUser || isUpdatingUser || isResettingUser || isDeletingUser || !user.id}
+                        disabled={
+                          isCurrentUser ||
+                          isUpdatingUser ||
+                          isResettingUser ||
+                          isDeletingUser ||
+                          !user.id
+                        }
                       >
-                        {isUpdatingUser
-                          ? "Updating..."
-                          : user.isActive
-                            ? "Deactivate"
-                            : "Activate"}
+                        {isUpdatingUser ? "Updating..." : user.isActive ? "Deactivate" : "Activate"}
                       </button>
                     ) : null}
 
@@ -880,7 +835,13 @@ export default function UserManagementPanel({
                         type="button"
                         className={styles.dangerButton}
                         onClick={() => void handleDeleteUser(user)}
-                        disabled={isCurrentUser || isUpdatingUser || isResettingUser || isDeletingUser || !user.id}
+                        disabled={
+                          isCurrentUser ||
+                          isUpdatingUser ||
+                          isResettingUser ||
+                          isDeletingUser ||
+                          !user.id
+                        }
                       >
                         {isDeletingUser ? "Deleting..." : "Delete"}
                       </button>

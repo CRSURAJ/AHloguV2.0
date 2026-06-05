@@ -86,8 +86,7 @@ export default function WorkerStatusPanel({ onClose }: WorkerStatusPanelProps) {
       const data = await getCloudProvider().workerStatus.list();
       setStatuses(data);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Could not load worker status.";
+      const errorMessage = error instanceof Error ? error.message : "Could not load worker status.";
       setMessage(errorMessage);
     } finally {
       setIsLoading(false);
@@ -97,9 +96,12 @@ export default function WorkerStatusPanel({ onClose }: WorkerStatusPanelProps) {
   useEffect(() => {
     void loadWorkerStatuses();
 
-    const intervalId = window.setInterval(() => {
-      void loadWorkerStatuses();
-    }, 5 * 60 * 1000);
+    const intervalId = window.setInterval(
+      () => {
+        void loadWorkerStatuses();
+      },
+      5 * 60 * 1000,
+    );
 
     const handleFocus = () => {
       void loadWorkerStatuses();
@@ -196,9 +198,7 @@ export default function WorkerStatusPanel({ onClose }: WorkerStatusPanelProps) {
                       {item.status === "offline" &&
                       item.lastKnownStatus &&
                       item.lastKnownStatus !== "offline" ? (
-                        <div className={styles.muted}>
-                          was {formatStatus(item.lastKnownStatus)}
-                        </div>
+                        <div className={styles.muted}>was {formatStatus(item.lastKnownStatus)}</div>
                       ) : null}
                     </td>
 
@@ -225,9 +225,7 @@ export default function WorkerStatusPanel({ onClose }: WorkerStatusPanelProps) {
                     </td>
 
                     <td>
-                      <span className={styles.muted}>
-                        {formatLastSeen(item.lastSeenAt)}
-                      </span>
+                      <span className={styles.muted}>{formatLastSeen(item.lastSeenAt)}</span>
                     </td>
                   </tr>
                 ))}

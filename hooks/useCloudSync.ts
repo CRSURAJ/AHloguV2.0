@@ -3,14 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { checkCloudHealth } from "@/lib/cloud/health";
-import {
-  getSyncQueueCount,
-  SYNC_QUEUE_CHANGED_EVENT,
-} from "@/lib/cloud/syncQueue";
-import {
-  processCloudSyncQueue,
-  type ProcessSyncQueueResult,
-} from "@/lib/cloud/syncProcessor";
+import { getSyncQueueCount, SYNC_QUEUE_CHANGED_EVENT } from "@/lib/cloud/syncQueue";
+import { processCloudSyncQueue, type ProcessSyncQueueResult } from "@/lib/cloud/syncProcessor";
 
 type CloudSyncState = {
   provider: string;
@@ -58,8 +52,7 @@ export function useCloudSync() {
         lastMessage: result.message ?? "Cloud status checked.",
       }));
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Cloud status check failed.";
+      const message = error instanceof Error ? error.message : "Cloud status check failed.";
 
       setState((current) => ({
         ...current,
@@ -90,8 +83,7 @@ export function useCloudSync() {
 
       return result;
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Cloud sync failed.";
+      const message = error instanceof Error ? error.message : "Cloud sync failed.";
 
       const failedResult: ProcessSyncQueueResult = {
         processed: 0,
@@ -113,20 +105,19 @@ export function useCloudSync() {
     }
   }, []);
 
-
   useEffect(() => {
-  const refresh = () => refreshPendingCount();
+    const refresh = () => refreshPendingCount();
 
-  window.addEventListener("storage", refresh);
-  window.addEventListener("focus", refresh);
-  window.addEventListener(SYNC_QUEUE_CHANGED_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener(SYNC_QUEUE_CHANGED_EVENT, refresh);
 
-  return () => {
-    window.removeEventListener("storage", refresh);
-    window.removeEventListener("focus", refresh);
-    window.removeEventListener(SYNC_QUEUE_CHANGED_EVENT, refresh);
-  };
-}, [refreshPendingCount]);
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener(SYNC_QUEUE_CHANGED_EVENT, refresh);
+    };
+  }, [refreshPendingCount]);
 
   return {
     ...state,

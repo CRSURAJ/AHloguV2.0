@@ -5,8 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import FeedbackMessage from "@/components/FeedbackMessage";
 import { useJobs } from "@/hooks/useJobs";
 import { WORKER_ROLE_OPTIONS } from "@/types/work";
-import type { Job,
-  PermissionLevel, JobDrawing, WorkerRole } from "@/types/work";
+import type { Job, PermissionLevel, JobDrawing, WorkerRole } from "@/types/work";
 
 import styles from "./JobManagementPanel.module.css";
 
@@ -28,13 +27,7 @@ type JobFormState = {
   isActive: boolean;
 };
 
-type JobFormField =
-  | "caseNo"
-  | "jobId"
-  | "orderNo"
-  | "jobName"
-  | "customerName"
-  | "assignedRoles";
+type JobFormField = "caseNo" | "jobId" | "orderNo" | "jobName" | "customerName" | "assignedRoles";
 
 const EMPTY_FORM: JobFormState = {
   caseNo: "",
@@ -116,13 +109,14 @@ function isDuplicateJobIdMessage(message: string): boolean {
 
   return (
     value.includes("job id") &&
-    (value.includes("already exists") ||
-      value.includes("unique") ||
-      value.includes("duplicate"))
+    (value.includes("already exists") || value.includes("unique") || value.includes("duplicate"))
   );
 }
 
-export default function JobManagementPanel({ onClose, currentPermissionLevel }: JobManagementPanelProps) {
+export default function JobManagementPanel({
+  onClose,
+  currentPermissionLevel,
+}: JobManagementPanelProps) {
   const canArchiveOrDeleteJobs = currentPermissionLevel === "admin";
   const {
     jobs,
@@ -154,10 +148,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
   const jobFeedbackRef = useRef<HTMLDivElement>(null);
   const jobFormCardRef = useRef<HTMLDivElement>(null);
 
-  const visibleJobs = useMemo(
-    () => jobs.filter((job) => job.isArchived !== true),
-    [jobs]
-  );
+  const visibleJobs = useMemo(() => jobs.filter((job) => job.isArchived !== true), [jobs]);
 
   const sortedJobs = useMemo(
     () =>
@@ -166,7 +157,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
 
         return getJobTitle(a).localeCompare(getJobTitle(b));
       }),
-    [visibleJobs]
+    [visibleJobs],
   );
 
   function getJobInputClass(field: JobFormField): string {
@@ -226,10 +217,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
     }, 420);
   }
 
-  function updateField<K extends keyof JobFormState>(
-    field: K,
-    value: JobFormState[K]
-  ): void {
+  function updateField<K extends keyof JobFormState>(field: K, value: JobFormState[K]): void {
     setForm((current) => ({
       ...current,
       [field]: value,
@@ -317,8 +305,8 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
     if (acceptedFiles.length === 0) {
       setJobDrawingMessage(
         `No files added. Each job drawing must be ${formatBytes(
-          MAX_JOB_DRAWING_SIZE_BYTES
-        )} or smaller.`
+          MAX_JOB_DRAWING_SIZE_BYTES,
+        )} or smaller.`,
       );
       return;
     }
@@ -335,7 +323,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
     setJobDrawingMessage(
       rejectedCount > 0
         ? `Added ${newDocs.length} job drawing(s). ${rejectedCount} file(s) were skipped due to size/count limit.`
-        : `Added ${newDocs.length} job drawing(s).`
+        : `Added ${newDocs.length} job drawing(s).`,
     );
   }
 
@@ -395,11 +383,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
       const result = await handleUpdateJob(editingJobId, form);
 
       if (!result.ok && isDuplicateJobIdMessage(result.message)) {
-        markJobFormError(
-          "jobId",
-          "Job ID already exists. Use a unique Job ID.",
-          jobIdInputRef,
-        );
+        markJobFormError("jobId", "Job ID already exists. Use a unique Job ID.", jobIdInputRef);
         return;
       }
 
@@ -415,11 +399,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
     const result = await handleCreateJob(form);
 
     if (!result.ok && isDuplicateJobIdMessage(result.message)) {
-      markJobFormError(
-        "jobId",
-        "Job ID already exists. Use a unique Job ID.",
-        jobIdInputRef,
-      );
+      markJobFormError("jobId", "Job ID already exists. Use a unique Job ID.", jobIdInputRef);
       return;
     }
 
@@ -440,7 +420,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
 
   async function handleArchive(job: Job): Promise<void> {
     const confirmed = window.confirm(
-      `Archive ${getJobTitle(job)}?\n\nThis will remove the job from workers, normal job lists, and normal work logs.\nAll existing work logs for this job will move to archived work logs.\n\nThis cannot be undone.`
+      `Archive ${getJobTitle(job)}?\n\nThis will remove the job from workers, normal job lists, and normal work logs.\nAll existing work logs for this job will move to archived work logs.\n\nThis cannot be undone.`,
     );
 
     if (!confirmed) return;
@@ -455,9 +435,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
   }
 
   async function handleDelete(job: Job): Promise<void> {
-    const confirmed = window.confirm(
-      `Delete ${getJobTitle(job)}? This cannot be undone.`
-    );
+    const confirmed = window.confirm(`Delete ${getJobTitle(job)}? This cannot be undone.`);
 
     if (!confirmed) return;
 
@@ -477,8 +455,8 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
           <div>
             <h2>Job Management</h2>
             <p className={styles.subtitle}>
-              Create jobs and assign them to worker roles. Jobs are stored in AWS
-              and cached locally for offline viewing. Job drawings remain local-only until S3 is added.
+              Create jobs and assign them to worker roles. Jobs are stored in AWS and cached locally
+              for offline viewing. Job drawings remain local-only until S3 is added.
             </p>
           </div>
 
@@ -504,29 +482,17 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
           </div>
         </div>
 
-        <div
-          ref={jobFeedbackRef}
-          tabIndex={-1}
-          className={styles.feedbackFocusTarget}
-        >
+        <div ref={jobFeedbackRef} tabIndex={-1} className={styles.feedbackFocusTarget}>
           <FeedbackMessage message={jobFormMessage || jobMessage} />
           <FeedbackMessage message={jobDrawingMessage} />
         </div>
 
-        <div
-          ref={jobFormCardRef}
-          tabIndex={-1}
-          className={styles.card}
-        >
+        <div ref={jobFormCardRef} tabIndex={-1} className={styles.card}>
           <div className={styles.cardHeader}>
             <h3>{editingJobId ? "Edit Job" : "Add Job"}</h3>
 
             {editingJobId ? (
-              <button
-                className={styles.textButton}
-                type="button"
-                onClick={resetForm}
-              >
+              <button className={styles.textButton} type="button" onClick={resetForm}>
                 Cancel Edit
               </button>
             ) : null}
@@ -583,9 +549,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
                 ref={customerNameInputRef}
                 className={getJobInputClass("customerName")}
                 value={form.customerName}
-                onChange={(event) =>
-                  updateField("customerName", event.target.value)
-                }
+                onChange={(event) => updateField("customerName", event.target.value)}
                 aria-invalid={jobErrorField === "customerName"}
               />
             </label>
@@ -637,9 +601,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
             Description / Notes
             <textarea
               value={form.description}
-              onChange={(event) =>
-                updateField("description", event.target.value)
-              }
+              onChange={(event) => updateField("description", event.target.value)}
               rows={4}
             />
           </label>
@@ -649,10 +611,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
 
             <div className={styles.roleGrid}>
               {WORKER_ROLE_OPTIONS.map((role) => (
-                <label
-                  className={styles.roleOption}
-                  key={role.value}
-                >
+                <label className={styles.roleOption} key={role.value}>
                   <input
                     type="checkbox"
                     checked={form.assignedRoles.includes(role.value)}
@@ -669,9 +628,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
               <input
                 type="checkbox"
                 checked={form.isActive}
-                onChange={(event) =>
-                  updateField("isActive", event.target.checked)
-                }
+                onChange={(event) => updateField("isActive", event.target.checked)}
               />
               Active Job
             </label>
@@ -702,16 +659,12 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
                   <div>
                     <h4>{getJobTitle(job)}</h4>
                     <p>
-                      Job ID: {job.jobId || "—"} · Case: {job.caseNo || "—"} ·
-                      Order: {job.orderNo || "—"}
+                      Job ID: {job.jobId || "—"} · Case: {job.caseNo || "—"} · Order:{" "}
+                      {job.orderNo || "—"}
                     </p>
                   </div>
 
-                  <span
-                    className={
-                      job.isActive ? styles.activeBadge : styles.inactiveBadge
-                    }
-                  >
+                  <span className={job.isActive ? styles.activeBadge : styles.inactiveBadge}>
                     {job.isActive ? "ACTIVE" : "INACTIVE"}
                   </span>
                 </div>
@@ -723,9 +676,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
                     : `${job.jobDrawings.length} job doc(s)`}
                 </p>
 
-                <p className={styles.jobRoles}>
-                  Assigned to: {formatRoleList(job.assignedRoles)}
-                </p>
+                <p className={styles.jobRoles}>Assigned to: {formatRoleList(job.assignedRoles)}</p>
 
                 {job.description ? (
                   <p className={styles.jobDescription}>{job.description}</p>
@@ -755,31 +706,25 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
                     Edit
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => void handleToggleJobStatus(job)}
-                  >
+                  <button type="button" onClick={() => void handleToggleJobStatus(job)}>
                     {job.isActive ? "Deactivate" : "Activate"}
                   </button>
 
-                                    {canArchiveOrDeleteJobs ? (
-<button
-                    type="button"
-                    onClick={() => void handleArchive(job)}
-                  >
-                    Archive
-                  </button>
-) : null}
+                  {canArchiveOrDeleteJobs ? (
+                    <button type="button" onClick={() => void handleArchive(job)}>
+                      Archive
+                    </button>
+                  ) : null}
 
-{canArchiveOrDeleteJobs ? (
-<button
-                    className={styles.dangerButton}
-                    type="button"
-                    onClick={() => void handleDelete(job)}
-                  >
-                    Delete
-                  </button>
-) : null}
+                  {canArchiveOrDeleteJobs ? (
+                    <button
+                      className={styles.dangerButton}
+                      type="button"
+                      onClick={() => void handleDelete(job)}
+                    >
+                      Delete
+                    </button>
+                  ) : null}
                 </div>
               </article>
             ))}

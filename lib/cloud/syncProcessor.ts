@@ -35,11 +35,7 @@ function getErrorMessage(error: unknown) {
 }
 
 function isJobPayload(payload: unknown): payload is Job {
-  return (
-    isRecord(payload) &&
-    typeof payload.id === "string" &&
-    typeof payload.jobId === "string"
-  );
+  return isRecord(payload) && typeof payload.id === "string" && typeof payload.jobId === "string";
 }
 
 function isJobDeletePayload(payload: unknown): payload is { jobId: string } {
@@ -54,9 +50,7 @@ function isWorkLogPayload(payload: unknown): payload is LogItem {
   );
 }
 
-async function processSyncQueueItem(
-  item: SyncQueueItem,
-): Promise<CloudSyncResult> {
+async function processSyncQueueItem(item: SyncQueueItem): Promise<CloudSyncResult> {
   const cloud = getCloudProvider();
 
   switch (item.action) {
@@ -147,10 +141,7 @@ export async function processCloudSyncQueue(limit = 25) {
         removeSyncQueueItem(item.id);
         result.synced += 1;
       } else {
-        markSyncQueueItemFailed(
-          item.id,
-          syncResult.message ?? "Cloud sync failed.",
-        );
+        markSyncQueueItemFailed(item.id, syncResult.message ?? "Cloud sync failed.");
         result.failed += 1;
       }
     } catch (error) {

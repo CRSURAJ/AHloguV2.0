@@ -27,9 +27,7 @@ export default function CloudSyncStatus() {
           <h3 className={styles.title}>{statusText}</h3>
         </div>
 
-        <span className={isOnline ? styles.onlinePill : styles.localPill}>
-          {providerText}
-        </span>
+        <span className={isOnline ? styles.onlinePill : styles.localPill}>{providerText}</span>
       </div>
 
       <div className={styles.metaGrid}>

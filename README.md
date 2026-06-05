@@ -44,3 +44,4 @@ Create a `.env.local` file with:
 
 ```bash
 NEXT_PUBLIC_PROJECT_LOGU_SYNC_URL=https://your-endpoint.example.com
+```

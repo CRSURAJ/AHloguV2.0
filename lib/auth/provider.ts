@@ -34,40 +34,36 @@ type AuthProviderInitResult = {
 
 export type AuthProvider = {
   init: () => Promise<AuthProviderInitResult>;
-  signIn: (
-    users: OfflineUser[],
-    username: string,
-    secret: string
-  ) => Promise<AuthProviderResult>;
+  signIn: (users: OfflineUser[], username: string, secret: string) => Promise<AuthProviderResult>;
   signOut: () => AuthProviderResult;
   changeOwnCredential: (
     users: OfflineUser[],
     currentUser: CurrentUser | null,
     currentSecret: string,
     nextSecret: string,
-    confirmSecret: string
+    confirmSecret: string,
   ) => Promise<AuthProviderResult>;
   createUser: (
     users: OfflineUser[],
     actor: CurrentUser | null,
-    input: CreateLocalUserInput & { confirmSecret: string }
+    input: CreateLocalUserInput & { confirmSecret: string },
   ) => Promise<AuthProviderResult>;
   adminResetCredential: (
     users: OfflineUser[],
     actor: CurrentUser | null,
     userId: string,
     nextSecret: string,
-    confirmSecret: string
+    confirmSecret: string,
   ) => Promise<AuthProviderResult>;
   toggleUserActive: (
     users: OfflineUser[],
     actor: CurrentUser | null,
-    userId: string
+    userId: string,
   ) => AuthProviderResult;
   deleteUser: (
     users: OfflineUser[],
     actor: CurrentUser | null,
-    userId: string
+    userId: string,
   ) => AuthProviderResult;
 };
 
@@ -76,10 +72,7 @@ export const authProvider: AuthProvider = {
     await ensureSeedUsers();
 
     const users = loadOfflineUsers();
-    const currentUser = restoreCurrentUserFromSession(
-      users,
-      loadLocalAuthSession()
-    );
+    const currentUser = restoreCurrentUserFromSession(users, loadLocalAuthSession());
 
     return { users, currentUser };
   },
@@ -134,13 +127,7 @@ export const authProvider: AuthProvider = {
     };
   },
 
-  async changeOwnCredential(
-    users,
-    currentUser,
-    currentSecret,
-    nextSecret,
-    confirmSecret
-  ) {
+  async changeOwnCredential(users, currentUser, currentSecret, nextSecret, confirmSecret) {
     if (!currentUser) {
       return { ok: false, message: "No signed-in user." };
     }
@@ -181,14 +168,12 @@ export const authProvider: AuthProvider = {
             mustChangeCredential: false,
             updatedAt: new Date().toISOString(),
           }
-        : user
+        : user,
     );
 
     saveOfflineUsers(updatedUsers);
 
-    const refreshedUser = updatedUsers.find(
-      (user) => user.id === targetUser.id
-    );
+    const refreshedUser = updatedUsers.find((user) => user.id === targetUser.id);
 
     return {
       ok: true,
@@ -210,8 +195,7 @@ export const authProvider: AuthProvider = {
     const fullName = input.fullName.trim();
     const permissionLevel = input.permissionLevel;
     const role = input.role;
-    const credentialType =
-      permissionLevel === "admin" ? "password" : input.credentialType;
+    const credentialType = permissionLevel === "admin" ? "password" : input.credentialType;
 
     if (!username) {
       return { ok: false, message: "Username is required." };
@@ -300,7 +284,7 @@ export const authProvider: AuthProvider = {
             mustChangeCredential: true,
             updatedAt: new Date().toISOString(),
           }
-        : user
+        : user,
     );
 
     saveOfflineUsers(updatedUsers);
@@ -311,8 +295,7 @@ export const authProvider: AuthProvider = {
       ok: true,
       message: "Credential reset successfully. User must change it at next sign-in.",
       users: updatedUsers,
-      currentUser:
-        actor.id === userId && refreshedUser ? toCurrentUser(refreshedUser) : actor,
+      currentUser: actor.id === userId && refreshedUser ? toCurrentUser(refreshedUser) : actor,
     };
   },
 
@@ -352,7 +335,7 @@ export const authProvider: AuthProvider = {
             isActive: !user.isActive,
             updatedAt: new Date().toISOString(),
           }
-        : user
+        : user,
     );
 
     saveOfflineUsers(updatedUsers);

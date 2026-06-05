@@ -74,8 +74,7 @@ async function openDatabase(): Promise<IDBDatabase> {
     };
 
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () =>
-      reject(request.error ?? new Error("Failed to open IndexedDB."));
+    request.onerror = () => reject(request.error ?? new Error("Failed to open IndexedDB."));
   });
 
   return dbPromise;
@@ -88,9 +87,7 @@ export async function readLogs(userId: string): Promise<LogItem[]> {
   const records = (await requestToPromise(index.getAll(userId))) as LogRecord[];
   await transactionDone(tx);
 
-  return records
-    .map((record) => record.value)
-    .sort((a, b) => b.ts - a.ts);
+  return records.map((record) => record.value).sort((a, b) => b.ts - a.ts);
 }
 
 export async function writeLogs(userId: string, logs: LogItem[]): Promise<void> {
@@ -100,7 +97,7 @@ export async function writeLogs(userId: string, logs: LogItem[]): Promise<void> 
   const index = store.index("byUserId");
 
   const existingKeys = (await requestToPromise(
-    index.getAllKeys(IDBKeyRange.only(userId))
+    index.getAllKeys(IDBKeyRange.only(userId)),
   )) as IDBValidKey[];
 
   existingKeys.forEach((key) => {
@@ -126,7 +123,7 @@ export async function clearLogsForUser(userId: string): Promise<void> {
   const index = store.index("byUserId");
 
   const existingKeys = (await requestToPromise(
-    index.getAllKeys(IDBKeyRange.only(userId))
+    index.getAllKeys(IDBKeyRange.only(userId)),
   )) as IDBValidKey[];
 
   existingKeys.forEach((key) => {
@@ -139,18 +136,15 @@ export async function clearLogsForUser(userId: string): Promise<void> {
 export async function readSession(userId: string): Promise<ActiveSession | null> {
   const db = await openDatabase();
   const tx = db.transaction(SESSIONS_STORE, "readonly");
-  const record = (await requestToPromise(
-    tx.objectStore(SESSIONS_STORE).get(userId)
-  )) as SessionRecord | undefined;
+  const record = (await requestToPromise(tx.objectStore(SESSIONS_STORE).get(userId))) as
+    | SessionRecord
+    | undefined;
   await transactionDone(tx);
 
   return record?.value ?? null;
 }
 
-export async function writeSession(
-  userId: string,
-  session: ActiveSession
-): Promise<void> {
+export async function writeSession(userId: string, session: ActiveSession): Promise<void> {
   const db = await openDatabase();
   const tx = db.transaction(SESSIONS_STORE, "readwrite");
   const store = tx.objectStore(SESSIONS_STORE);
@@ -174,9 +168,9 @@ export async function clearSessionForUser(userId: string): Promise<void> {
 export async function readDraft(userId: string): Promise<DraftState | null> {
   const db = await openDatabase();
   const tx = db.transaction(DRAFTS_STORE, "readonly");
-  const record = (await requestToPromise(
-    tx.objectStore(DRAFTS_STORE).get(userId)
-  )) as DraftRecord | undefined;
+  const record = (await requestToPromise(tx.objectStore(DRAFTS_STORE).get(userId))) as
+    | DraftRecord
+    | undefined;
   await transactionDone(tx);
 
   return record?.value ?? null;

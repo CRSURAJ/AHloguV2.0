@@ -11,7 +11,7 @@ type SecurityPanelProps = {
   onSubmit: (
     currentSecret: string,
     nextSecret: string,
-    confirmSecret: string
+    confirmSecret: string,
   ) => Promise<{ ok: boolean; message: string }>;
 };
 

@@ -21,18 +21,16 @@ const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "ap-s
 
 const USERS_TABLE = process.env.USERS_TABLE;
 const JOBS_TABLE = process.env.JOBS_TABLE;
-const WORK_LOGS_TABLE = process.env.WORK_LOGS_TABLE; const WORKER_STATUS_TABLE = process.env.WORKER_STATUS_TABLE;
+const WORK_LOGS_TABLE = process.env.WORK_LOGS_TABLE;
+const WORKER_STATUS_TABLE = process.env.WORKER_STATUS_TABLE;
 const SYNC_EVENTS_TABLE = process.env.SYNC_EVENTS_TABLE;
 const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || process.env.USER_POOL_ID;
 
-const dynamo = DynamoDBDocumentClient.from(
-  new DynamoDBClient({ region: REGION }),
-  {
-    marshallOptions: {
-      removeUndefinedValues: true,
-    },
+const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }), {
+  marshallOptions: {
+    removeUndefinedValues: true,
   },
-);
+});
 
 const cognito = new CognitoIdentityProviderClient({ region: REGION });
 
@@ -58,9 +56,7 @@ function getRequest(event) {
 
 function getClaims(event) {
   return (
-    event.requestContext?.authorizer?.jwt?.claims ||
-    event.requestContext?.authorizer?.claims ||
-    {}
+    event.requestContext?.authorizer?.jwt?.claims || event.requestContext?.authorizer?.claims || {}
   );
 }
 
@@ -242,8 +238,6 @@ async function getMe(event) {
   });
 }
 
-
-
 const ALLOWED_USER_ROLES = new Set([
   "plumber",
   "electrician",
@@ -305,13 +299,15 @@ async function findDuplicateJobByJobId(tableName, jobId, ignoreJobRecordId = "")
     }),
   );
 
-  return (result.Items ?? []).find((job) => {
-    if (ignoreJobRecordId && String(job.id || "") === ignoreJobRecordId) {
-      return false;
-    }
+  return (
+    (result.Items ?? []).find((job) => {
+      if (ignoreJobRecordId && String(job.id || "") === ignoreJobRecordId) {
+        return false;
+      }
 
-    return normalizeJobIdForCompare(job.jobId) === normalizedJobId;
-  }) || null;
+      return normalizeJobIdForCompare(job.jobId) === normalizedJobId;
+    }) || null
+  );
 }
 
 function getJobLabel(job) {
@@ -339,10 +335,7 @@ async function createUser(event) {
   const isAdmin = requestedPermissionLevel === "admin";
   const temporaryPassword = cleanString(body.temporaryPassword || body.password);
 
-  if (
-    getUserPermissionLevel(profile.user) === "manager" &&
-    requestedPermissionLevel === "admin"
-  ) {
+  if (getUserPermissionLevel(profile.user) === "manager" && requestedPermissionLevel === "admin") {
     return json(403, {
       error: "Managers cannot create admin users.",
     });
@@ -536,9 +529,7 @@ async function updateUserActive(event, path) {
     });
   }
 
-  const cognitoUsername = cleanString(
-    existingResult.Item.email || existingResult.Item.username,
-  );
+  const cognitoUsername = cleanString(existingResult.Item.email || existingResult.Item.username);
 
   if (!cognitoUsername) {
     return json(400, {
@@ -628,7 +619,6 @@ async function updateUserActive(event, path) {
   });
 }
 
-
 async function resetUserPassword(event, path) {
   const profile = await requireAdminUser(event);
 
@@ -638,9 +628,7 @@ async function resetUserPassword(event, path) {
 
   const tableName = requireEnv("USERS_TABLE", USERS_TABLE);
   const userPoolId = requireEnv("COGNITO_USER_POOL_ID", COGNITO_USER_POOL_ID);
-  const id = decodeURIComponent(
-    path.replace("/users/", "").replace("/reset-password", ""),
-  );
+  const id = decodeURIComponent(path.replace("/users/", "").replace("/reset-password", ""));
   const body = parseBody(event);
   const temporaryPassword = cleanString(body.temporaryPassword || body.password);
 
@@ -687,9 +675,7 @@ async function resetUserPassword(event, path) {
     });
   }
 
-  const cognitoUsername = cleanString(
-    existingResult.Item.email || existingResult.Item.username,
-  );
+  const cognitoUsername = cleanString(existingResult.Item.email || existingResult.Item.username);
 
   if (!cognitoUsername) {
     return json(400, {
@@ -758,9 +744,7 @@ async function deleteUser(event, path) {
     });
   }
 
-  const cognitoUsername = cleanString(
-    existingResult.Item.email || existingResult.Item.username,
-  );
+  const cognitoUsername = cleanString(existingResult.Item.email || existingResult.Item.username);
 
   if (!cognitoUsername) {
     return json(400, {
@@ -827,7 +811,9 @@ async function listJobs(event) {
   );
 
   const jobs = (result.Items ?? []).sort((a, b) =>
-    String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")),
+    String(b.updatedAt || b.createdAt || "").localeCompare(
+      String(a.updatedAt || a.createdAt || ""),
+    ),
   );
 
   return json(200, jobs);
@@ -923,10 +909,7 @@ async function updateJob(event, path) {
     });
   }
 
-  if (
-    existingResult.Item.isArchived === true ||
-    existingResult.Item.isArchived === "true"
-  ) {
+  if (existingResult.Item.isArchived === true || existingResult.Item.isArchived === "true") {
     return json(400, {
       error: "Archived jobs cannot be edited.",
     });
@@ -975,7 +958,6 @@ async function updateJob(event, path) {
     job,
   });
 }
-
 
 async function archiveJob(event, path) {
   const profile = await requireFullAdminUser(event);
@@ -1204,12 +1186,8 @@ async function updateWorkLog(event, path) {
     role: cleanString(body.role),
     description: cleanString(body.description),
     location: cleanString(body.location),
-    workedMinutes: Number.isFinite(Number(body.workedMinutes))
-      ? Number(body.workedMinutes)
-      : 0,
-    breakMinutes: Number.isFinite(Number(body.breakMinutes))
-      ? Number(body.breakMinutes)
-      : 0,
+    workedMinutes: Number.isFinite(Number(body.workedMinutes)) ? Number(body.workedMinutes) : 0,
+    breakMinutes: Number.isFinite(Number(body.breakMinutes)) ? Number(body.breakMinutes) : 0,
     stickyNote: cleanString(body.stickyNote),
     isJobArchived: body.isJobArchived === true || body.isJobArchived === "true",
     jobArchivedAt: cleanString(body.jobArchivedAt),
@@ -1371,18 +1349,11 @@ async function uploadWorkLogsBulk(event) {
   });
 }
 
-
 function normalizeWorkerStatus(body, profile) {
   const now = new Date().toISOString();
   const status = cleanString(body.status) || "online";
 
-  const allowedStatuses = new Set([
-    "online",
-    "available",
-    "working",
-    "on_break",
-    "offline",
-  ]);
+  const allowedStatuses = new Set(["online", "available", "working", "on_break", "offline"]);
 
   return {
     userId: profile.user.id,
@@ -1397,9 +1368,7 @@ function normalizeWorkerStatus(body, profile) {
 
     startedAt: cleanString(body.startedAt),
     breakStartedAt: cleanString(body.breakStartedAt),
-    breakMinutes: Number.isFinite(Number(body.breakMinutes))
-      ? Number(body.breakMinutes)
-      : 0,
+    breakMinutes: Number.isFinite(Number(body.breakMinutes)) ? Number(body.breakMinutes) : 0,
 
     pendingSyncCount: Number.isFinite(Number(body.pendingSyncCount))
       ? Number(body.pendingSyncCount)
@@ -1434,10 +1403,7 @@ async function listWorkerStatus(event) {
   }
 
   const usersTableName = requireEnv("USERS_TABLE", USERS_TABLE);
-  const workerStatusTableName = requireEnv(
-    "WORKER_STATUS_TABLE",
-    WORKER_STATUS_TABLE,
-  );
+  const workerStatusTableName = requireEnv("WORKER_STATUS_TABLE", WORKER_STATUS_TABLE);
 
   const [usersResult, statusResult] = await Promise.all([
     dynamo.send(
@@ -1476,8 +1442,7 @@ async function listWorkerStatus(event) {
 
       const lastSeenAt = cleanString(statusItem?.lastSeenAt || statusItem?.updatedAt);
       const lastSeenMs = Date.parse(lastSeenAt);
-      const isStale =
-        !Number.isFinite(lastSeenMs) || nowMs - lastSeenMs > 15 * 60 * 1000;
+      const isStale = !Number.isFinite(lastSeenMs) || nowMs - lastSeenMs > 15 * 60 * 1000;
 
       const lastKnownStatus = cleanString(statusItem?.status) || "offline";
 
@@ -1492,43 +1457,25 @@ async function listWorkerStatus(event) {
       return {
         userId,
         fullName:
-          cleanString(statusItem?.fullName) ||
-          cleanString(user.fullName) ||
-          cleanString(user.name),
+          cleanString(statusItem?.fullName) || cleanString(user.fullName) || cleanString(user.name),
         email:
-          cleanString(statusItem?.email) ||
-          cleanString(user.email) ||
-          cleanString(user.username),
+          cleanString(statusItem?.email) || cleanString(user.email) || cleanString(user.username),
         role: cleanString(statusItem?.role) || cleanString(user.role) || "other",
         status: liveStatus,
         lastKnownStatus,
 
-        currentJobId:
-          isDeactivated || !statusItem ? "" : cleanString(statusItem.currentJobId),
-        currentJobName:
-          isDeactivated || !statusItem ? "" : cleanString(statusItem.currentJobName),
+        currentJobId: isDeactivated || !statusItem ? "" : cleanString(statusItem.currentJobId),
+        currentJobName: isDeactivated || !statusItem ? "" : cleanString(statusItem.currentJobName),
         currentJobLocation:
-          isDeactivated || !statusItem
-            ? ""
-            : cleanString(statusItem.currentJobLocation),
+          isDeactivated || !statusItem ? "" : cleanString(statusItem.currentJobLocation),
 
-        startedAt:
-          isDeactivated || !statusItem ? "" : cleanString(statusItem.startedAt),
-        breakStartedAt:
-          isDeactivated || !statusItem
-            ? ""
-            : cleanString(statusItem.breakStartedAt),
+        startedAt: isDeactivated || !statusItem ? "" : cleanString(statusItem.startedAt),
+        breakStartedAt: isDeactivated || !statusItem ? "" : cleanString(statusItem.breakStartedAt),
         breakMinutes: isDeactivated ? 0 : Number(statusItem?.breakMinutes || 0),
 
-        pendingSyncCount: isDeactivated
-          ? 0
-          : Number(statusItem?.pendingSyncCount || 0),
-        failedSyncCount: isDeactivated
-          ? 0
-          : Number(statusItem?.failedSyncCount || 0),
-        oldestPendingSyncAt: isDeactivated
-          ? ""
-          : cleanString(statusItem?.oldestPendingSyncAt),
+        pendingSyncCount: isDeactivated ? 0 : Number(statusItem?.pendingSyncCount || 0),
+        failedSyncCount: isDeactivated ? 0 : Number(statusItem?.failedSyncCount || 0),
+        oldestPendingSyncAt: isDeactivated ? "" : cleanString(statusItem?.oldestPendingSyncAt),
 
         lastSeenAt,
         updatedAt: cleanString(statusItem?.updatedAt),
@@ -1607,11 +1554,7 @@ export const handler = async (event) => {
       return listUsers(event);
     }
 
-    if (
-      method === "POST" &&
-      path.startsWith("/users/") &&
-      path.endsWith("/reset-password")
-    ) {
+    if (method === "POST" && path.startsWith("/users/") && path.endsWith("/reset-password")) {
       return resetUserPassword(event, path);
     }
 
@@ -1633,8 +1576,6 @@ export const handler = async (event) => {
     if (method === "POST" && path.startsWith("/jobs/") && path.endsWith("/archive")) {
       return archiveJob(event, path);
     }
-
-
 
     if (method === "PUT" && path.startsWith("/jobs/")) {
       return updateJob(event, path);
@@ -1659,8 +1600,8 @@ export const handler = async (event) => {
     }
 
     if (method === "DELETE" && path.startsWith("/work-logs/")) {
-  return deleteWorkLog(event, path);
-}
+      return deleteWorkLog(event, path);
+    }
 
     if (method === "POST" && path === "/work-logs") {
       return uploadWorkLog(event);

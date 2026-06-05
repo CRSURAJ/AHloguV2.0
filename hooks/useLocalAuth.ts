@@ -24,15 +24,15 @@ type UseLocalAuthReturn = {
   handleChangeOwnCredential: (
     currentSecret: string,
     nextSecret: string,
-    confirmSecret: string
+    confirmSecret: string,
   ) => Promise<AuthActionResult>;
   handleCreateUser: (
-    input: CreateLocalUserInput & { confirmSecret: string }
+    input: CreateLocalUserInput & { confirmSecret: string },
   ) => Promise<AuthActionResult>;
   handleAdminResetCredential: (
     userId: string,
     nextSecret: string,
-    confirmSecret: string
+    confirmSecret: string,
   ) => Promise<AuthActionResult>;
   handleToggleUserActive: (userId: string) => AuthActionResult;
   handleDeleteUser: (userId: string) => AuthActionResult;
@@ -67,7 +67,8 @@ export function useLocalAuth(): UseLocalAuthReturn {
     };
   }, []);
 
-  const canManageUsers = currentUser?.permissionLevel === "admin" || currentUser?.permissionLevel === "manager";
+  const canManageUsers =
+    currentUser?.permissionLevel === "admin" || currentUser?.permissionLevel === "manager";
 
   const securityLabel = useMemo(() => {
     if (!currentUser) return "Change Credential";
@@ -103,14 +104,14 @@ export function useLocalAuth(): UseLocalAuthReturn {
   async function handleChangeOwnCredential(
     currentSecret: string,
     nextSecret: string,
-    confirmSecret: string
+    confirmSecret: string,
   ): Promise<AuthActionResult> {
     const result = await authProvider.changeOwnCredential(
       users,
       currentUser,
       currentSecret,
       nextSecret,
-      confirmSecret
+      confirmSecret,
     );
 
     if (result.users) {
@@ -128,7 +129,7 @@ export function useLocalAuth(): UseLocalAuthReturn {
   }
 
   async function handleCreateUser(
-    input: CreateLocalUserInput & { confirmSecret: string }
+    input: CreateLocalUserInput & { confirmSecret: string },
   ): Promise<AuthActionResult> {
     const result = await authProvider.createUser(users, currentUser, input);
 
@@ -145,14 +146,14 @@ export function useLocalAuth(): UseLocalAuthReturn {
   async function handleAdminResetCredential(
     userId: string,
     nextSecret: string,
-    confirmSecret: string
+    confirmSecret: string,
   ): Promise<AuthActionResult> {
     const result = await authProvider.adminResetCredential(
       users,
       currentUser,
       userId,
       nextSecret,
-      confirmSecret
+      confirmSecret,
     );
 
     if (result.users) {

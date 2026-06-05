@@ -23,9 +23,7 @@ export type UpdateJobInput = Partial<CreateJobInput> & {
   jobDrawings?: Job["jobDrawings"];
 };
 
-const VALID_WORKER_ROLES = new Set<WorkerRole>(
-  WORKER_ROLE_OPTIONS.map((option) => option.value)
-);
+const VALID_WORKER_ROLES = new Set<WorkerRole>(WORKER_ROLE_OPTIONS.map((option) => option.value));
 
 function getCloud() {
   return getCloudProvider();
@@ -78,10 +76,7 @@ function stripJobDrawingsForCloud(job: Job): Job {
   };
 }
 
-function mergeCloudJobsWithLocalDrawings(
-  cloudJobs: Job[],
-  localJobs: Job[]
-): Job[] {
+function mergeCloudJobsWithLocalDrawings(cloudJobs: Job[], localJobs: Job[]): Job[] {
   return cloudJobs.map((cloudJob) => {
     const localJob = localJobs.find((job) => job.id === cloudJob.id);
 
@@ -105,7 +100,6 @@ async function loadLocalJobs(): Promise<Job[]> {
     .filter((job): job is Job => job !== null)
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 }
-
 
 function makeId(prefix: string): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -141,7 +135,7 @@ function cleanAssignedRoles(value: unknown): WorkerRole[] {
 
   return value.filter(
     (role): role is WorkerRole =>
-      typeof role === "string" && VALID_WORKER_ROLES.has(role as WorkerRole)
+      typeof role === "string" && VALID_WORKER_ROLES.has(role as WorkerRole),
   );
 }
 
@@ -200,10 +194,7 @@ type SaveJobsOptions = {
   notify?: boolean;
 };
 
-export async function saveJobs(
-  jobs: Job[],
-  options: SaveJobsOptions = {}
-): Promise<void> {
+export async function saveJobs(jobs: Job[], options: SaveJobsOptions = {}): Promise<void> {
   if (typeof window === "undefined") return;
 
   window.localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(jobs));
@@ -248,10 +239,7 @@ export async function createJob(input: CreateJobInput): Promise<Job> {
   return job;
 }
 
-export async function updateJob(
-  id: string,
-  updates: UpdateJobInput
-): Promise<Job | null> {
+export async function updateJob(id: string, updates: UpdateJobInput): Promise<Job | null> {
   const jobs = await loadJobs();
   const existingJob = jobs.find((job) => job.id === id);
 

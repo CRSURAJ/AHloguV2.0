@@ -24,10 +24,7 @@ export function minutesBetween(startIso: string, endIso: string): number {
   return Math.max(0, Math.round((end - start) / 60_000));
 }
 
-export function getWorkingStatusText(
-  isWorking: boolean,
-  isOnBreak: boolean
-): string {
+export function getWorkingStatusText(isWorking: boolean, isOnBreak: boolean): string {
   if (!isWorking) return "Ready";
   if (isOnBreak) return "On break";
 

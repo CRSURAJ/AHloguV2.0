@@ -71,11 +71,7 @@ export default function ActionButtons({
           Clear All
         </button>
 
-        <button
-          type="button"
-          className={styles.syncButton}
-          onClick={handleSync}
-        >
+        <button type="button" className={styles.syncButton} onClick={handleSync}>
           Sync
         </button>
 

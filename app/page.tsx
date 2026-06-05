@@ -39,7 +39,6 @@ type CreateAwsUserPayload = {
   confirmTemporaryPassword: string;
 };
 
-
 type AwsUserListItem = {
   id: string;
   email: string;
@@ -52,7 +51,6 @@ type AwsUserListItem = {
   createdAt: string;
   updatedAt: string;
 };
-
 
 const WORKER_ROLES: WorkerRole[] = [
   "plumber",
@@ -188,8 +186,7 @@ function convertProfileToCurrentUser(
   fallbackEmail: string,
   fallbackSub: string,
 ): CurrentUser {
-  const username =
-    getStringValue(profile, ["email", "username", "userName"]) || fallbackEmail;
+  const username = getStringValue(profile, ["email", "username", "userName"]) || fallbackEmail;
 
   const fullName =
     getStringValue(profile, ["fullName", "full_name", "name", "displayName"]) ||
@@ -197,22 +194,13 @@ function convertProfileToCurrentUser(
     fallbackEmail;
 
   const role = normalizeWorkerRole(
-    getStringValue(profile, [
-      "workerRole",
-      "worker_role",
-      "tradeRole",
-      "trade_role",
-      "role",
-    ]),
+    getStringValue(profile, ["workerRole", "worker_role", "tradeRole", "trade_role", "role"]),
   );
 
   const credentialType: CredentialType = "password";
 
   return {
-    id:
-      getStringValue(profile, ["id", "userId", "user_id", "sub"]) ||
-      fallbackSub ||
-      username,
+    id: getStringValue(profile, ["id", "userId", "user_id", "sub"]) || fallbackSub || username,
     username,
     fullName,
     permissionLevel: normalizePermissionLevel(profile),
@@ -223,8 +211,7 @@ function convertProfileToCurrentUser(
 }
 
 function normalizeLoginErrorMessage(error: unknown): string {
-  const rawMessage =
-    error instanceof Error ? error.message : "Sign in failed.";
+  const rawMessage = error instanceof Error ? error.message : "Sign in failed.";
 
   const value = rawMessage.toLowerCase();
 
@@ -256,7 +243,6 @@ function getApiBaseUrl(): string {
 
   return apiBaseUrl.replace(/\/$/, "");
 }
-
 
 async function fetchAwsUsersFromCloud(): Promise<AwsUserListItem[]> {
   const session = await getCurrentCognitoSession();
@@ -337,9 +323,7 @@ async function fetchCurrentUserFromCloud(
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      errorText || `Could not load AHlogu user profile. Status ${response.status}.`,
-    );
+    throw new Error(errorText || `Could not load AHlogu user profile. Status ${response.status}.`);
   }
 
   const responseJson = (await response.json()) as unknown;
@@ -457,10 +441,7 @@ function CognitoLoginCard({
         </div>
 
         {message ? (
-          <div
-            key={message}
-            style={{ animation: "loginMessageShake 0.38s ease-in-out" }}
-          >
+          <div key={message} style={{ animation: "loginMessageShake 0.38s ease-in-out" }}>
             <FeedbackMessage message={message} />
           </div>
         ) : null}
@@ -539,9 +520,7 @@ function CognitoLoginCard({
               <input
                 type="password"
                 value={confirmNewPassword}
-                onChange={(event) =>
-                  onConfirmNewPasswordChange(event.target.value)
-                }
+                onChange={(event) => onConfirmNewPasswordChange(event.target.value)}
                 autoComplete="new-password"
                 required
                 style={inputStyle}
@@ -567,11 +546,7 @@ function CognitoLoginCard({
             cursor: isBusy ? "not-allowed" : "pointer",
           }}
         >
-          {isBusy
-            ? "Please wait…"
-            : requiresNewPassword
-              ? "Set new password"
-              : "Sign In"}
+          {isBusy ? "Please wait…" : requiresNewPassword ? "Set new password" : "Sign In"}
         </button>
       </form>
     </main>
@@ -587,8 +562,9 @@ export default function Page() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [message, setMessage] = useState("");
-  const [newPasswordUser, setNewPasswordUser] =
-    useState<NonNullable<CognitoSignInResult["cognitoUser"]> | null>(null);
+  const [newPasswordUser, setNewPasswordUser] = useState<NonNullable<
+    CognitoSignInResult["cognitoUser"]
+  > | null>(null);
   const [accountMessage, setAccountMessage] = useState("");
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [currentPasswordInput, setCurrentPasswordInput] = useState("");
@@ -632,11 +608,7 @@ export default function Page() {
         signOutCognito();
 
         if (isMounted) {
-          setMessage(
-            error instanceof Error
-              ? error.message
-              : "Could not restore your session.",
-          );
+          setMessage(error instanceof Error ? error.message : "Could not restore your session.");
         }
       } finally {
         if (isMounted) {
@@ -671,10 +643,7 @@ export default function Page() {
 
     try {
       if (newPasswordUser) {
-        const passwordPolicyError = getPasswordPolicyError(
-          newPassword,
-          "New password",
-        );
+        const passwordPolicyError = getPasswordPolicyError(newPassword, "New password");
 
         if (passwordPolicyError) {
           setMessage(passwordPolicyError);
@@ -686,10 +655,7 @@ export default function Page() {
           return;
         }
 
-        const session = await completeNewCognitoPassword(
-          newPasswordUser,
-          newPassword,
-        );
+        const session = await completeNewCognitoPassword(newPasswordUser, newPassword);
 
         await finishSignIn(session);
         return;
@@ -733,17 +699,13 @@ export default function Page() {
       const users = await fetchAwsUsersFromCloud();
       setAwsUsers(users);
     } catch (error) {
-      setUsersMessage(
-        error instanceof Error ? error.message : "Could not load Users.",
-      );
+      setUsersMessage(error instanceof Error ? error.message : "Could not load Users.");
     } finally {
       setUsersLoading(false);
     }
   }
 
-  async function handleCreateAwsUser(
-    input: CreateAwsUserPayload,
-  ): Promise<AuthActionResult> {
+  async function handleCreateAwsUser(input: CreateAwsUserPayload): Promise<AuthActionResult> {
     setUsersMessage("");
 
     if (input.temporaryPassword !== input.confirmTemporaryPassword) {
@@ -814,8 +776,7 @@ export default function Page() {
     } catch (error) {
       return {
         ok: false,
-        message:
-          error instanceof Error ? error.message : "Could not create User.",
+        message: error instanceof Error ? error.message : "Could not create User.",
       };
     }
   }
@@ -872,15 +833,12 @@ export default function Page() {
 
       return {
         ok: true,
-        message: isActive
-          ? "User activated."
-          : "User deactivated.",
+        message: isActive ? "User activated." : "User deactivated.",
       };
     } catch (error) {
       return {
         ok: false,
-        message:
-          error instanceof Error ? error.message : "Could not update user.",
+        message: error instanceof Error ? error.message : "Could not update user.",
       };
     }
   }
@@ -898,10 +856,7 @@ export default function Page() {
       };
     }
 
-    const passwordPolicyError = getPasswordPolicyError(
-      temporaryPassword,
-      "Temporary password",
-    );
+    const passwordPolicyError = getPasswordPolicyError(temporaryPassword, "Temporary password");
 
     if (passwordPolicyError) {
       return {
@@ -949,14 +904,12 @@ export default function Page() {
 
       return {
         ok: true,
-        message:
-          "Temporary password set. The user must set a new password on next sign-in.",
+        message: "Temporary password set. The user must set a new password on next sign-in.",
       };
     } catch (error) {
       return {
         ok: false,
-        message:
-          error instanceof Error ? error.message : "Could not reset password.",
+        message: error instanceof Error ? error.message : "Could not reset password.",
       };
     }
   }
@@ -1012,8 +965,7 @@ export default function Page() {
     } catch (error) {
       return {
         ok: false,
-        message:
-          error instanceof Error ? error.message : "Could not delete user.",
+        message: error instanceof Error ? error.message : "Could not delete user.",
       };
     }
   }
@@ -1050,18 +1002,14 @@ export default function Page() {
 
     try {
       try {
-        const verificationResult = await signInWithCognito(
-          signInIdentifier,
-          currentPasswordValue,
-        );
+        const verificationResult = await signInWithCognito(signInIdentifier, currentPasswordValue);
 
         if (!verificationResult.session) {
           setAccountMessage("Incorrect Current Password.");
           return;
         }
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Incorrect password.";
+        const errorMessage = error instanceof Error ? error.message : "Incorrect password.";
 
         setAccountMessage(
           errorMessage.includes("Attempt limit exceeded")
@@ -1071,10 +1019,7 @@ export default function Page() {
         return;
       }
 
-      const passwordPolicyError = getPasswordPolicyError(
-        newPasswordValue,
-        "New password",
-      );
+      const passwordPolicyError = getPasswordPolicyError(newPasswordValue, "New password");
 
       if (passwordPolicyError) {
         setAccountMessage(passwordPolicyError);
@@ -1093,8 +1038,7 @@ export default function Page() {
       setChangePasswordOpen(false);
       setAccountMessage("Password changed successfully.");
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Could not change password.";
+      const errorMessage = error instanceof Error ? error.message : "Could not change password.";
 
       setAccountMessage(
         errorMessage === "Incorrect username or password."
@@ -1232,11 +1176,9 @@ export default function Page() {
             >
               <h2 style={{ marginTop: 0 }}>Change Password</h2>
 
-            <PasswordRequirementsNote />
+              <PasswordRequirementsNote />
 
-              {accountMessage ? (
-                              <FeedbackMessage message={accountMessage} />
-              ) : null}
+              {accountMessage ? <FeedbackMessage message={accountMessage} /> : null}
 
               <label
                 style={{
@@ -1357,7 +1299,6 @@ export default function Page() {
           </div>
         ) : null}
 
-
         {userManagementOpen ? (
           <UserManagementPanel
             users={awsUsers}
@@ -1374,15 +1315,19 @@ export default function Page() {
         ) : null}
 
         {workLogsOpen ? (
-        <AdminWorkLogsPanel onClose={() => setWorkLogsOpen(false)} currentPermissionLevel={currentUser?.permissionLevel ?? "worker"} />
-      ) : null}
+          <AdminWorkLogsPanel
+            onClose={() => setWorkLogsOpen(false)}
+            currentPermissionLevel={currentUser?.permissionLevel ?? "worker"}
+          />
+        ) : null}
 
-      {workerStatusOpen ? (
-        <WorkerStatusPanel onClose={() => setWorkerStatusOpen(false)} />
-      ) : null}
+        {workerStatusOpen ? <WorkerStatusPanel onClose={() => setWorkerStatusOpen(false)} /> : null}
 
-      {jobManagementOpen ? (
-          <JobManagementPanel onClose={() => setJobManagementOpen(false)} currentPermissionLevel={currentUser?.permissionLevel ?? "worker"} />
+        {jobManagementOpen ? (
+          <JobManagementPanel
+            onClose={() => setJobManagementOpen(false)}
+            currentPermissionLevel={currentUser?.permissionLevel ?? "worker"}
+          />
         ) : null}
       </>
     );
@@ -1434,7 +1379,7 @@ export default function Page() {
                 value={currentPasswordInput}
                 onChange={(event) => setCurrentPasswordInput(event.target.value)}
                 autoComplete="current-password"
-                  required
+                required
                 style={{
                   width: "100%",
                   border: "1px solid rgba(255,255,255,0.14)",
@@ -1461,7 +1406,7 @@ export default function Page() {
                 value={newPasswordInput}
                 onChange={(event) => setNewPasswordInput(event.target.value)}
                 autoComplete="new-password"
-                  required
+                required
                 style={{
                   width: "100%",
                   border: "1px solid rgba(255,255,255,0.14)",
@@ -1488,7 +1433,7 @@ export default function Page() {
                 value={confirmPasswordInput}
                 onChange={(event) => setConfirmPasswordInput(event.target.value)}
                 autoComplete="new-password"
-                  required
+                required
                 style={{
                   width: "100%",
                   border: "1px solid rgba(255,255,255,0.14)",

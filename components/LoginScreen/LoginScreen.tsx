@@ -32,9 +32,7 @@ export default function LoginScreen({
             className={styles.logo}
             priority
           />
-          <p className={styles.subtitle}>
-            Please Login to continue.
-          </p>
+          <p className={styles.subtitle}>Please Login to continue.</p>
         </div>
 
         {authMessage ? <div className={styles.message}>{authMessage}</div> : null}
@@ -82,12 +80,8 @@ export default function LoginScreen({
 
         <div className={styles.helpCard}>
           <div className={styles.helpTitle}>Forgot your credential?</div>
-          <div className={styles.helpText}>
-            Ask the device admin to reset your PIN or password.
-          </div>
+          <div className={styles.helpText}>Ask the device admin to reset your PIN or password.</div>
         </div>
-
-        
       </div>
     </div>
   );

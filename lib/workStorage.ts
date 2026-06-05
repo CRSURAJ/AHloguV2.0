@@ -23,12 +23,7 @@ function getStorageKeys(userId: string) {
 }
 
 function safeStatus(value: unknown): SyncStatus {
-  if (
-    value === "pending" ||
-    value === "syncing" ||
-    value === "synced" ||
-    value === "failed"
-  ) {
+  if (value === "pending" || value === "syncing" || value === "synced" || value === "failed") {
     return value;
   }
 
@@ -49,8 +44,8 @@ function normalizeLog(item: Partial<LogItem>, index: number): LogItem {
       typeof item.id === "string"
         ? item.id
         : typeof item.id === "number"
-        ? String(item.id)
-        : makeFallbackId(index),
+          ? String(item.id)
+          : makeFallbackId(index),
     loguId:
       typeof item.loguId === "string" && item.loguId.trim() !== ""
         ? item.loguId
@@ -68,8 +63,7 @@ function normalizeLog(item: Partial<LogItem>, index: number): LogItem {
     breakMinutes: typeof item.breakMinutes === "number" ? item.breakMinutes : 0,
     workedMinutes: typeof item.workedMinutes === "number" ? item.workedMinutes : 0,
     syncStatus: safeStatus(item.syncStatus),
-    syncMessage:
-      typeof item.syncMessage === "string" ? item.syncMessage : "Waiting to sync",
+    syncMessage: typeof item.syncMessage === "string" ? item.syncMessage : "Waiting to sync",
   };
 }
 
@@ -78,8 +72,7 @@ function normalizeSession(item: Partial<ActiveSession>): ActiveSession {
     isWorking: item.isWorking === true,
     isOnBreak: item.isOnBreak === true,
     startTime: typeof item.startTime === "string" ? item.startTime : null,
-    breakStartTime:
-      typeof item.breakStartTime === "string" ? item.breakStartTime : null,
+    breakStartTime: typeof item.breakStartTime === "string" ? item.breakStartTime : null,
     breakMinutes: typeof item.breakMinutes === "number" ? item.breakMinutes : 0,
     jobId: typeof item.jobId === "string" ? item.jobId : "",
     location: typeof item.location === "string" ? item.location : "",
@@ -249,10 +242,7 @@ export async function loadSession(userId: string): Promise<ActiveSession | null>
   }
 }
 
-export async function saveSession(
-  userId: string,
-  session: ActiveSession
-): Promise<void> {
+export async function saveSession(userId: string, session: ActiveSession): Promise<void> {
   if (typeof window === "undefined") return;
 
   if (!isIndexedDbAvailable()) {
