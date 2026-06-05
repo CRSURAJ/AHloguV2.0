@@ -78,6 +78,7 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
                 width={160}
                 height={48}
                 className={styles.logoImage}
+                style={{ width: "160px", height: "auto" }}
                 priority
               />
             </div>

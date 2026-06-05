@@ -92,6 +92,7 @@ export default function AdminDashboard({
                 width={160}
                 height={48}
                 className={workerStyles.logoImage}
+                style={{ width: "160px", height: "auto" }}
                 priority
               />
             </div>
