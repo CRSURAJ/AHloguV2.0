@@ -4,8 +4,7 @@ export type SyncQueueAction =
   | "job.create"
   | "job.update"
   | "job.delete"
-  | "workLog.upload"
-  | "drawing.upload";
+  | "workLog.upload";
 
 export type SyncQueueStatus = "pending" | "syncing" | "failed";
 

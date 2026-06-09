@@ -91,13 +91,11 @@ export type LogItem = {
   syncedAt?: number;
 };
 
-export type JobDrawing = {
+export type JobDocumentLink = {
   id: string;
-  fileName: string;
-  fileData: string;
-  mimeType: string;
-  sizeBytes: number;
-  uploadedAt: string;
+  title: string;
+  url: string;
+  addedAt: string;
 };
 
 export type Job = {
@@ -110,7 +108,7 @@ export type Job = {
   location: string;
   description: string;
   assignedRoles: WorkerRole[];
-  jobDrawings: JobDrawing[];
+  jobDocumentLinks: JobDocumentLink[];
   isActive: boolean;
   isArchived?: boolean;
   archivedAt?: string;

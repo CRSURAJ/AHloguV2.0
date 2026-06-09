@@ -8,19 +8,14 @@ import { WORKER_ROLE_OPTIONS } from "@/types/work";
 import type { Job, PermissionLevel, WorkerRole } from "@/types/work";
 
 import {
-  formatBytes,
-  getAcceptedJobDrawingFiles,
   getArchiveJobConfirmationMessage,
   getDeleteJobConfirmationMessage,
-  getJobDrawingUploadMessage,
+  getInvalidJobDocumentLinkMessage,
+  getJobDocumentLinkAddedMessage,
   getJobTitle,
-  getNoAcceptedJobDrawingMessage,
-  getNoJobDrawingSlotsMessage,
-  getRemainingJobDrawingSlots,
   isDuplicateJobIdMessage,
-  MAX_JOB_DRAWING_SIZE_BYTES,
-  MAX_JOB_DRAWINGS,
-  readJobDrawingFile,
+  isValidJobDocumentUrl,
+  makeJobDocumentLink,
 } from "./jobManagementHelpers";
 
 import JobCard from "./JobCard";
@@ -41,7 +36,7 @@ type JobFormState = {
   location: string;
   description: string;
   assignedRoles: WorkerRole[];
-  jobDrawings: Job["jobDrawings"];
+  jobDocumentLinks: Job["jobDocumentLinks"];
   isActive: boolean;
 };
 
@@ -56,7 +51,7 @@ const EMPTY_FORM: JobFormState = {
   location: "",
   description: "",
   assignedRoles: [],
-  jobDrawings: [],
+  jobDocumentLinks: [],
   isActive: true,
 };
 
@@ -81,7 +76,10 @@ export default function JobManagementPanel({
 
   const [form, setForm] = useState<JobFormState>(EMPTY_FORM);
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
-  const [jobDrawingMessage, setJobDrawingMessage] = useState("");
+  const [jobDocumentTitle, setJobDocumentTitle] = useState("");
+  const [jobDocumentUrl, setJobDocumentUrl] = useState("");
+  const [jobDocumentMessage, setJobDocumentMessage] = useState("");
+  const [isJobDocumentDialogOpen, setIsJobDocumentDialogOpen] = useState(false);
   const [jobFormMessage, setJobFormMessage] = useState("");
   const [jobErrorField, setJobErrorField] = useState<JobFormField | "">("");
   const [jobShakeField, setJobShakeField] = useState<JobFormField | "">("");
@@ -171,7 +169,7 @@ export default function JobManagementPanel({
     }));
 
     if (jobMessage) clearJobMessage();
-    if (jobDrawingMessage) setJobDrawingMessage("");
+    if (jobDocumentMessage) setJobDocumentMessage("");
     clearJobFormError(field as JobFormField);
   }
 
@@ -188,7 +186,7 @@ export default function JobManagementPanel({
     });
 
     if (jobMessage) clearJobMessage();
-    if (jobDrawingMessage) setJobDrawingMessage("");
+    if (jobDocumentMessage) setJobDocumentMessage("");
     clearJobFormError("assignedRoles");
   }
 
@@ -205,7 +203,10 @@ export default function JobManagementPanel({
   function resetForm(): void {
     setForm(EMPTY_FORM);
     setEditingJobId(null);
-    setJobDrawingMessage("");
+    setJobDocumentTitle("");
+    setJobDocumentUrl("");
+    setJobDocumentMessage("");
+    setIsJobDocumentDialogOpen(false);
     setJobFormMessage("");
     setJobErrorField("");
     setJobShakeField("");
@@ -222,55 +223,49 @@ export default function JobManagementPanel({
       location: job.location,
       description: job.description,
       assignedRoles: job.assignedRoles,
-      jobDrawings: job.jobDrawings,
+      jobDocumentLinks: job.jobDocumentLinks ?? [],
       isActive: job.isActive,
     });
 
     if (jobMessage) clearJobMessage();
-    if (jobDrawingMessage) setJobDrawingMessage("");
+    if (jobDocumentMessage) setJobDocumentMessage("");
     if (jobFormMessage) setJobFormMessage("");
     setJobErrorField("");
     setJobShakeField("");
     focusJobFormCard();
   }
 
-  async function handleJobDrawingsUpload(files: FileList | null): Promise<void> {
-    if (!files || files.length === 0) return;
+  function addJobDocumentLink(): void {
+    const title = jobDocumentTitle.trim();
+    const url = jobDocumentUrl.trim();
 
-    const selectedFiles = Array.from(files);
-    const remainingSlots = getRemainingJobDrawingSlots(form.jobDrawings.length);
-
-    if (remainingSlots <= 0) {
-      setJobDrawingMessage(getNoJobDrawingSlotsMessage());
+    if (!title || !isValidJobDocumentUrl(url)) {
+      setJobDocumentMessage(getInvalidJobDocumentLinkMessage());
       return;
     }
 
-    const acceptedFiles = getAcceptedJobDrawingFiles(selectedFiles, remainingSlots);
-
-    if (acceptedFiles.length === 0) {
-      setJobDrawingMessage(getNoAcceptedJobDrawingMessage());
-      return;
-    }
-
-    const newDocs = await Promise.all(acceptedFiles.map(readJobDrawingFile));
+    const newDoc = makeJobDocumentLink(title, url);
 
     setForm((current) => ({
       ...current,
-      jobDrawings: [...current.jobDrawings, ...newDocs],
+      jobDocumentLinks: [...current.jobDocumentLinks, newDoc],
     }));
 
-    const rejectedCount = selectedFiles.length - acceptedFiles.length;
+    setJobDocumentTitle("");
+    setJobDocumentUrl("");
+    setJobDocumentMessage(getJobDocumentLinkAddedMessage(title));
+    setIsJobDocumentDialogOpen(false);
 
-    setJobDrawingMessage(getJobDrawingUploadMessage(newDocs.length, rejectedCount));
+    if (jobMessage) clearJobMessage();
   }
 
-  function removeJobDrawing(docId: string): void {
+  function removeJobDocumentLink(docId: string): void {
     setForm((current) => ({
       ...current,
-      jobDrawings: current.jobDrawings.filter((doc) => doc.id !== docId),
+      jobDocumentLinks: current.jobDocumentLinks.filter((doc) => doc.id !== docId),
     }));
 
-    setJobDrawingMessage("");
+    setJobDocumentMessage("");
   }
 
   function focusJobFeedbackMessage(): void {
@@ -391,7 +386,7 @@ export default function JobManagementPanel({
             <h2>Job Management</h2>
             <p className={styles.subtitle}>
               Create jobs and assign them to worker roles. Jobs are stored in AWS and cached locally
-              for offline viewing. Job drawings remain local-only until S3 is added.
+              for offline viewing. Job document links are saved with the job and can open OneDrive or SharePoint documents.
             </p>
           </div>
 
@@ -408,7 +403,7 @@ export default function JobManagementPanel({
 
         <div ref={jobFeedbackRef} tabIndex={-1} className={styles.feedbackFocusTarget}>
           <FeedbackMessage message={jobFormMessage || jobMessage} />
-          <FeedbackMessage message={jobDrawingMessage} />
+          <FeedbackMessage message={jobDocumentMessage} />
         </div>
 
         <div ref={jobFormCardRef} tabIndex={-1} className={styles.card}>
@@ -481,43 +476,108 @@ export default function JobManagementPanel({
             <div className={styles.docsField}>
               <span className={styles.docsLabel}>Job Drawings</span>
 
-              <label className={styles.fileUploadBox}>
-                <input
-                  className={styles.fileInput}
-                  type="file"
-                  multiple
-                  onChange={(event) => {
-                    void handleJobDrawingsUpload(event.currentTarget.files);
-                    event.currentTarget.value = "";
-                  }}
-                />
-                <span>Upload job drawings</span>
-              </label>
+              <button
+                className={styles.addDrawingButton}
+                type="button"
+                onClick={() => {
+                  setJobDocumentMessage("");
+                  setIsJobDocumentDialogOpen(true);
+                }}
+              >
+                + Add drawings
+              </button>
 
               <span className={styles.docsHelp}>
-                Max {MAX_JOB_DRAWINGS} files, {formatBytes(MAX_JOB_DRAWING_SIZE_BYTES)} each.
+                Add OneDrive or SharePoint drawing links without uploading files.
               </span>
             </div>
           </div>
 
-          {form.jobDrawings.length > 0 ? (
+          {form.jobDocumentLinks.length > 0 ? (
             <div className={styles.docList}>
-              {form.jobDrawings.map((doc) => (
+              {form.jobDocumentLinks.map((doc) => (
                 <div className={styles.docItem} key={doc.id}>
                   <div className={styles.docInfo}>
-                    <span className={styles.docName}>{doc.fileName}</span>
-                    <span className={styles.docSize}>{formatBytes(doc.sizeBytes)}</span>
+                    <span className={styles.docName}>{doc.title}</span>
+                    <a href={doc.url} target="_blank" rel="noreferrer">
+                      Open document
+                    </a>
                   </div>
 
                   <button
                     className={styles.removeDocButton}
                     type="button"
-                    onClick={() => removeJobDrawing(doc.id)}
+                    onClick={() => removeJobDocumentLink(doc.id)}
                   >
                     Remove
                   </button>
                 </div>
               ))}
+            </div>
+          ) : null}
+
+          {isJobDocumentDialogOpen ? (
+            <div className={styles.modalBackdrop}>
+              <form
+                className={styles.modalCard}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  addJobDocumentLink();
+                }}
+              >
+                <h2 className={styles.modalTitle}>Add Drawing</h2>
+
+                <p className={styles.modalDescription}>
+                  Add a OneDrive or SharePoint drawing link. AHlogu stores the link only.
+                </p>
+
+                <FeedbackMessage message={jobDocumentMessage} />
+
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Document Title</span>
+                  <input
+                    className={styles.modalInput}
+                    autoFocus
+                    value={jobDocumentTitle}
+                    onChange={(event) => {
+                      setJobDocumentTitle(event.target.value);
+                      if (jobDocumentMessage) setJobDocumentMessage("");
+                    }}
+                    placeholder="Mechanical drawing"
+                  />
+                </label>
+
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Document Link</span>
+                  <input
+                    className={styles.modalInput}
+                    type="url"
+                    value={jobDocumentUrl}
+                    onChange={(event) => {
+                      setJobDocumentUrl(event.target.value);
+                      if (jobDocumentMessage) setJobDocumentMessage("");
+                    }}
+                    placeholder="https://..."
+                  />
+                </label>
+
+                <div className={styles.modalActions}>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => {
+                      setJobDocumentMessage("");
+                      setIsJobDocumentDialogOpen(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+                  <button type="submit" className={styles.primaryButton}>
+                    Add Drawing
+                  </button>
+                </div>
+              </form>
             </div>
           ) : null}
 

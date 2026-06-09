@@ -98,14 +98,6 @@ async function processSyncQueueItem(item: SyncQueueItem): Promise<CloudSyncResul
       return cloud.workLogs.upload(item.payload);
     }
 
-    case "drawing.upload": {
-      return {
-        ok: false,
-        message:
-          "Drawing queue processing is not enabled yet. Files need cloud storage handling first.",
-      };
-    }
-
     default: {
       return {
         ok: false,

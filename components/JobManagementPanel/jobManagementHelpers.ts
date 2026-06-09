@@ -1,8 +1,5 @@
 import { WORKER_ROLE_OPTIONS } from "@/types/work";
-import type { Job, JobDrawing, WorkerRole } from "@/types/work";
-
-export const MAX_JOB_DRAWINGS = 5;
-export const MAX_JOB_DRAWING_SIZE_BYTES = 2 * 1024 * 1024;
+import type { Job, JobDocumentLink, WorkerRole } from "@/types/work";
 
 function makeClientId(prefix: string): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -12,41 +9,34 @@ function makeClientId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export function formatBytes(sizeBytes: number): string {
-  if (sizeBytes < 1024) return `${sizeBytes} B`;
+export function isValidJobDocumentUrl(url: string): boolean {
+  const value = url.trim();
 
-  const sizeKb = sizeBytes / 1024;
-  if (sizeKb < 1024) return `${sizeKb.toFixed(1)} KB`;
+  if (!value) return false;
 
-  return `${(sizeKb / 1024).toFixed(1)} MB`;
+  try {
+    const parsedUrl = new URL(value);
+    return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
-export function readJobDrawingFile(file: File): Promise<JobDrawing> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
+export function makeJobDocumentLink(title: string, url: string): JobDocumentLink {
+  return {
+    id: makeClientId("job-doc-link"),
+    title: title.trim(),
+    url: url.trim(),
+    addedAt: new Date().toISOString(),
+  };
+}
 
-    reader.addEventListener("load", () => {
-      if (typeof reader.result !== "string") {
-        reject(new Error("Could not read file."));
-        return;
-      }
+export function getJobDocumentLinkAddedMessage(title: string): string {
+  return `Added job document link: ${title.trim()}.`;
+}
 
-      resolve({
-        id: makeClientId("job-doc"),
-        fileName: file.name,
-        fileData: reader.result,
-        mimeType: file.type || "application/octet-stream",
-        sizeBytes: file.size,
-        uploadedAt: new Date().toISOString(),
-      });
-    });
-
-    reader.addEventListener("error", () => {
-      reject(new Error("Could not read file."));
-    });
-
-    reader.readAsDataURL(file);
-  });
+export function getInvalidJobDocumentLinkMessage(): string {
+  return "Enter a document title and a valid http/https link.";
 }
 
 export function getRoleLabel(role: WorkerRole): string {
@@ -80,26 +70,3 @@ export function getDeleteJobConfirmationMessage(job: Job): string {
   return `Delete ${getJobTitle(job)}? This cannot be undone.`;
 }
 
-export function getRemainingJobDrawingSlots(currentDrawingCount: number): number {
-  return MAX_JOB_DRAWINGS - currentDrawingCount;
-}
-
-export function getAcceptedJobDrawingFiles(files: File[], remainingSlots: number): File[] {
-  return files.filter((file) => file.size <= MAX_JOB_DRAWING_SIZE_BYTES).slice(0, remainingSlots);
-}
-
-export function getNoJobDrawingSlotsMessage(): string {
-  return `Maximum ${MAX_JOB_DRAWINGS} job drawings can be attached to one job.`;
-}
-
-export function getNoAcceptedJobDrawingMessage(): string {
-  return `No files added. Each job drawing must be ${formatBytes(
-    MAX_JOB_DRAWING_SIZE_BYTES,
-  )} or smaller.`;
-}
-
-export function getJobDrawingUploadMessage(addedCount: number, rejectedCount: number): string {
-  return rejectedCount > 0
-    ? `Added ${addedCount} job drawing(s). ${rejectedCount} file(s) were skipped due to size/count limit.`
-    : `Added ${addedCount} job drawing(s).`;
-}

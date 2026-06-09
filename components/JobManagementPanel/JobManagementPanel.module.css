@@ -608,3 +608,95 @@
 .card {
   scroll-margin-top: 24px;
 }
+
+.addDrawingButton {
+  border: none;
+  border-radius: 999px;
+  background: #11302d;
+  color: #ffffff;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+  width: fit-content;
+  box-shadow: 0 10px 22px rgba(17, 48, 45, 0.18);
+}
+
+.addDrawingButton:hover {
+  background: #085153;
+}
+
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(8px);
+}
+
+.modalCard {
+  width: min(460px, 100%);
+  border-radius: 24px;
+  padding: 24px;
+  background: #11302d;
+  color: #eef7f3;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
+}
+
+.modalTitle {
+  margin: 0 0 12px;
+  color: #d9cdc7;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.modalDescription {
+  margin: 0 0 16px;
+  color: rgba(238, 247, 243, 0.72);
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.modalField {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.modalLabel {
+  color: #d9cdc7;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.modalInput {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #eef7f3;
+  padding: 12px 14px;
+  font-size: 15px;
+  outline: none;
+}
+
+.modalInput:focus {
+  border-color: #53bc7b;
+  box-shadow: 0 0 0 3px rgba(83, 188, 123, 0.18);
+}
+
+.modalInput::placeholder {
+  color: rgba(238, 247, 243, 0.46);
+}

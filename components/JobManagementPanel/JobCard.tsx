@@ -2,7 +2,7 @@
 
 import type { Job } from "@/types/work";
 
-import { formatBytes, formatRoleList, getJobTitle } from "./jobManagementHelpers";
+import { formatRoleList, getJobTitle } from "./jobManagementHelpers";
 import styles from "./JobManagementPanel.module.css";
 
 type JobCardProps = {
@@ -22,6 +22,8 @@ export default function JobCard({
   onArchive,
   onDelete,
 }: JobCardProps) {
+  const jobDocumentLinks = job.jobDocumentLinks ?? [];
+
   return (
     <article className={styles.jobItem}>
       <div className={styles.jobTopLine}>
@@ -39,26 +41,29 @@ export default function JobCard({
 
       <p className={styles.jobMeta}>
         {job.customerName || "No customer / site"} ·{" "}
-        {job.jobDrawings.length === 0 ? "No job drawings" : `${job.jobDrawings.length} job doc(s)`}
+        {jobDocumentLinks.length === 0
+          ? "No job documents"
+          : `${jobDocumentLinks.length} job document link(s)`}
       </p>
 
       <p className={styles.jobRoles}>Assigned to: {formatRoleList(job.assignedRoles)}</p>
 
       {job.description ? <p className={styles.jobDescription}>{job.description}</p> : null}
 
-      {job.jobDrawings.length > 0 ? (
+      {jobDocumentLinks.length > 0 ? (
         <div className={styles.savedDocs}>
-          <p className={styles.savedDocsTitle}>Job Drawings</p>
+          <p className={styles.savedDocsTitle}>Job Documents / Drawings</p>
 
           <div className={styles.savedDocsList}>
-            {job.jobDrawings.map((doc) => (
+            {jobDocumentLinks.map((doc) => (
               <a
                 className={styles.savedDocLink}
-                href={doc.fileData}
-                download={doc.fileName}
+                href={doc.url}
+                target="_blank"
+                rel="noreferrer"
                 key={doc.id}
               >
-                {doc.fileName} · {formatBytes(doc.sizeBytes)}
+                {doc.title}
               </a>
             ))}
           </div>

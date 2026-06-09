@@ -36,8 +36,4 @@ export type CloudProvider = {
     list: () => Promise<WorkerLiveStatus[]>;
     updateMine: (status: WorkerLiveStatus) => Promise<CloudSyncResult>;
   };
-
-  drawings: {
-    upload: (params: { jobId: string; fileName: string; file: File }) => Promise<CloudSyncResult>;
-  };
 };

@@ -330,47 +330,4 @@ export const awsCloudProvider: CloudProvider = {
       });
     },
   },
-
-  drawings: {
-    async upload({ jobId, fileName, file }) {
-      const baseUrl = getAwsApiBaseUrl();
-
-      if (!baseUrl) {
-        return {
-          ok: false,
-          message: "Missing NEXT_PUBLIC_AHLOGU_API_URL.",
-        };
-      }
-
-      const formData = new FormData();
-      formData.append("jobId", jobId);
-      formData.append("fileName", fileName);
-      formData.append("file", file);
-
-      try {
-        const response = await fetch(`${baseUrl}/drawings`, {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: formData,
-        });
-
-        if (!response.ok) {
-          return {
-            ok: false,
-            message: `Drawing upload failed with status ${response.status}.`,
-          };
-        }
-
-        return {
-          ok: true,
-          message: "Drawing uploaded to AWS API.",
-        };
-      } catch (error) {
-        return {
-          ok: false,
-          message: getErrorMessage(error),
-        };
-      }
-    },
-  },
 };
