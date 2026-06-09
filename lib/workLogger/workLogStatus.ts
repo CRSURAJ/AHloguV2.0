@@ -40,3 +40,18 @@ export function markWorkLogFailed(logs: LogItem[], id: string, message: string):
       : log,
   );
 }
+
+export function updateWorkLogStickyNote(logs: LogItem[], id: string, value: string): LogItem[] {
+  return logs.map((log) => {
+    if (log.id !== id) return log;
+
+    if (log.syncStatus === "synced" || log.syncStatus === "syncing") {
+      return log;
+    }
+
+    return {
+      ...log,
+      stickyNote: value,
+    };
+  });
+}

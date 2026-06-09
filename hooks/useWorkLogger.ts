@@ -23,6 +23,7 @@ import {
   markWorkLogFailed,
   markWorkLogSynced,
   markWorkLogSyncing,
+  updateWorkLogStickyNote,
 } from "@/lib/workLogger/workLogStatus";
 import {
   createActiveSessionSnapshot,
@@ -377,20 +378,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
   }, [isHydrated, publishWorkerStatus]);
 
   function handleStickyNoteChange(id: string, value: string) {
-    setLogs((prev) =>
-      prev.map((log) => {
-        if (log.id !== id) return log;
-
-        if (log.syncStatus === "synced" || log.syncStatus === "syncing") {
-          return log;
-        }
-
-        return {
-          ...log,
-          stickyNote: value,
-        };
-      }),
-    );
+    setLogs((prev) => updateWorkLogStickyNote(prev, id, value));
   }
   function validateBeforeStart(): string {
     if (jobId.trim() === "") return "Job ID is required.";
