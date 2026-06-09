@@ -16,6 +16,7 @@ import {
 import { getJobsForRole, JOBS_CHANGED_EVENT } from "@/lib/jobStorage";
 import { getCloudProvider } from "@/lib/cloud/client";
 import { getWorkingStatusText, minutesBetween } from "@/lib/workUtils";
+import { createPendingWorkLog } from "@/lib/workLogger/workLogItem";
 import { uploadWorkLogToAws } from "@/lib/workLogger/workLogSync";
 import {
   buildWorkerLiveStatusPayload,
@@ -70,14 +71,6 @@ export type WorkLoggerState = {
   handleStickyNoteChange: (id: string, value: string) => void;
   getSyncBadgeClass: (status: SyncStatus) => string;
 };
-
-function makeUuid(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-
-  return `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
 
 export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
   const [jobId, setJobId] = useState("");
@@ -473,28 +466,17 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       return;
     }
 
-    const stopTime = new Date().toISOString();
-    const totalMinutes = minutesBetween(startTime, stopTime);
-    const workedMinutes = Math.max(0, totalMinutes - breakMinutes);
-
-    const logItem: LogItem = {
-      id: makeUuid(),
-      loguId: makeUuid(),
-      ts: new Date(stopTime).getTime(),
-      fullname: currentUser.fullName,
+    const logItem = createPendingWorkLog({
+      currentUser,
       jobId,
       location,
       role,
       jobDocs,
       description,
-      startedAt: startTime,
-      stoppedAt: stopTime,
+      startTime,
+      stopTime: new Date().toISOString(),
       breakMinutes,
-      workedMinutes,
-      syncStatus: "pending",
-      syncMessage: "Waiting to sync",
-      stickyNote: "",
-    };
+    });
     setLogs((prev) => [logItem, ...prev]);
     setIsWorking(false);
     setIsOnBreak(false);
@@ -530,28 +512,17 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       return { ok: false, message: "Select or enter the next location." };
     }
 
-    const stopTime = new Date().toISOString();
-    const totalMinutes = minutesBetween(startTime, stopTime);
-    const workedMinutes = Math.max(0, totalMinutes - breakMinutes);
-
-    const logItem: LogItem = {
-      id: makeUuid(),
-      loguId: makeUuid(),
-      ts: new Date(stopTime).getTime(),
-      fullname: currentUser.fullName,
+    const logItem = createPendingWorkLog({
+      currentUser,
       jobId,
       location,
       role,
       jobDocs,
       description,
-      startedAt: startTime,
-      stoppedAt: stopTime,
+      startTime,
+      stopTime: new Date().toISOString(),
       breakMinutes,
-      workedMinutes,
-      syncStatus: "pending",
-      syncMessage: "Waiting to sync",
-      stickyNote: "",
-    };
+    });
     const newStartTime = new Date().toISOString();
 
     setLogs((prev) => [logItem, ...prev]);
