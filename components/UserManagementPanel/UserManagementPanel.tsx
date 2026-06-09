@@ -4,8 +4,9 @@ import FeedbackMessage from "@/components/FeedbackMessage";
 import { getPasswordPolicyError } from "@/lib/auth/passwordPolicy";
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import styles from "./UserManagementPanel.module.css";
-import { getPermissionLabel, getRoleLabel, isValidEmailAddress } from "./userManagementHelpers";
+import { isValidEmailAddress } from "./userManagementHelpers";
 import ResetPasswordDialog from "./ResetPasswordDialog";
+import UserListRow from "./UserListRow";
 import { PERMISSION_LEVEL_OPTIONS, WORKER_ROLE_OPTIONS } from "@/types/work";
 import type { AuthActionResult, PermissionLevel, WorkerRole } from "@/types/work";
 
@@ -625,108 +626,21 @@ export default function UserManagementPanel({
               <div className={styles.userCard}>No AWS users found.</div>
             ) : null}
 
-            {sortedUsers.map((user) => {
-              const isCurrentUser = user.id === currentUserId;
-              const isUpdatingUser = updatingUserId === user.id;
-              const isResettingUser = resettingUserId === user.id;
-              const isDeletingUser = deletingUserId === user.id;
-              const canManageUser =
-                isAdminActor || (isManagerActor && user.permissionLevel !== "admin");
-              const canDeleteUser = isAdminActor;
-
-              return (
-                <div key={user.id || user.email} className={styles.userCard}>
-                  <div className={styles.userTop}>
-                    <div>
-                      <div className={styles.userName}>
-                        {user.fullName || user.email || "Unnamed user"}
-                      </div>
-                      <div className={styles.userMeta}>
-                        {user.email || user.username} · {getPermissionLabel(user.permissionLevel)} ·{" "}
-                        {getRoleLabel(user.role)}
-                      </div>
-                    </div>
-
-                    <div className={styles.topRight}>
-                      {isCurrentUser ? (
-                        <span className={styles.selfUserBadge}>Current admin</span>
-                      ) : null}
-
-                      <div className={styles.badges}>
-                        <span
-                          className={`${styles.badge} ${
-                            user.isActive ? styles.badgeActive : styles.badgeInactive
-                          }`}
-                        >
-                          {user.isActive ? "ACTIVE" : "INACTIVE"}
-                        </span>
-
-                        {user.permissionLevel === "admin" ? (
-                          <span className={`${styles.badge} ${styles.badgeWarn}`}>ADMIN</span>
-                        ) : null}
-
-                        {user.permissionLevel === "manager" ? (
-                          <span className={styles.badge}>MANAGER</span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className={styles.actions}>
-                    {canManageUser ? (
-                      <button
-                        type="button"
-                        className={styles.secondaryButton}
-                        onClick={() => handleOpenResetPassword(user)}
-                        disabled={
-                          isCurrentUser ||
-                          isUpdatingUser ||
-                          isResettingUser ||
-                          isDeletingUser ||
-                          !user.id
-                        }
-                      >
-                        {isResettingUser ? "Resetting..." : "Reset Password"}
-                      </button>
-                    ) : null}
-
-                    {canManageUser ? (
-                      <button
-                        type="button"
-                        className={styles.secondaryButton}
-                        onClick={() => void handleToggleActive(user)}
-                        disabled={
-                          isCurrentUser ||
-                          isUpdatingUser ||
-                          isResettingUser ||
-                          isDeletingUser ||
-                          !user.id
-                        }
-                      >
-                        {isUpdatingUser ? "Updating..." : user.isActive ? "Deactivate" : "Activate"}
-                      </button>
-                    ) : null}
-
-                    {canDeleteUser ? (
-                      <button
-                        type="button"
-                        className={styles.dangerButton}
-                        onClick={() => void handleDeleteUser(user)}
-                        disabled={
-                          isCurrentUser ||
-                          isUpdatingUser ||
-                          isResettingUser ||
-                          isDeletingUser ||
-                          !user.id
-                        }
-                      >
-                        {isDeletingUser ? "Deleting..." : "Delete"}
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
+            {sortedUsers.map((user) => (
+              <UserListRow
+                currentUserId={currentUserId}
+                deletingUserId={deletingUserId}
+                isAdminActor={isAdminActor}
+                isManagerActor={isManagerActor}
+                key={user.id || user.email}
+                onDeleteUser={handleDeleteUser}
+                onOpenResetPassword={handleOpenResetPassword}
+                onToggleActive={handleToggleActive}
+                resettingUserId={resettingUserId}
+                updatingUserId={updatingUserId}
+                user={user}
+              />
+            ))}
           </div>
         </section>
       </div>
