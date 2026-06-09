@@ -24,6 +24,7 @@ import {
   readJobDrawingFile,
 } from "./jobManagementHelpers";
 
+import JobStatsCards from "./JobStatsCards";
 import styles from "./JobManagementPanel.module.css";
 
 type JobManagementPanelProps = {
@@ -399,22 +400,11 @@ export default function JobManagementPanel({
           </button>
         </div>
 
-        <div className={styles.statsGrid}>
-          <div className={styles.statCard}>
-            <span>Total Jobs</span>
-            <strong>{visibleJobs.length}</strong>
-          </div>
-
-          <div className={styles.statCard}>
-            <span>Active</span>
-            <strong>{activeJobs.length}</strong>
-          </div>
-
-          <div className={styles.statCard}>
-            <span>Inactive</span>
-            <strong>{inactiveJobs.length}</strong>
-          </div>
-        </div>
+        <JobStatsCards
+          totalJobs={visibleJobs.length}
+          activeJobs={activeJobs.length}
+          inactiveJobs={inactiveJobs.length}
+        />
 
         <div ref={jobFeedbackRef} tabIndex={-1} className={styles.feedbackFocusTarget}>
           <FeedbackMessage message={jobFormMessage || jobMessage} />
