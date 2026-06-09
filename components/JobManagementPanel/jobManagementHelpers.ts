@@ -71,3 +71,11 @@ export function isDuplicateJobIdMessage(message: string): boolean {
     (value.includes("already exists") || value.includes("unique") || value.includes("duplicate"))
   );
 }
+
+export function getArchiveJobConfirmationMessage(job: Job): string {
+  return `Archive ${getJobTitle(job)}?\n\nThis will remove the job from workers, normal job lists, and normal work logs.\nAll existing work logs for this job will move to archived work logs.\n\nThis cannot be undone.`;
+}
+
+export function getDeleteJobConfirmationMessage(job: Job): string {
+  return `Delete ${getJobTitle(job)}? This cannot be undone.`;
+}

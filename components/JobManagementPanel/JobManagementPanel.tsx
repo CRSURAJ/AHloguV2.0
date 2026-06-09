@@ -10,6 +10,8 @@ import type { Job, PermissionLevel, WorkerRole } from "@/types/work";
 import {
   formatBytes,
   formatRoleList,
+  getArchiveJobConfirmationMessage,
+  getDeleteJobConfirmationMessage,
   getJobTitle,
   isDuplicateJobIdMessage,
   MAX_JOB_DRAWING_SIZE_BYTES,
@@ -358,9 +360,7 @@ export default function JobManagementPanel({
   }
 
   async function handleArchive(job: Job): Promise<void> {
-    const confirmed = window.confirm(
-      `Archive ${getJobTitle(job)}?\n\nThis will remove the job from workers, normal job lists, and normal work logs.\nAll existing work logs for this job will move to archived work logs.\n\nThis cannot be undone.`,
-    );
+    const confirmed = window.confirm(getArchiveJobConfirmationMessage(job));
 
     if (!confirmed) return;
 
@@ -374,7 +374,7 @@ export default function JobManagementPanel({
   }
 
   async function handleDelete(job: Job): Promise<void> {
-    const confirmed = window.confirm(`Delete ${getJobTitle(job)}? This cannot be undone.`);
+    const confirmed = window.confirm(getDeleteJobConfirmationMessage(job));
 
     if (!confirmed) return;
 
