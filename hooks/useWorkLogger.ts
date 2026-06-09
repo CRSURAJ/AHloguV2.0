@@ -19,6 +19,12 @@ import { getWorkingStatusText, minutesBetween } from "@/lib/workUtils";
 import { createPendingWorkLog } from "@/lib/workLogger/workLogItem";
 import { uploadWorkLogToAws } from "@/lib/workLogger/workLogSync";
 import {
+  getSyncableWorkLogs,
+  markWorkLogFailed,
+  markWorkLogSynced,
+  markWorkLogSyncing,
+} from "@/lib/workLogger/workLogStatus";
+import {
   buildWorkerLiveStatusPayload,
   getWorkerLiveStatusSignature,
 } from "@/lib/workLogger/workerStatusPayload";
@@ -542,25 +548,13 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
   }
 
   async function syncOneItem(item: LogItem): Promise<number> {
-    setLogs((prev) =>
-      prev.map((log) =>
-        log.id === item.id
-          ? {
-              ...log,
-              syncStatus: "syncing",
-              syncMessage: "Syncing...",
-            }
-          : log,
-      ),
-    );
+    setLogs((prev) => markWorkLogSyncing(prev, item.id));
 
     return uploadWorkLogToAws(item);
   }
 
   async function handleSync(): Promise<void> {
-    const itemsToSync = logs.filter(
-      (item) => item.syncStatus === "pending" || item.syncStatus === "failed",
-    );
+    const itemsToSync = getSyncableWorkLogs(logs);
 
     if (itemsToSync.length === 0) {
       setBannerMessage("");
@@ -571,32 +565,11 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       try {
         const syncedAt = await syncOneItem(item);
 
-        setLogs((prev) =>
-          prev.map((log) =>
-            log.id === item.id
-              ? {
-                  ...log,
-                  syncedAt,
-                  syncStatus: "synced",
-                  syncMessage: "Synced successfully",
-                }
-              : log,
-          ),
-        );
+        setLogs((prev) => markWorkLogSynced(prev, item.id, syncedAt));
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown sync error";
 
-        setLogs((prev) =>
-          prev.map((log) =>
-            log.id === item.id
-              ? {
-                  ...log,
-                  syncStatus: "failed",
-                  syncMessage: message,
-                }
-              : log,
-          ),
-        );
+        setLogs((prev) => markWorkLogFailed(prev, item.id, message));
       }
     }
 
