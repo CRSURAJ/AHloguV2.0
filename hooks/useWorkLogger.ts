@@ -17,6 +17,10 @@ import { getJobsForRole, JOBS_CHANGED_EVENT } from "@/lib/jobStorage";
 import { getCloudProvider } from "@/lib/cloud/client";
 import { getWorkingStatusText, minutesBetween } from "@/lib/workUtils";
 import { uploadWorkLogToAws } from "@/lib/workLogger/workLogSync";
+import {
+  buildWorkerLiveStatusPayload,
+  getWorkerLiveStatusSignature,
+} from "@/lib/workLogger/workerStatusPayload";
 import type {
   ActiveSession,
   AuthActionResult,
@@ -25,7 +29,6 @@ import type {
   Job,
   LogItem,
   SyncStatus,
-  WorkerLiveStatus,
 } from "@/types/work";
 
 export type WorkLoggerState = {
@@ -299,58 +302,21 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     async (options: { force?: boolean } = {}) => {
       if (!isHydrated) return;
 
-      const pendingItems = logs.filter(
-        (item) => item.syncStatus === "pending" || item.syncStatus === "failed",
-      );
-
-      const oldestPendingSyncAt = pendingItems
-        .map((item) => item.stoppedAt || item.startedAt)
-        .filter((value): value is string => Boolean(value))
-        .sort()[0];
-
-      const trimmedJobId = jobId.trim();
-      const currentJob = availableJobs.find(
-        (job) => job.jobId === trimmedJobId || job.id === trimmedJobId,
-      );
-
-      const nowIso = new Date().toISOString();
-
-      const statusPayload: WorkerLiveStatus = {
-        userId: currentUser.id,
-        fullName: currentUser.fullName,
-        email: currentUser.username,
-        role: currentUser.role,
-        status: isWorking ? (isOnBreak ? "on_break" : "working") : "available",
-
-        currentJobId: trimmedJobId || undefined,
-        currentJobName: currentJob?.jobName || undefined,
-        currentJobLocation: location.trim() || undefined,
-
-        startedAt: isWorking && startTime ? startTime : undefined,
-        breakStartedAt: isWorking && isOnBreak && breakStartTime ? breakStartTime : undefined,
+      const statusPayload = buildWorkerLiveStatusPayload({
+        currentUser,
+        logs,
+        availableJobs,
+        jobId,
+        location,
+        isWorking,
+        isOnBreak,
+        startTime,
+        breakStartTime,
         breakMinutes,
-
-        pendingSyncCount: pendingItems.length,
-        failedSyncCount: failedCount,
-        oldestPendingSyncAt,
-
-        lastSeenAt: nowIso,
-        updatedAt: nowIso,
-      };
-
-      const signature = JSON.stringify({
-        userId: statusPayload.userId,
-        status: statusPayload.status,
-        currentJobId: statusPayload.currentJobId,
-        currentJobName: statusPayload.currentJobName,
-        currentJobLocation: statusPayload.currentJobLocation,
-        startedAt: statusPayload.startedAt,
-        breakStartedAt: statusPayload.breakStartedAt,
-        breakMinutes: statusPayload.breakMinutes,
-        pendingSyncCount: statusPayload.pendingSyncCount,
-        failedSyncCount: statusPayload.failedSyncCount,
-        oldestPendingSyncAt: statusPayload.oldestPendingSyncAt,
+        failedCount,
       });
+
+      const signature = getWorkerLiveStatusSignature(statusPayload);
 
       const nowMs = Date.now();
 
@@ -386,10 +352,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       availableJobs,
       breakMinutes,
       breakStartTime,
-      currentUser.fullName,
-      currentUser.id,
-      currentUser.role,
-      currentUser.username,
+      currentUser,
       failedCount,
       isHydrated,
       isOnBreak,
