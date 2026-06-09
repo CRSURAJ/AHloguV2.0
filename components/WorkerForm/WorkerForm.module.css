@@ -602,3 +602,34 @@ select.input:disabled {
 #jobId + .input {
   margin-top: 10px;
 }
+
+.jobDocumentsField {
+  align-self: stretch;
+}
+
+.jobDocumentLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.jobDocumentLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(83, 188, 123, 0.45);
+  background: #11302d;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-decoration: none;
+  padding: 0.35rem 0.75rem;
+}
+
+.jobDocumentLink:hover {
+  background: #085153;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
