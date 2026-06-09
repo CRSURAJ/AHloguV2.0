@@ -10,9 +10,14 @@ import type { Job, PermissionLevel, WorkerRole } from "@/types/work";
 import {
   formatBytes,
   formatRoleList,
+  getAcceptedJobDrawingFiles,
   getArchiveJobConfirmationMessage,
   getDeleteJobConfirmationMessage,
+  getJobDrawingUploadMessage,
   getJobTitle,
+  getNoAcceptedJobDrawingMessage,
+  getNoJobDrawingSlotsMessage,
+  getRemainingJobDrawingSlots,
   isDuplicateJobIdMessage,
   MAX_JOB_DRAWING_SIZE_BYTES,
   MAX_JOB_DRAWINGS,
@@ -232,23 +237,17 @@ export default function JobManagementPanel({
     if (!files || files.length === 0) return;
 
     const selectedFiles = Array.from(files);
-    const remainingSlots = MAX_JOB_DRAWINGS - form.jobDrawings.length;
+    const remainingSlots = getRemainingJobDrawingSlots(form.jobDrawings.length);
 
     if (remainingSlots <= 0) {
-      setJobDrawingMessage(`Maximum ${MAX_JOB_DRAWINGS} job drawings can be attached to one job.`);
+      setJobDrawingMessage(getNoJobDrawingSlotsMessage());
       return;
     }
 
-    const acceptedFiles = selectedFiles
-      .filter((file) => file.size <= MAX_JOB_DRAWING_SIZE_BYTES)
-      .slice(0, remainingSlots);
+    const acceptedFiles = getAcceptedJobDrawingFiles(selectedFiles, remainingSlots);
 
     if (acceptedFiles.length === 0) {
-      setJobDrawingMessage(
-        `No files added. Each job drawing must be ${formatBytes(
-          MAX_JOB_DRAWING_SIZE_BYTES,
-        )} or smaller.`,
-      );
+      setJobDrawingMessage(getNoAcceptedJobDrawingMessage());
       return;
     }
 
@@ -261,11 +260,7 @@ export default function JobManagementPanel({
 
     const rejectedCount = selectedFiles.length - acceptedFiles.length;
 
-    setJobDrawingMessage(
-      rejectedCount > 0
-        ? `Added ${newDocs.length} job drawing(s). ${rejectedCount} file(s) were skipped due to size/count limit.`
-        : `Added ${newDocs.length} job drawing(s).`,
-    );
+    setJobDrawingMessage(getJobDrawingUploadMessage(newDocs.length, rejectedCount));
   }
 
   function removeJobDrawing(docId: string): void {

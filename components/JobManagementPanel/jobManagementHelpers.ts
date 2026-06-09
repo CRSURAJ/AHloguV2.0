@@ -79,3 +79,27 @@ export function getArchiveJobConfirmationMessage(job: Job): string {
 export function getDeleteJobConfirmationMessage(job: Job): string {
   return `Delete ${getJobTitle(job)}? This cannot be undone.`;
 }
+
+export function getRemainingJobDrawingSlots(currentDrawingCount: number): number {
+  return MAX_JOB_DRAWINGS - currentDrawingCount;
+}
+
+export function getAcceptedJobDrawingFiles(files: File[], remainingSlots: number): File[] {
+  return files.filter((file) => file.size <= MAX_JOB_DRAWING_SIZE_BYTES).slice(0, remainingSlots);
+}
+
+export function getNoJobDrawingSlotsMessage(): string {
+  return `Maximum ${MAX_JOB_DRAWINGS} job drawings can be attached to one job.`;
+}
+
+export function getNoAcceptedJobDrawingMessage(): string {
+  return `No files added. Each job drawing must be ${formatBytes(
+    MAX_JOB_DRAWING_SIZE_BYTES,
+  )} or smaller.`;
+}
+
+export function getJobDrawingUploadMessage(addedCount: number, rejectedCount: number): string {
+  return rejectedCount > 0
+    ? `Added ${addedCount} job drawing(s). ${rejectedCount} file(s) were skipped due to size/count limit.`
+    : `Added ${addedCount} job drawing(s).`;
+}
