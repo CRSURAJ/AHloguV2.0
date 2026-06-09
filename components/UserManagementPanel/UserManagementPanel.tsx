@@ -6,7 +6,7 @@ import { useMemo, useRef, useState, type FormEvent } from "react";
 import styles from "./UserManagementPanel.module.css";
 import { isValidEmailAddress } from "./userManagementHelpers";
 import ResetPasswordDialog from "./ResetPasswordDialog";
-import UserListRow from "./UserListRow";
+import UserListSection from "./UserListSection";
 import { PERMISSION_LEVEL_OPTIONS, WORKER_ROLE_OPTIONS } from "@/types/work";
 import type { AuthActionResult, PermissionLevel, WorkerRole } from "@/types/work";
 
@@ -605,44 +605,20 @@ export default function UserManagementPanel({
           </button>
         </section>
 
-        <section className={styles.section}>
-          <div className={styles.sectionTitle}>Existing Users</div>
-
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            onClick={onRefresh}
-            disabled={loading}
-          >
-            {loading ? "Refreshing..." : "Refresh Users"}
-          </button>
-
-          <div className={styles.userList}>
-            {loading && sortedUsers.length === 0 ? (
-              <div className={styles.userCard}>Loading users...</div>
-            ) : null}
-
-            {!loading && sortedUsers.length === 0 ? (
-              <div className={styles.userCard}>No AWS users found.</div>
-            ) : null}
-
-            {sortedUsers.map((user) => (
-              <UserListRow
-                currentUserId={currentUserId}
-                deletingUserId={deletingUserId}
-                isAdminActor={isAdminActor}
-                isManagerActor={isManagerActor}
-                key={user.id || user.email}
-                onDeleteUser={handleDeleteUser}
-                onOpenResetPassword={handleOpenResetPassword}
-                onToggleActive={handleToggleActive}
-                resettingUserId={resettingUserId}
-                updatingUserId={updatingUserId}
-                user={user}
-              />
-            ))}
-          </div>
-        </section>
+        <UserListSection
+          currentUserId={currentUserId}
+          deletingUserId={deletingUserId}
+          isAdminActor={isAdminActor}
+          isManagerActor={isManagerActor}
+          loading={loading}
+          onDeleteUser={handleDeleteUser}
+          onOpenResetPassword={handleOpenResetPassword}
+          onRefresh={onRefresh}
+          onToggleActive={handleToggleActive}
+          resettingUserId={resettingUserId}
+          updatingUserId={updatingUserId}
+          users={sortedUsers}
+        />
       </div>
     </div>
   );
