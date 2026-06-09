@@ -9,7 +9,6 @@ import type { Job, PermissionLevel, WorkerRole } from "@/types/work";
 
 import {
   formatBytes,
-  formatRoleList,
   getAcceptedJobDrawingFiles,
   getArchiveJobConfirmationMessage,
   getDeleteJobConfirmationMessage,
@@ -24,6 +23,7 @@ import {
   readJobDrawingFile,
 } from "./jobManagementHelpers";
 
+import JobCard from "./JobCard";
 import JobStatsCards from "./JobStatsCards";
 import styles from "./JobManagementPanel.module.css";
 
@@ -578,79 +578,15 @@ export default function JobManagementPanel({
 
           <div className={styles.jobList}>
             {sortedJobs.map((job) => (
-              <article className={styles.jobItem} key={job.id}>
-                <div className={styles.jobTopLine}>
-                  <div>
-                    <h4>{getJobTitle(job)}</h4>
-                    <p>
-                      Job ID: {job.jobId || "—"} · Case: {job.caseNo || "—"} · Order:{" "}
-                      {job.orderNo || "—"}
-                    </p>
-                  </div>
-
-                  <span className={job.isActive ? styles.activeBadge : styles.inactiveBadge}>
-                    {job.isActive ? "ACTIVE" : "INACTIVE"}
-                  </span>
-                </div>
-
-                <p className={styles.jobMeta}>
-                  {job.customerName || "No customer / site"} ·{" "}
-                  {job.jobDrawings.length === 0
-                    ? "No job drawings"
-                    : `${job.jobDrawings.length} job doc(s)`}
-                </p>
-
-                <p className={styles.jobRoles}>Assigned to: {formatRoleList(job.assignedRoles)}</p>
-
-                {job.description ? (
-                  <p className={styles.jobDescription}>{job.description}</p>
-                ) : null}
-
-                {job.jobDrawings.length > 0 ? (
-                  <div className={styles.savedDocs}>
-                    <p className={styles.savedDocsTitle}>Job Drawings</p>
-
-                    <div className={styles.savedDocsList}>
-                      {job.jobDrawings.map((doc) => (
-                        <a
-                          className={styles.savedDocLink}
-                          href={doc.fileData}
-                          download={doc.fileName}
-                          key={doc.id}
-                        >
-                          {doc.fileName} · {formatBytes(doc.sizeBytes)}
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className={styles.jobActions}>
-                  <button type="button" onClick={() => startEdit(job)}>
-                    Edit
-                  </button>
-
-                  <button type="button" onClick={() => void handleToggleJobStatus(job)}>
-                    {job.isActive ? "Deactivate" : "Activate"}
-                  </button>
-
-                  {canArchiveOrDeleteJobs ? (
-                    <button type="button" onClick={() => void handleArchive(job)}>
-                      Archive
-                    </button>
-                  ) : null}
-
-                  {canArchiveOrDeleteJobs ? (
-                    <button
-                      className={styles.dangerButton}
-                      type="button"
-                      onClick={() => void handleDelete(job)}
-                    >
-                      Delete
-                    </button>
-                  ) : null}
-                </div>
-              </article>
+              <JobCard
+                canArchiveOrDeleteJobs={canArchiveOrDeleteJobs}
+                job={job}
+                key={job.id}
+                onArchive={handleArchive}
+                onDelete={handleDelete}
+                onEdit={startEdit}
+                onToggleStatus={handleToggleJobStatus}
+              />
             ))}
           </div>
         </div>
