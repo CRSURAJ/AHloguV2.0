@@ -25,18 +25,15 @@ import {
   markWorkLogSyncing,
 } from "@/lib/workLogger/workLogStatus";
 import {
+  createActiveSessionSnapshot,
+  createDraftSnapshot,
+  hasMeaningfulDraft,
+} from "@/lib/workLogger/workLoggerPersistence";
+import {
   buildWorkerLiveStatusPayload,
   getWorkerLiveStatusSignature,
 } from "@/lib/workLogger/workerStatusPayload";
-import type {
-  ActiveSession,
-  AuthActionResult,
-  CurrentUser,
-  DraftState,
-  Job,
-  LogItem,
-  SyncStatus,
-} from "@/types/work";
+import type { AuthActionResult, CurrentUser, Job, LogItem, SyncStatus } from "@/types/work";
 
 export type WorkLoggerState = {
   currentUserFullName: string;
@@ -212,7 +209,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     if (!isHydrated) return;
 
     if (isWorking) {
-      const session: ActiveSession = {
+      const session = createActiveSessionSnapshot({
         isWorking,
         isOnBreak,
         startTime,
@@ -223,7 +220,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
         role,
         jobDocs,
         description,
-      };
+      });
 
       void saveSession(currentUser.id, session);
       return;
@@ -249,22 +246,15 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     if (!isHydrated) return;
     if (isWorking) return;
 
-    const draft: DraftState = {
+    const draft = createDraftSnapshot({
       jobId,
       location,
       role,
       jobDocs,
       description,
-    };
+    });
 
-    const hasMeaningfulDraft =
-      draft.jobId.trim() !== "" ||
-      draft.location.trim() !== "" ||
-      draft.role.trim() !== "" ||
-      draft.jobDocs.trim() !== "" ||
-      draft.description.trim() !== "";
-
-    if (hasMeaningfulDraft) {
+    if (hasMeaningfulDraft(draft)) {
       void saveDraft(currentUser.id, draft);
     } else {
       void clearDraft(currentUser.id);
