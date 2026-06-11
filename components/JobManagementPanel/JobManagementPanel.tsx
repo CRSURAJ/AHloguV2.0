@@ -386,7 +386,8 @@ export default function JobManagementPanel({
             <h2>Job Management</h2>
             <p className={styles.subtitle}>
               Create jobs and assign them to worker roles. Jobs are stored in AWS and cached locally
-              for offline viewing. Job document links are saved with the job and can open OneDrive or SharePoint documents.
+              for offline viewing. Job document links are saved with the job and can open OneDrive
+              or SharePoint documents.
             </p>
           </div>
 

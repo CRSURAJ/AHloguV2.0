@@ -69,4 +69,3 @@ export function getArchiveJobConfirmationMessage(job: Job): string {
 export function getDeleteJobConfirmationMessage(job: Job): string {
   return `Delete ${getJobTitle(job)}? This cannot be undone.`;
 }
-
