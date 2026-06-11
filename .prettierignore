@@ -1,0 +1,16 @@
+node_modules
+.next
+out
+build
+coverage
+package-lock.json
+
+.env
+.env.local
+.env.production
+.env.development
+
+aws/lambda/AHloguApi/node_modules
+aws/lambda/AHloguApi/ahlogu-api.zip
+
+CLAUDE.md

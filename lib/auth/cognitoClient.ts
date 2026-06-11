@@ -28,10 +28,7 @@ export function getCurrentCognitoUser() {
   return getUserPool().getCurrentUser();
 }
 
-export function signInWithCognito(
-  email: string,
-  password: string,
-): Promise<CognitoSignInResult> {
+export function signInWithCognito(email: string, password: string): Promise<CognitoSignInResult> {
   const userPool = getUserPool();
 
   const cognitoUser = new CognitoUser({
@@ -97,16 +94,14 @@ export function getCurrentCognitoSession(): Promise<CognitoUserSession | null> {
   }
 
   return new Promise((resolve) => {
-    cognitoUser.getSession(
-      (error: Error | null, session: CognitoUserSession | null) => {
-        if (error || !session || !session.isValid()) {
-          resolve(null);
-          return;
-        }
+    cognitoUser.getSession((error: Error | null, session: CognitoUserSession | null) => {
+      if (error || !session || !session.isValid()) {
+        resolve(null);
+        return;
+      }
 
-        resolve(session);
-      },
-    );
+      resolve(session);
+    });
   });
 }
 
@@ -127,18 +122,14 @@ export function changeCurrentCognitoPassword(
         return;
       }
 
-      cognitoUser.changePassword(
-        currentPassword,
-        newPassword,
-        (changeError) => {
-          if (changeError) {
-            reject(changeError);
-            return;
-          }
+      cognitoUser.changePassword(currentPassword, newPassword, (changeError) => {
+        if (changeError) {
+          reject(changeError);
+          return;
+        }
 
-          resolve();
-        },
-      );
+        resolve();
+      });
     });
   });
 }

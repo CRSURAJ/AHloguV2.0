@@ -1,11 +1,6 @@
 const SYNC_QUEUE_STORAGE_KEY = "ahlogu:cloud-sync-queue";
 export const SYNC_QUEUE_CHANGED_EVENT = "ahlogu:cloud-sync-queue-changed";
-export type SyncQueueAction =
-  | "job.create"
-  | "job.update"
-  | "job.delete"
-  | "workLog.upload"
-  | "drawing.upload";
+export type SyncQueueAction = "job.create" | "job.update" | "job.delete" | "workLog.upload";
 
 export type SyncQueueStatus = "pending" | "syncing" | "failed";
 

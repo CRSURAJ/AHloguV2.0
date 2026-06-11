@@ -5,9 +5,21 @@ import { useMemo, useRef, useState } from "react";
 import FeedbackMessage from "@/components/FeedbackMessage";
 import { useJobs } from "@/hooks/useJobs";
 import { WORKER_ROLE_OPTIONS } from "@/types/work";
-import type { Job,
-  PermissionLevel, JobDrawing, WorkerRole } from "@/types/work";
+import type { Job, PermissionLevel, WorkerRole } from "@/types/work";
 
+import {
+  getArchiveJobConfirmationMessage,
+  getDeleteJobConfirmationMessage,
+  getInvalidJobDocumentLinkMessage,
+  getJobDocumentLinkAddedMessage,
+  getJobTitle,
+  isDuplicateJobIdMessage,
+  isValidJobDocumentUrl,
+  makeJobDocumentLink,
+} from "./jobManagementHelpers";
+
+import JobCard from "./JobCard";
+import JobStatsCards from "./JobStatsCards";
 import styles from "./JobManagementPanel.module.css";
 
 type JobManagementPanelProps = {
@@ -24,17 +36,11 @@ type JobFormState = {
   location: string;
   description: string;
   assignedRoles: WorkerRole[];
-  jobDrawings: Job["jobDrawings"];
+  jobDocumentLinks: Job["jobDocumentLinks"];
   isActive: boolean;
 };
 
-type JobFormField =
-  | "caseNo"
-  | "jobId"
-  | "orderNo"
-  | "jobName"
-  | "customerName"
-  | "assignedRoles";
+type JobFormField = "caseNo" | "jobId" | "orderNo" | "jobName" | "customerName" | "assignedRoles";
 
 const EMPTY_FORM: JobFormState = {
   caseNo: "",
@@ -45,84 +51,14 @@ const EMPTY_FORM: JobFormState = {
   location: "",
   description: "",
   assignedRoles: [],
-  jobDrawings: [],
+  jobDocumentLinks: [],
   isActive: true,
 };
 
-const MAX_JOB_DRAWINGS = 5;
-const MAX_JOB_DRAWING_SIZE_BYTES = 2 * 1024 * 1024;
-
-function makeClientId(prefix: string): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-
-  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function formatBytes(sizeBytes: number): string {
-  if (sizeBytes < 1024) return `${sizeBytes} B`;
-
-  const sizeKb = sizeBytes / 1024;
-  if (sizeKb < 1024) return `${sizeKb.toFixed(1)} KB`;
-
-  return `${(sizeKb / 1024).toFixed(1)} MB`;
-}
-
-function readJobDrawingFile(file: File): Promise<JobDrawing> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.addEventListener("load", () => {
-      if (typeof reader.result !== "string") {
-        reject(new Error("Could not read file."));
-        return;
-      }
-
-      resolve({
-        id: makeClientId("job-doc"),
-        fileName: file.name,
-        fileData: reader.result,
-        mimeType: file.type || "application/octet-stream",
-        sizeBytes: file.size,
-        uploadedAt: new Date().toISOString(),
-      });
-    });
-
-    reader.addEventListener("error", () => {
-      reject(new Error("Could not read file."));
-    });
-
-    reader.readAsDataURL(file);
-  });
-}
-
-function getRoleLabel(role: WorkerRole): string {
-  return WORKER_ROLE_OPTIONS.find((item) => item.value === role)?.label ?? role;
-}
-
-function formatRoleList(roles: WorkerRole[]): string {
-  if (roles.length === 0) return "No roles assigned";
-
-  return roles.map(getRoleLabel).join(", ");
-}
-
-function getJobTitle(job: Job): string {
-  return job.jobName || job.jobId || job.caseNo || "Untitled Job";
-}
-
-function isDuplicateJobIdMessage(message: string): boolean {
-  const value = message.toLowerCase();
-
-  return (
-    value.includes("job id") &&
-    (value.includes("already exists") ||
-      value.includes("unique") ||
-      value.includes("duplicate"))
-  );
-}
-
-export default function JobManagementPanel({ onClose, currentPermissionLevel }: JobManagementPanelProps) {
+export default function JobManagementPanel({
+  onClose,
+  currentPermissionLevel,
+}: JobManagementPanelProps) {
   const canArchiveOrDeleteJobs = currentPermissionLevel === "admin";
   const {
     jobs,
@@ -140,7 +76,10 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
 
   const [form, setForm] = useState<JobFormState>(EMPTY_FORM);
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
-  const [jobDrawingMessage, setJobDrawingMessage] = useState("");
+  const [jobDocumentTitle, setJobDocumentTitle] = useState("");
+  const [jobDocumentUrl, setJobDocumentUrl] = useState("");
+  const [jobDocumentMessage, setJobDocumentMessage] = useState("");
+  const [isJobDocumentDialogOpen, setIsJobDocumentDialogOpen] = useState(false);
   const [jobFormMessage, setJobFormMessage] = useState("");
   const [jobErrorField, setJobErrorField] = useState<JobFormField | "">("");
   const [jobShakeField, setJobShakeField] = useState<JobFormField | "">("");
@@ -154,10 +93,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
   const jobFeedbackRef = useRef<HTMLDivElement>(null);
   const jobFormCardRef = useRef<HTMLDivElement>(null);
 
-  const visibleJobs = useMemo(
-    () => jobs.filter((job) => job.isArchived !== true),
-    [jobs]
-  );
+  const visibleJobs = useMemo(() => jobs.filter((job) => job.isArchived !== true), [jobs]);
 
   const sortedJobs = useMemo(
     () =>
@@ -166,7 +102,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
 
         return getJobTitle(a).localeCompare(getJobTitle(b));
       }),
-    [visibleJobs]
+    [visibleJobs],
   );
 
   function getJobInputClass(field: JobFormField): string {
@@ -226,17 +162,14 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
     }, 420);
   }
 
-  function updateField<K extends keyof JobFormState>(
-    field: K,
-    value: JobFormState[K]
-  ): void {
+  function updateField<K extends keyof JobFormState>(field: K, value: JobFormState[K]): void {
     setForm((current) => ({
       ...current,
       [field]: value,
     }));
 
     if (jobMessage) clearJobMessage();
-    if (jobDrawingMessage) setJobDrawingMessage("");
+    if (jobDocumentMessage) setJobDocumentMessage("");
     clearJobFormError(field as JobFormField);
   }
 
@@ -253,7 +186,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
     });
 
     if (jobMessage) clearJobMessage();
-    if (jobDrawingMessage) setJobDrawingMessage("");
+    if (jobDocumentMessage) setJobDocumentMessage("");
     clearJobFormError("assignedRoles");
   }
 
@@ -270,7 +203,10 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
   function resetForm(): void {
     setForm(EMPTY_FORM);
     setEditingJobId(null);
-    setJobDrawingMessage("");
+    setJobDocumentTitle("");
+    setJobDocumentUrl("");
+    setJobDocumentMessage("");
+    setIsJobDocumentDialogOpen(false);
     setJobFormMessage("");
     setJobErrorField("");
     setJobShakeField("");
@@ -287,65 +223,49 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
       location: job.location,
       description: job.description,
       assignedRoles: job.assignedRoles,
-      jobDrawings: job.jobDrawings,
+      jobDocumentLinks: job.jobDocumentLinks ?? [],
       isActive: job.isActive,
     });
 
     if (jobMessage) clearJobMessage();
-    if (jobDrawingMessage) setJobDrawingMessage("");
+    if (jobDocumentMessage) setJobDocumentMessage("");
     if (jobFormMessage) setJobFormMessage("");
     setJobErrorField("");
     setJobShakeField("");
     focusJobFormCard();
   }
 
-  async function handleJobDrawingsUpload(files: FileList | null): Promise<void> {
-    if (!files || files.length === 0) return;
+  function addJobDocumentLink(): void {
+    const title = jobDocumentTitle.trim();
+    const url = jobDocumentUrl.trim();
 
-    const selectedFiles = Array.from(files);
-    const remainingSlots = MAX_JOB_DRAWINGS - form.jobDrawings.length;
-
-    if (remainingSlots <= 0) {
-      setJobDrawingMessage(`Maximum ${MAX_JOB_DRAWINGS} job drawings can be attached to one job.`);
+    if (!title || !isValidJobDocumentUrl(url)) {
+      setJobDocumentMessage(getInvalidJobDocumentLinkMessage());
       return;
     }
 
-    const acceptedFiles = selectedFiles
-      .filter((file) => file.size <= MAX_JOB_DRAWING_SIZE_BYTES)
-      .slice(0, remainingSlots);
-
-    if (acceptedFiles.length === 0) {
-      setJobDrawingMessage(
-        `No files added. Each job drawing must be ${formatBytes(
-          MAX_JOB_DRAWING_SIZE_BYTES
-        )} or smaller.`
-      );
-      return;
-    }
-
-    const newDocs = await Promise.all(acceptedFiles.map(readJobDrawingFile));
+    const newDoc = makeJobDocumentLink(title, url);
 
     setForm((current) => ({
       ...current,
-      jobDrawings: [...current.jobDrawings, ...newDocs],
+      jobDocumentLinks: [...current.jobDocumentLinks, newDoc],
     }));
 
-    const rejectedCount = selectedFiles.length - acceptedFiles.length;
+    setJobDocumentTitle("");
+    setJobDocumentUrl("");
+    setJobDocumentMessage(getJobDocumentLinkAddedMessage(title));
+    setIsJobDocumentDialogOpen(false);
 
-    setJobDrawingMessage(
-      rejectedCount > 0
-        ? `Added ${newDocs.length} job drawing(s). ${rejectedCount} file(s) were skipped due to size/count limit.`
-        : `Added ${newDocs.length} job drawing(s).`
-    );
+    if (jobMessage) clearJobMessage();
   }
 
-  function removeJobDrawing(docId: string): void {
+  function removeJobDocumentLink(docId: string): void {
     setForm((current) => ({
       ...current,
-      jobDrawings: current.jobDrawings.filter((doc) => doc.id !== docId),
+      jobDocumentLinks: current.jobDocumentLinks.filter((doc) => doc.id !== docId),
     }));
 
-    setJobDrawingMessage("");
+    setJobDocumentMessage("");
   }
 
   function focusJobFeedbackMessage(): void {
@@ -395,11 +315,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
       const result = await handleUpdateJob(editingJobId, form);
 
       if (!result.ok && isDuplicateJobIdMessage(result.message)) {
-        markJobFormError(
-          "jobId",
-          "Job ID already exists. Use a unique Job ID.",
-          jobIdInputRef,
-        );
+        markJobFormError("jobId", "Job ID already exists. Use a unique Job ID.", jobIdInputRef);
         return;
       }
 
@@ -415,11 +331,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
     const result = await handleCreateJob(form);
 
     if (!result.ok && isDuplicateJobIdMessage(result.message)) {
-      markJobFormError(
-        "jobId",
-        "Job ID already exists. Use a unique Job ID.",
-        jobIdInputRef,
-      );
+      markJobFormError("jobId", "Job ID already exists. Use a unique Job ID.", jobIdInputRef);
       return;
     }
 
@@ -439,9 +351,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
   }
 
   async function handleArchive(job: Job): Promise<void> {
-    const confirmed = window.confirm(
-      `Archive ${getJobTitle(job)}?\n\nThis will remove the job from workers, normal job lists, and normal work logs.\nAll existing work logs for this job will move to archived work logs.\n\nThis cannot be undone.`
-    );
+    const confirmed = window.confirm(getArchiveJobConfirmationMessage(job));
 
     if (!confirmed) return;
 
@@ -455,9 +365,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
   }
 
   async function handleDelete(job: Job): Promise<void> {
-    const confirmed = window.confirm(
-      `Delete ${getJobTitle(job)}? This cannot be undone.`
-    );
+    const confirmed = window.confirm(getDeleteJobConfirmationMessage(job));
 
     if (!confirmed) return;
 
@@ -477,8 +385,9 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
           <div>
             <h2>Job Management</h2>
             <p className={styles.subtitle}>
-              Create jobs and assign them to worker roles. Jobs are stored in AWS
-              and cached locally for offline viewing. Job drawings remain local-only until S3 is added.
+              Create jobs and assign them to worker roles. Jobs are stored in AWS and cached locally
+              for offline viewing. Job document links are saved with the job and can open OneDrive
+              or SharePoint documents.
             </p>
           </div>
 
@@ -487,46 +396,23 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
           </button>
         </div>
 
-        <div className={styles.statsGrid}>
-          <div className={styles.statCard}>
-            <span>Total Jobs</span>
-            <strong>{visibleJobs.length}</strong>
-          </div>
+        <JobStatsCards
+          totalJobs={visibleJobs.length}
+          activeJobs={activeJobs.length}
+          inactiveJobs={inactiveJobs.length}
+        />
 
-          <div className={styles.statCard}>
-            <span>Active</span>
-            <strong>{activeJobs.length}</strong>
-          </div>
-
-          <div className={styles.statCard}>
-            <span>Inactive</span>
-            <strong>{inactiveJobs.length}</strong>
-          </div>
-        </div>
-
-        <div
-          ref={jobFeedbackRef}
-          tabIndex={-1}
-          className={styles.feedbackFocusTarget}
-        >
+        <div ref={jobFeedbackRef} tabIndex={-1} className={styles.feedbackFocusTarget}>
           <FeedbackMessage message={jobFormMessage || jobMessage} />
-          <FeedbackMessage message={jobDrawingMessage} />
+          <FeedbackMessage message={jobDocumentMessage} />
         </div>
 
-        <div
-          ref={jobFormCardRef}
-          tabIndex={-1}
-          className={styles.card}
-        >
+        <div ref={jobFormCardRef} tabIndex={-1} className={styles.card}>
           <div className={styles.cardHeader}>
             <h3>{editingJobId ? "Edit Job" : "Add Job"}</h3>
 
             {editingJobId ? (
-              <button
-                className={styles.textButton}
-                type="button"
-                onClick={resetForm}
-              >
+              <button className={styles.textButton} type="button" onClick={resetForm}>
                 Cancel Edit
               </button>
             ) : null}
@@ -583,9 +469,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
                 ref={customerNameInputRef}
                 className={getJobInputClass("customerName")}
                 value={form.customerName}
-                onChange={(event) =>
-                  updateField("customerName", event.target.value)
-                }
+                onChange={(event) => updateField("customerName", event.target.value)}
                 aria-invalid={jobErrorField === "customerName"}
               />
             </label>
@@ -593,38 +477,38 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
             <div className={styles.docsField}>
               <span className={styles.docsLabel}>Job Drawings</span>
 
-              <label className={styles.fileUploadBox}>
-                <input
-                  className={styles.fileInput}
-                  type="file"
-                  multiple
-                  onChange={(event) => {
-                    void handleJobDrawingsUpload(event.currentTarget.files);
-                    event.currentTarget.value = "";
-                  }}
-                />
-                <span>Upload job drawings</span>
-              </label>
+              <button
+                className={styles.addDrawingButton}
+                type="button"
+                onClick={() => {
+                  setJobDocumentMessage("");
+                  setIsJobDocumentDialogOpen(true);
+                }}
+              >
+                + Add drawings
+              </button>
 
               <span className={styles.docsHelp}>
-                Max {MAX_JOB_DRAWINGS} files, {formatBytes(MAX_JOB_DRAWING_SIZE_BYTES)} each.
+                Add OneDrive or SharePoint drawing links without uploading files.
               </span>
             </div>
           </div>
 
-          {form.jobDrawings.length > 0 ? (
+          {form.jobDocumentLinks.length > 0 ? (
             <div className={styles.docList}>
-              {form.jobDrawings.map((doc) => (
+              {form.jobDocumentLinks.map((doc) => (
                 <div className={styles.docItem} key={doc.id}>
                   <div className={styles.docInfo}>
-                    <span className={styles.docName}>{doc.fileName}</span>
-                    <span className={styles.docSize}>{formatBytes(doc.sizeBytes)}</span>
+                    <span className={styles.docName}>{doc.title}</span>
+                    <a href={doc.url} target="_blank" rel="noreferrer">
+                      Open document
+                    </a>
                   </div>
 
                   <button
                     className={styles.removeDocButton}
                     type="button"
-                    onClick={() => removeJobDrawing(doc.id)}
+                    onClick={() => removeJobDocumentLink(doc.id)}
                   >
                     Remove
                   </button>
@@ -633,13 +517,76 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
             </div>
           ) : null}
 
+          {isJobDocumentDialogOpen ? (
+            <div className={styles.modalBackdrop}>
+              <form
+                className={styles.modalCard}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  addJobDocumentLink();
+                }}
+              >
+                <h2 className={styles.modalTitle}>Add Drawing</h2>
+
+                <p className={styles.modalDescription}>
+                  Add a OneDrive or SharePoint drawing link. AHlogu stores the link only.
+                </p>
+
+                <FeedbackMessage message={jobDocumentMessage} />
+
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Document Title</span>
+                  <input
+                    className={styles.modalInput}
+                    autoFocus
+                    value={jobDocumentTitle}
+                    onChange={(event) => {
+                      setJobDocumentTitle(event.target.value);
+                      if (jobDocumentMessage) setJobDocumentMessage("");
+                    }}
+                    placeholder="Mechanical drawing"
+                  />
+                </label>
+
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Document Link</span>
+                  <input
+                    className={styles.modalInput}
+                    type="url"
+                    value={jobDocumentUrl}
+                    onChange={(event) => {
+                      setJobDocumentUrl(event.target.value);
+                      if (jobDocumentMessage) setJobDocumentMessage("");
+                    }}
+                    placeholder="https://..."
+                  />
+                </label>
+
+                <div className={styles.modalActions}>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => {
+                      setJobDocumentMessage("");
+                      setIsJobDocumentDialogOpen(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+                  <button type="submit" className={styles.primaryButton}>
+                    Add Drawing
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : null}
+
           <label className={styles.fullWidthLabel}>
             Description / Notes
             <textarea
               value={form.description}
-              onChange={(event) =>
-                updateField("description", event.target.value)
-              }
+              onChange={(event) => updateField("description", event.target.value)}
               rows={4}
             />
           </label>
@@ -649,10 +596,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
 
             <div className={styles.roleGrid}>
               {WORKER_ROLE_OPTIONS.map((role) => (
-                <label
-                  className={styles.roleOption}
-                  key={role.value}
-                >
+                <label className={styles.roleOption} key={role.value}>
                   <input
                     type="checkbox"
                     checked={form.assignedRoles.includes(role.value)}
@@ -669,9 +613,7 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
               <input
                 type="checkbox"
                 checked={form.isActive}
-                onChange={(event) =>
-                  updateField("isActive", event.target.checked)
-                }
+                onChange={(event) => updateField("isActive", event.target.checked)}
               />
               Active Job
             </label>
@@ -697,91 +639,15 @@ export default function JobManagementPanel({ onClose, currentPermissionLevel }: 
 
           <div className={styles.jobList}>
             {sortedJobs.map((job) => (
-              <article className={styles.jobItem} key={job.id}>
-                <div className={styles.jobTopLine}>
-                  <div>
-                    <h4>{getJobTitle(job)}</h4>
-                    <p>
-                      Job ID: {job.jobId || "—"} · Case: {job.caseNo || "—"} ·
-                      Order: {job.orderNo || "—"}
-                    </p>
-                  </div>
-
-                  <span
-                    className={
-                      job.isActive ? styles.activeBadge : styles.inactiveBadge
-                    }
-                  >
-                    {job.isActive ? "ACTIVE" : "INACTIVE"}
-                  </span>
-                </div>
-
-                <p className={styles.jobMeta}>
-                  {job.customerName || "No customer / site"} ·{" "}
-                  {job.jobDrawings.length === 0
-                    ? "No job drawings"
-                    : `${job.jobDrawings.length} job doc(s)`}
-                </p>
-
-                <p className={styles.jobRoles}>
-                  Assigned to: {formatRoleList(job.assignedRoles)}
-                </p>
-
-                {job.description ? (
-                  <p className={styles.jobDescription}>{job.description}</p>
-                ) : null}
-
-                {job.jobDrawings.length > 0 ? (
-                  <div className={styles.savedDocs}>
-                    <p className={styles.savedDocsTitle}>Job Drawings</p>
-
-                    <div className={styles.savedDocsList}>
-                      {job.jobDrawings.map((doc) => (
-                        <a
-                          className={styles.savedDocLink}
-                          href={doc.fileData}
-                          download={doc.fileName}
-                          key={doc.id}
-                        >
-                          {doc.fileName} · {formatBytes(doc.sizeBytes)}
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className={styles.jobActions}>
-                  <button type="button" onClick={() => startEdit(job)}>
-                    Edit
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => void handleToggleJobStatus(job)}
-                  >
-                    {job.isActive ? "Deactivate" : "Activate"}
-                  </button>
-
-                                    {canArchiveOrDeleteJobs ? (
-<button
-                    type="button"
-                    onClick={() => void handleArchive(job)}
-                  >
-                    Archive
-                  </button>
-) : null}
-
-{canArchiveOrDeleteJobs ? (
-<button
-                    className={styles.dangerButton}
-                    type="button"
-                    onClick={() => void handleDelete(job)}
-                  >
-                    Delete
-                  </button>
-) : null}
-                </div>
-              </article>
+              <JobCard
+                canArchiveOrDeleteJobs={canArchiveOrDeleteJobs}
+                job={job}
+                key={job.id}
+                onArchive={handleArchive}
+                onDelete={handleDelete}
+                onEdit={startEdit}
+                onToggleStatus={handleToggleJobStatus}
+              />
             ))}
           </div>
         </div>

@@ -6,7 +6,6 @@ import type { CurrentUser } from "@/types/work";
 import workerStyles from "@/components/WorkLoggerView/WorkLoggerView.module.css";
 import styles from "./AdminDashboard.module.css";
 
-
 type AdminDashboardProps = {
   currentUser: CurrentUser;
   securityLabel: string;
@@ -39,7 +38,6 @@ function JobIcon() {
     </svg>
   );
 }
-
 
 function WorkerStatusIcon() {
   return (
@@ -92,8 +90,9 @@ export default function AdminDashboard({
                 src="/AHlogu.png"
                 alt="AH LOGU"
                 width={160}
-                height={48}
+                height={40}
                 className={workerStyles.logoImage}
+                style={{ width: "160px", height: "auto" }}
                 priority
               />
             </div>
@@ -102,14 +101,10 @@ export default function AdminDashboard({
           <section className={workerStyles.entryCard}>
             <div className={workerStyles.cardHeader}>
               <div className={workerStyles.headerText}>
-                <h1 className={workerStyles.cardTitle}>
-                  Hi, {currentUser.fullName}!
-                </h1>
+                <h1 className={workerStyles.cardTitle}>Hi, {currentUser.fullName}!</h1>
 
                 <div className={workerStyles.headerMetaRow}>
-                  <span
-                    className={`${workerStyles.statusPill} ${workerStyles.statusReady}`}
-                  >
+                  <span className={`${workerStyles.statusPill} ${workerStyles.statusReady}`}>
                     Admin Mode
                   </span>
                 </div>
@@ -124,23 +119,14 @@ export default function AdminDashboard({
                   {securityLabel}
                 </button>
 
-                <button
-                  type="button"
-                  className={workerStyles.signOutButton}
-                  onClick={onSignOut}
-                >
+                <button type="button" className={workerStyles.signOutButton} onClick={onSignOut}>
                   Sign out
                 </button>
               </div>
             </div>
 
-
             <div className={styles.actionGrid}>
-              <button
-                type="button"
-                className={styles.actionCard}
-                onClick={onOpenUserManagement}
-              >
+              <button type="button" className={styles.actionCard} onClick={onOpenUserManagement}>
                 <span className={styles.iconBox}>
                   <UserIcon />
                 </span>
@@ -170,26 +156,20 @@ export default function AdminDashboard({
                 <span className={styles.actionArrow}>→</span>
               </button>
 
-                        <button type="button" className={styles.actionCard} onClick={onOpenWorkerStatus}>
+              <button type="button" className={styles.actionCard} onClick={onOpenWorkerStatus}>
                 <span className={styles.iconBox}>
                   <WorkerStatusIcon />
                 </span>
 
                 <span className={styles.actionContent}>
                   <span className={styles.actionTitle}>Worker Status</span>
-                  <span className={styles.actionText}>
-                    View live worker status
-                  </span>
+                  <span className={styles.actionText}>View live worker status</span>
                 </span>
 
                 <span className={styles.actionArrow}>→</span>
               </button>
 
-<button
-            className={styles.actionCard}
-            type="button"
-            onClick={onOpenWorkLogs}
-          >
+              <button className={styles.actionCard} type="button" onClick={onOpenWorkLogs}>
                 <span className={styles.iconBoxMuted}>
                   <LogsIcon />
                 </span>
@@ -201,11 +181,9 @@ export default function AdminDashboard({
                   </span>
                 </span>
 
-            <span className={styles.actionArrow}>→</span>
-          </button>
-
-
-</div>
+                <span className={styles.actionArrow}>→</span>
+              </button>
+            </div>
           </section>
         </div>
       </div>

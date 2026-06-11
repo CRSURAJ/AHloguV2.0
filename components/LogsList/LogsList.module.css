@@ -270,7 +270,10 @@
   color: #eef7f3;
   cursor: pointer;
   font: inherit;
-  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .stickyToggleButton:hover {
@@ -297,11 +300,7 @@
   padding: 14px;
   border-radius: 16px;
   border: 1px solid rgba(226, 173, 63, 0.28);
-  background: linear-gradient(
-    180deg,
-    rgba(255, 236, 179, 0.12),
-    rgba(226, 173, 63, 0.08)
-  );
+  background: linear-gradient(180deg, rgba(255, 236, 179, 0.12), rgba(226, 173, 63, 0.08));
 }
 
 .stickyNoteHeader {

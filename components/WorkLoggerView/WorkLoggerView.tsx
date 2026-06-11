@@ -2,11 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import {
-  ActionButtons,
-  LogsList,
-  WorkerForm,
-} from "@/components";
+import { ActionButtons, LogsList, WorkerForm } from "@/components";
 import type { WorkLoggerState } from "@/hooks/useWorkLogger";
 import type { CurrentUser } from "@/types/work";
 import styles from "./WorkLoggerView.module.css";
@@ -33,20 +29,16 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
   const [switchJobId, setSwitchJobId] = useState("");
   const [switchCustomJobMode, setSwitchCustomJobMode] = useState(false);
   const [switchLocation, setSwitchLocation] = useState("");
-  const [switchLocationPlaceholder, setSwitchLocationPlaceholder] =
-    useState("Warehouse or Site Address");
+  const [switchLocationPlaceholder, setSwitchLocationPlaceholder] = useState(
+    "Warehouse or Site Address",
+  );
   const [switchMessage, setSwitchMessage] = useState("");
 
-  const selectedSwitchJobIsAssigned = props.availableJobs.some(
-    (job) => job.jobId === switchJobId
-  );
+  const selectedSwitchJobIsAssigned = props.availableJobs.some((job) => job.jobId === switchJobId);
   const showSwitchCustomJobInput =
     props.availableJobs.length > 0 &&
-    (switchCustomJobMode ||
-      (switchJobId.trim() !== "" && !selectedSwitchJobIsAssigned));
-  const switchJobSelectValue = showSwitchCustomJobInput
-    ? CUSTOM_SWITCH_JOB_OPTION
-    : switchJobId;
+    (switchCustomJobMode || (switchJobId.trim() !== "" && !selectedSwitchJobIsAssigned));
+  const switchJobSelectValue = showSwitchCustomJobInput ? CUSTOM_SWITCH_JOB_OPTION : switchJobId;
 
   function openSwitchModal() {
     setSwitchJobId("");
@@ -84,8 +76,9 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
                 src="/AHlogu.png"
                 alt="AH LOGU"
                 width={160}
-                height={48}
+                height={40}
                 className={styles.logoImage}
+                style={{ width: "160px", height: "auto" }}
                 priority
               />
             </div>
@@ -122,11 +115,7 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
                   </button>
                 ) : null}
 
-                <button
-                  type="button"
-                  className={styles.signOutButton}
-                  onClick={props.onSignOut}
-                >
+                <button type="button" className={styles.signOutButton} onClick={props.onSignOut}>
                   Sign out
                 </button>
               </div>
@@ -138,8 +127,6 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
               availableJobs={props.availableJobs}
               location={props.location}
               setLocation={props.setLocation}
-              jobDocs={props.jobDocs}
-              setJobDocs={props.setJobDocs}
               description={props.description}
               setDescription={props.setDescription}
               isWorking={props.isWorking}
@@ -162,15 +149,12 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
               handleClearAll={props.handleClearAll}
             />
 
-
             {switchOpen ? (
               <div className={styles.switchBackdrop}>
                 <div className={styles.switchModal}>
                   <div className={styles.switchHeader}>
                     <h2>Save & Switch Job</h2>
-                    <p>
-                      Save the current job log and immediately start the next job.
-                    </p>
+                    <p>Save the current job log and immediately start the next job.</p>
                   </div>
 
                   {switchMessage ? (
@@ -180,16 +164,13 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
                   <div className={styles.switchGrid}>
                     <label className={styles.switchField}>
                       Job ID
-
                       {props.availableJobs.length > 0 ? (
                         <>
                           <select
                             className={styles.switchInput}
                             value={switchJobSelectValue}
                             onChange={(event) => {
-                              if (
-                                event.target.value === CUSTOM_SWITCH_JOB_OPTION
-                              ) {
+                              if (event.target.value === CUSTOM_SWITCH_JOB_OPTION) {
                                 setSwitchCustomJobMode(true);
                                 setSwitchJobId("");
                                 return;
@@ -209,18 +190,14 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
                               </option>
                             ))}
 
-                            <option value={CUSTOM_SWITCH_JOB_OPTION}>
-                              Custom Job
-                            </option>
+                            <option value={CUSTOM_SWITCH_JOB_OPTION}>Custom Job</option>
                           </select>
 
                           {showSwitchCustomJobInput ? (
                             <input
                               className={styles.switchInput}
                               value={switchJobId}
-                              onChange={(event) =>
-                                setSwitchJobId(event.target.value)
-                              }
+                              onChange={(event) => setSwitchJobId(event.target.value)}
                               placeholder="Enter custom Job ID"
                             />
                           ) : null}
@@ -229,9 +206,7 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
                         <input
                           className={styles.switchInput}
                           value={switchJobId}
-                          onChange={(event) =>
-                            setSwitchJobId(event.target.value)
-                          }
+                          onChange={(event) => setSwitchJobId(event.target.value)}
                           placeholder="Enter next Job ID"
                         />
                       )}
@@ -239,16 +214,13 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
 
                     <label className={styles.switchField}>
                       Location
-
                       <div className={styles.switchLocationButtons}>
                         <button
                           type="button"
                           className={styles.switchChip}
                           onClick={() => {
                             setSwitchLocation("Warehouse");
-                            setSwitchLocationPlaceholder(
-                              "Warehouse or Site Address"
-                            );
+                            setSwitchLocationPlaceholder("Warehouse or Site Address");
                           }}
                         >
                           Warehouse
@@ -262,13 +234,10 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
                           Site Address
                         </button>
                       </div>
-
                       <input
                         className={styles.switchInput}
                         value={switchLocation}
-                        onChange={(event) =>
-                          setSwitchLocation(event.target.value)
-                        }
+                        onChange={(event) => setSwitchLocation(event.target.value)}
                         readOnly={switchLocation === "Warehouse"}
                         placeholder={switchLocationPlaceholder}
                       />
@@ -295,8 +264,7 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
                 </div>
               </div>
             ) : null}
-            <div className={styles.cloudSyncSection}>
-</div>
+            <div className={styles.cloudSyncSection}></div>
             <LogsList
               logs={props.logs}
               expandedLogId={props.expandedLogId}

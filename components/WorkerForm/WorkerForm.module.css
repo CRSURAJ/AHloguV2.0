@@ -114,95 +114,6 @@ select.input:disabled {
   cursor: not-allowed;
 }
 
-.modalBackdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgba(1, 10, 9, 0.72);
-  backdrop-filter: blur(10px);
-}
-
-.modalCard {
-  width: min(420px, 100%);
-  border-radius: 24px;
-  padding: 18px;
-  background: rgba(17, 48, 45, 0.98);
-  border: 1px solid rgba(178, 223, 220, 0.16);
-  box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  color: #eef7f3;
-}
-
-.modalHeader {
-  margin-bottom: 14px;
-}
-
-.modalHeader h3 {
-  margin: 0;
-  color: #d9cdc7;
-  font-size: 20px;
-  line-height: 1.2;
-}
-
-.modalHeader p {
-  margin: 8px 0 0;
-  color: rgba(238, 247, 243, 0.68);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.modalActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.modalPrimaryButton,
-.modalSecondaryButton {
-  min-height: 42px;
-  padding: 0 14px;
-  border-radius: 14px;
-  border: 0;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.modalPrimaryButton {
-  background: #53bc7b;
-  color: #072c29;
-}
-
-.modalSecondaryButton {
-  background: rgba(8, 34, 32, 0.8);
-  color: #eef7f3;
-  border: 1px solid rgba(178, 223, 220, 0.16);
-}
-
-.modalPrimaryButton:hover {
-  filter: brightness(1.04);
-}
-
-.modalSecondaryButton:hover {
-  border-color: rgba(83, 188, 123, 0.34);
-  background: rgba(8, 34, 32, 0.95);
-}
-
-@media (max-width: 520px) {
-  .modalActions {
-    flex-direction: column-reverse;
-  }
-
-  .modalPrimaryButton,
-  .modalSecondaryButton {
-    width: 100%;
-  }
-}
-
 .locationActions {
   display: flex;
   gap: 8px;
@@ -403,12 +314,6 @@ select.input:disabled {
   gap: 8px;
 }
 
-.quickControlLabel {
-  color: rgba(238, 247, 243, 0.72);
-  font-size: 13px;
-  font-weight: 800;
-}
-
 .quickWorkButtons {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -467,10 +372,6 @@ select.input:disabled {
 /* Make quick Start/Break controls cleaner */
 .quickWorkControl {
   align-self: end !important;
-}
-
-.quickControlLabel {
-  display: none !important;
 }
 
 .quickWorkButtons {
@@ -666,7 +567,9 @@ select.input {
   background-position:
     calc(100% - 18px) calc(50% - 3px),
     calc(100% - 12px) calc(50% - 3px);
-  background-size: 6px 6px, 6px 6px;
+  background-size:
+    6px 6px,
+    6px 6px;
   background-repeat: no-repeat;
   padding-right: 42px !important;
 }
@@ -698,4 +601,35 @@ select.input:disabled {
 
 #jobId + .input {
   margin-top: 10px;
+}
+
+.jobDocumentsField {
+  align-self: stretch;
+}
+
+.jobDocumentLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.jobDocumentLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(83, 188, 123, 0.45);
+  background: #11302d;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-decoration: none;
+  padding: 0.35rem 0.75rem;
+}
+
+.jobDocumentLink:hover {
+  background: #085153;
+  color: #ffffff;
+  transform: translateY(-1px);
 }

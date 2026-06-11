@@ -1,6 +1,6 @@
 import { getCloudProvider } from "@/lib/cloud/client";
 import { WORKER_ROLE_OPTIONS } from "@/types/work";
-import type { Job, WorkerRole } from "@/types/work";
+import type { Job, JobDocumentLink, WorkerRole } from "@/types/work";
 
 const JOBS_STORAGE_KEY = "project_logu:jobs";
 
@@ -15,17 +15,13 @@ export type CreateJobInput = {
   location: string;
   description: string;
   assignedRoles: WorkerRole[];
-  jobDrawings?: Job["jobDrawings"];
+  jobDocumentLinks?: Job["jobDocumentLinks"];
   isActive?: boolean;
 };
 
-export type UpdateJobInput = Partial<CreateJobInput> & {
-  jobDrawings?: Job["jobDrawings"];
-};
+export type UpdateJobInput = Partial<CreateJobInput>;
 
-const VALID_WORKER_ROLES = new Set<WorkerRole>(
-  WORKER_ROLE_OPTIONS.map((option) => option.value)
-);
+const VALID_WORKER_ROLES = new Set<WorkerRole>(WORKER_ROLE_OPTIONS.map((option) => option.value));
 
 function getCloud() {
   return getCloudProvider();
@@ -71,27 +67,6 @@ function clearCloudJobsCache(): void {
   inFlightCloudJobs = null;
 }
 
-function stripJobDrawingsForCloud(job: Job): Job {
-  return {
-    ...job,
-    jobDrawings: [],
-  };
-}
-
-function mergeCloudJobsWithLocalDrawings(
-  cloudJobs: Job[],
-  localJobs: Job[]
-): Job[] {
-  return cloudJobs.map((cloudJob) => {
-    const localJob = localJobs.find((job) => job.id === cloudJob.id);
-
-    return {
-      ...cloudJob,
-      jobDrawings: localJob?.jobDrawings ?? cloudJob.jobDrawings ?? [],
-    };
-  });
-}
-
 async function loadLocalJobs(): Promise<Job[]> {
   if (typeof window === "undefined") return [];
 
@@ -105,7 +80,6 @@ async function loadLocalJobs(): Promise<Job[]> {
     .filter((job): job is Job => job !== null)
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 }
-
 
 function makeId(prefix: string): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -141,8 +115,31 @@ function cleanAssignedRoles(value: unknown): WorkerRole[] {
 
   return value.filter(
     (role): role is WorkerRole =>
-      typeof role === "string" && VALID_WORKER_ROLES.has(role as WorkerRole)
+      typeof role === "string" && VALID_WORKER_ROLES.has(role as WorkerRole),
   );
+}
+
+function cleanJobDocumentLinks(value: unknown): JobDocumentLink[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((doc, index): JobDocumentLink | null => {
+      if (!doc || typeof doc !== "object") return null;
+
+      const item = doc as Partial<JobDocumentLink>;
+      const title = cleanString(item.title);
+      const url = cleanString(item.url);
+
+      if (!title || !url) return null;
+
+      return {
+        id: cleanString(item.id) || makeId(`job-doc-link-${index}`),
+        title,
+        url,
+        addedAt: cleanDate(item.addedAt, new Date().toISOString()),
+      };
+    })
+    .filter((doc): doc is JobDocumentLink => doc !== null);
 }
 
 function normalizeJob(value: unknown, index: number): Job | null {
@@ -165,11 +162,9 @@ function normalizeJob(value: unknown, index: number): Job | null {
     location: cleanString(item.location),
     description: cleanString(item.description),
     assignedRoles: cleanAssignedRoles(item.assignedRoles),
-    jobDrawings: Array.isArray((item as { jobDrawings?: unknown }).jobDrawings)
-      ? (item as { jobDrawings: Job["jobDrawings"] }).jobDrawings
-      : Array.isArray((item as { jobDocs?: unknown }).jobDocs)
-        ? (item as { jobDocs: Job["jobDrawings"] }).jobDocs
-        : [],
+    jobDocumentLinks: cleanJobDocumentLinks(
+      (item as { jobDocumentLinks?: unknown }).jobDocumentLinks,
+    ),
     isActive: typeof item.isActive === "boolean" ? item.isActive : true,
     createdAt,
     updatedAt,
@@ -185,11 +180,10 @@ export async function loadJobs(): Promise<Job[]> {
 
   try {
     const cloudJobs = await listCloudJobsWithGuard();
-    const mergedJobs = mergeCloudJobsWithLocalDrawings(cloudJobs, localJobs);
 
-    await saveJobs(mergedJobs, { notify: false });
+    await saveJobs(cloudJobs, { notify: false });
 
-    return mergedJobs;
+    return cloudJobs;
   } catch (error) {
     console.warn("Could not load AWS jobs. Using local job cache.", error);
     return localJobs;
@@ -200,10 +194,7 @@ type SaveJobsOptions = {
   notify?: boolean;
 };
 
-export async function saveJobs(
-  jobs: Job[],
-  options: SaveJobsOptions = {}
-): Promise<void> {
+export async function saveJobs(jobs: Job[], options: SaveJobsOptions = {}): Promise<void> {
   if (typeof window === "undefined") return;
 
   window.localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(jobs));
@@ -227,14 +218,14 @@ export async function createJob(input: CreateJobInput): Promise<Job> {
     location: input.location.trim(),
     description: input.description.trim(),
     assignedRoles: cleanAssignedRoles(input.assignedRoles),
-    jobDrawings: input.jobDrawings ?? [],
+    jobDocumentLinks: input.jobDocumentLinks ?? [],
     isActive: input.isActive ?? true,
     createdAt: now,
     updatedAt: now,
   };
 
   if (shouldUseAwsJobs()) {
-    const result = await getCloud().jobs.create(stripJobDrawingsForCloud(job));
+    const result = await getCloud().jobs.create(job);
 
     if (!result.ok) {
       throw new Error(result.message || "Could not create job in AWS.");
@@ -248,10 +239,7 @@ export async function createJob(input: CreateJobInput): Promise<Job> {
   return job;
 }
 
-export async function updateJob(
-  id: string,
-  updates: UpdateJobInput
-): Promise<Job | null> {
+export async function updateJob(id: string, updates: UpdateJobInput): Promise<Job | null> {
   const jobs = await loadJobs();
   const existingJob = jobs.find((job) => job.id === id);
 
@@ -269,13 +257,13 @@ export async function updateJob(
     assignedRoles: updates.assignedRoles
       ? cleanAssignedRoles(updates.assignedRoles)
       : existingJob.assignedRoles,
-    jobDrawings: updates.jobDrawings ?? existingJob.jobDrawings,
+    jobDocumentLinks: updates.jobDocumentLinks ?? existingJob.jobDocumentLinks,
     isActive: updates.isActive ?? existingJob.isActive,
     updatedAt: new Date().toISOString(),
   };
 
   if (shouldUseAwsJobs()) {
-    const result = await getCloud().jobs.update(stripJobDrawingsForCloud(updatedJob));
+    const result = await getCloud().jobs.update(updatedJob);
 
     if (!result.ok) {
       throw new Error(result.message || "Could not update job in AWS.");

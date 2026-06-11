@@ -1,8 +1,6 @@
 export const MELBOURNE_TIME_ZONE = "Australia/Melbourne";
 
-export function formatMelbourneDateTime(
-  value: string | number | Date | null | undefined
-): string {
+export function formatMelbourneDateTime(value: string | number | Date | null | undefined): string {
   if (!value) return "-";
 
   const date = new Date(value);

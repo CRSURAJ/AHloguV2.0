@@ -24,9 +24,7 @@ function getCognitoIdToken(): string {
   }
 
   const tokenKey = Object.keys(window.localStorage).find(
-    (key) =>
-      key.includes("CognitoIdentityServiceProvider") &&
-      key.endsWith(".idToken"),
+    (key) => key.includes("CognitoIdentityServiceProvider") && key.endsWith(".idToken"),
   );
 
   if (!tokenKey) {
@@ -113,10 +111,7 @@ async function requestJson<TPayload>(
 
     if (!response.ok) {
       const message =
-        data &&
-        typeof data === "object" &&
-        "error" in data &&
-        typeof data.error === "string"
+        data && typeof data === "object" && "error" in data && typeof data.error === "string"
           ? data.error
           : `AWS API request failed with status ${response.status}.`;
 
@@ -127,10 +122,7 @@ async function requestJson<TPayload>(
     }
 
     const cloudId =
-      data &&
-      typeof data === "object" &&
-      "cloudId" in data &&
-      typeof data.cloudId === "string"
+      data && typeof data === "object" && "cloudId" in data && typeof data.cloudId === "string"
         ? data.cloudId
         : undefined;
 
@@ -199,10 +191,7 @@ export const awsCloudProvider: CloudProvider = {
 
       if (!response.ok) {
         const message =
-          data &&
-          typeof data === "object" &&
-          "error" in data &&
-          typeof data.error === "string"
+          data && typeof data === "object" && "error" in data && typeof data.error === "string"
             ? data.error
             : `AWS jobs list failed with status ${response.status}.`;
 
@@ -260,10 +249,7 @@ export const awsCloudProvider: CloudProvider = {
 
       if (!response.ok) {
         const message =
-          data &&
-          typeof data === "object" &&
-          "error" in data &&
-          typeof data.error === "string"
+          data && typeof data === "object" && "error" in data && typeof data.error === "string"
             ? data.error
             : `AWS work logs list failed with status ${response.status}.`;
 
@@ -283,12 +269,12 @@ export const awsCloudProvider: CloudProvider = {
         payload: log,
       });
     },
-    
+
     async delete(logId: string) {
-  return requestJson(`/work-logs/${encodeURIComponent(logId)}`, {
-    method: "DELETE",
-  });
-},
+      return requestJson(`/work-logs/${encodeURIComponent(logId)}`, {
+        method: "DELETE",
+      });
+    },
     async upload(log: LogItem) {
       return requestJson("/work-logs", {
         method: "POST",
@@ -323,10 +309,7 @@ export const awsCloudProvider: CloudProvider = {
 
       if (!response.ok) {
         const message =
-          data &&
-          typeof data === "object" &&
-          "error" in data &&
-          typeof data.error === "string"
+          data && typeof data === "object" && "error" in data && typeof data.error === "string"
             ? data.error
             : `AWS worker status list failed with status ${response.status}.`;
 
@@ -345,49 +328,6 @@ export const awsCloudProvider: CloudProvider = {
         method: "PUT",
         payload: status,
       });
-    },
-  },
-
-  drawings: {
-    async upload({ jobId, fileName, file }) {
-      const baseUrl = getAwsApiBaseUrl();
-
-      if (!baseUrl) {
-        return {
-          ok: false,
-          message: "Missing NEXT_PUBLIC_AHLOGU_API_URL.",
-        };
-      }
-
-      const formData = new FormData();
-      formData.append("jobId", jobId);
-      formData.append("fileName", fileName);
-      formData.append("file", file);
-
-      try {
-        const response = await fetch(`${baseUrl}/drawings`, {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: formData,
-        });
-
-        if (!response.ok) {
-          return {
-            ok: false,
-            message: `Drawing upload failed with status ${response.status}.`,
-          };
-        }
-
-        return {
-          ok: true,
-          message: "Drawing uploaded to AWS API.",
-        };
-      } catch (error) {
-        return {
-          ok: false,
-          message: getErrorMessage(error),
-        };
-      }
     },
   },
 };

@@ -13,14 +13,15 @@ export type CloudHealthResult = {
 };
 
 export type CloudProvider = {
-  providerName: string;
+  providerName: "aws";
   healthCheck: () => Promise<CloudHealthResult>;
 
   jobs: {
     list: () => Promise<Job[]>;
     create: (job: Job) => Promise<CloudSyncResult>;
     update: (job: Job) => Promise<CloudSyncResult>;
-    delete: (jobId: string) => Promise<CloudSyncResult>; archive: (jobId: string) => Promise<CloudSyncResult>;
+    delete: (jobId: string) => Promise<CloudSyncResult>;
+    archive: (jobId: string) => Promise<CloudSyncResult>;
   };
 
   workLogs: {
@@ -34,13 +35,5 @@ export type CloudProvider = {
   workerStatus: {
     list: () => Promise<WorkerLiveStatus[]>;
     updateMine: (status: WorkerLiveStatus) => Promise<CloudSyncResult>;
-  };
-
-  drawings: {
-    upload: (params: {
-      jobId: string;
-      fileName: string;
-      file: File;
-    }) => Promise<CloudSyncResult>;
   };
 };

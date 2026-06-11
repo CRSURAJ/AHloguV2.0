@@ -16,18 +16,25 @@ import {
 import { getJobsForRole, JOBS_CHANGED_EVENT } from "@/lib/jobStorage";
 import { getCloudProvider } from "@/lib/cloud/client";
 import { getWorkingStatusText, minutesBetween } from "@/lib/workUtils";
-import type {
-  ActiveSession,
-  AuthActionResult,
-  CurrentUser,
-  DraftState,
-  Job,
-  LogItem,
-  SyncStatus,
-  WorkerLiveStatus,
-} from "@/types/work";
-
-const TB_URL = process.env.NEXT_PUBLIC_PROJECT_LOGU_SYNC_URL ?? "";
+import { createPendingWorkLog } from "@/lib/workLogger/workLogItem";
+import { uploadWorkLogToAws } from "@/lib/workLogger/workLogSync";
+import {
+  getSyncableWorkLogs,
+  markWorkLogFailed,
+  markWorkLogSynced,
+  markWorkLogSyncing,
+  updateWorkLogStickyNote,
+} from "@/lib/workLogger/workLogStatus";
+import {
+  createActiveSessionSnapshot,
+  createDraftSnapshot,
+  hasMeaningfulDraft,
+} from "@/lib/workLogger/workLoggerPersistence";
+import {
+  buildWorkerLiveStatusPayload,
+  getWorkerLiveStatusSignature,
+} from "@/lib/workLogger/workerStatusPayload";
+import type { AuthActionResult, CurrentUser, Job, LogItem, SyncStatus } from "@/types/work";
 
 export type WorkLoggerState = {
   currentUserFullName: string;
@@ -60,10 +67,7 @@ export type WorkLoggerState = {
   handleStart: () => void;
   handleBreak: () => void;
   handleStop: () => void;
-  handleSaveAndSwitch: (
-    nextJobId: string,
-    nextLocation: string
-  ) => AuthActionResult;
+  handleSaveAndSwitch: (nextJobId: string, nextLocation: string) => AuthActionResult;
   handleSync: () => Promise<void>;
   handleClearAll: () => void;
   handleDeleteLog: (id: string) => void;
@@ -71,14 +75,6 @@ export type WorkLoggerState = {
   handleStickyNoteChange: (id: string, value: string) => void;
   getSyncBadgeClass: (status: SyncStatus) => string;
 };
-
-function makeUuid(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-
-  return `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
 
 export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
   const [jobId, setJobId] = useState("");
@@ -185,10 +181,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
 
   useEffect(() => {
     function refreshJobs(event?: Event) {
-      if (
-        event instanceof StorageEvent &&
-        event.key !== "project_logu:jobs"
-      ) {
+      if (event instanceof StorageEvent && event.key !== "project_logu:jobs") {
         return;
       }
 
@@ -217,7 +210,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     if (!isHydrated) return;
 
     if (isWorking) {
-      const session: ActiveSession = {
+      const session = createActiveSessionSnapshot({
         isWorking,
         isOnBreak,
         startTime,
@@ -228,7 +221,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
         role,
         jobDocs,
         description,
-      };
+      });
 
       void saveSession(currentUser.id, session);
       return;
@@ -254,42 +247,23 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     if (!isHydrated) return;
     if (isWorking) return;
 
-    const draft: DraftState = {
+    const draft = createDraftSnapshot({
       jobId,
       location,
       role,
       jobDocs,
       description,
-    };
+    });
 
-    const hasMeaningfulDraft =
-      draft.jobId.trim() !== "" ||
-      draft.location.trim() !== "" ||
-      draft.role.trim() !== "" ||
-      draft.jobDocs.trim() !== "" ||
-      draft.description.trim() !== "";
-
-    if (hasMeaningfulDraft) {
+    if (hasMeaningfulDraft(draft)) {
       void saveDraft(currentUser.id, draft);
     } else {
       void clearDraft(currentUser.id);
     }
-  }, [
-    currentUser.id,
-    description,
-    isHydrated,
-    isWorking,
-    jobDocs,
-    jobId,
-    location,
-    role,
-  ]);
+  }, [currentUser.id, description, isHydrated, isWorking, jobDocs, jobId, location, role]);
 
   const canStart =
-    !isWorking &&
-    jobId.trim() !== "" &&
-    role.trim() !== "" &&
-    location.trim() !== "";
+    !isWorking && jobId.trim() !== "" && role.trim() !== "" && location.trim() !== "";
 
   const canBreak = isWorking;
   const canStop = isWorking && !isOnBreak && description.trim() !== "";
@@ -297,21 +271,20 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
 
   const unsyncedCount = useMemo(
     () => logs.filter((item) => item.syncStatus !== "synced").length,
-    [logs]
+    [logs],
   );
 
   const syncedCount = useMemo(
     () => logs.filter((item) => item.syncStatus === "synced").length,
-    [logs]
+    [logs],
   );
 
   const failedCount = useMemo(
     () => logs.filter((item) => item.syncStatus === "failed").length,
-    [logs]
+    [logs],
   );
 
-  const canClearAll =
-    logs.length > 0 && logs.every((item) => item.syncStatus === "synced");
+  const canClearAll = logs.length > 0 && logs.every((item) => item.syncStatus === "synced");
 
   const workingStatusText = getWorkingStatusText(isWorking, isOnBreak);
 
@@ -319,59 +292,21 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     async (options: { force?: boolean } = {}) => {
       if (!isHydrated) return;
 
-      const pendingItems = logs.filter(
-        (item) => item.syncStatus === "pending" || item.syncStatus === "failed"
-      );
-
-      const oldestPendingSyncAt = pendingItems
-        .map((item) => item.stoppedAt || item.startedAt)
-        .filter((value): value is string => Boolean(value))
-        .sort()[0];
-
-      const trimmedJobId = jobId.trim();
-      const currentJob = availableJobs.find(
-        (job) => job.jobId === trimmedJobId || job.id === trimmedJobId
-      );
-
-      const nowIso = new Date().toISOString();
-
-      const statusPayload: WorkerLiveStatus = {
-        userId: currentUser.id,
-        fullName: currentUser.fullName,
-        email: currentUser.username,
-        role: currentUser.role,
-        status: isWorking ? (isOnBreak ? "on_break" : "working") : "available",
-
-        currentJobId: trimmedJobId || undefined,
-        currentJobName: currentJob?.jobName || undefined,
-        currentJobLocation: location.trim() || undefined,
-
-        startedAt: isWorking && startTime ? startTime : undefined,
-        breakStartedAt:
-          isWorking && isOnBreak && breakStartTime ? breakStartTime : undefined,
+      const statusPayload = buildWorkerLiveStatusPayload({
+        currentUser,
+        logs,
+        availableJobs,
+        jobId,
+        location,
+        isWorking,
+        isOnBreak,
+        startTime,
+        breakStartTime,
         breakMinutes,
-
-        pendingSyncCount: pendingItems.length,
-        failedSyncCount: failedCount,
-        oldestPendingSyncAt,
-
-        lastSeenAt: nowIso,
-        updatedAt: nowIso,
-      };
-
-      const signature = JSON.stringify({
-        userId: statusPayload.userId,
-        status: statusPayload.status,
-        currentJobId: statusPayload.currentJobId,
-        currentJobName: statusPayload.currentJobName,
-        currentJobLocation: statusPayload.currentJobLocation,
-        startedAt: statusPayload.startedAt,
-        breakStartedAt: statusPayload.breakStartedAt,
-        breakMinutes: statusPayload.breakMinutes,
-        pendingSyncCount: statusPayload.pendingSyncCount,
-        failedSyncCount: statusPayload.failedSyncCount,
-        oldestPendingSyncAt: statusPayload.oldestPendingSyncAt,
+        failedCount,
       });
+
+      const signature = getWorkerLiveStatusSignature(statusPayload);
 
       const nowMs = Date.now();
 
@@ -388,9 +323,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       workerStatusInFlightRef.current = true;
 
       try {
-        const result = await getCloudProvider().workerStatus.updateMine(
-          statusPayload
-        );
+        const result = await getCloudProvider().workerStatus.updateMine(statusPayload);
 
         if (!result.ok) {
           console.warn("Worker live status update failed:", result.message);
@@ -409,10 +342,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       availableJobs,
       breakMinutes,
       breakStartTime,
-      currentUser.fullName,
-      currentUser.id,
-      currentUser.role,
-      currentUser.username,
+      currentUser,
       failedCount,
       isHydrated,
       isOnBreak,
@@ -421,7 +351,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       location,
       logs,
       startTime,
-    ]
+    ],
   );
 
   useEffect(() => {
@@ -446,23 +376,10 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       window.removeEventListener("online", sendHeartbeat);
     };
   }, [isHydrated, publishWorkerStatus]);
- 
- function handleStickyNoteChange(id: string, value: string) {
-  setLogs((prev) =>
-    prev.map((log) => {
-      if (log.id !== id) return log;
 
-      if (log.syncStatus === "synced" || log.syncStatus === "syncing") {
-        return log;
-      }
-
-      return {
-        ...log,
-        stickyNote: value,
-      };
-    })
-  );
-}
+  function handleStickyNoteChange(id: string, value: string) {
+    setLogs((prev) => updateWorkLogStickyNote(prev, id, value));
+  }
   function validateBeforeStart(): string {
     if (jobId.trim() === "") return "Job ID is required.";
     if (role.trim() === "") return "Role is required.";
@@ -533,28 +450,17 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       return;
     }
 
-    const stopTime = new Date().toISOString();
-    const totalMinutes = minutesBetween(startTime, stopTime);
-    const workedMinutes = Math.max(0, totalMinutes - breakMinutes);
-
-    const logItem: LogItem = {
-      id: makeUuid(),
-      loguId: makeUuid(),
-      ts: new Date(stopTime).getTime(),
-      fullname: currentUser.fullName,
+    const logItem = createPendingWorkLog({
+      currentUser,
       jobId,
       location,
       role,
       jobDocs,
       description,
-      startedAt: startTime,
-      stoppedAt: stopTime,
+      startTime,
+      stopTime: new Date().toISOString(),
       breakMinutes,
-      workedMinutes,
-      syncStatus: "pending",
-      syncMessage: "Waiting to sync",
-      stickyNote: "",
-   };
+    });
     setLogs((prev) => [logItem, ...prev]);
     setIsWorking(false);
     setIsOnBreak(false);
@@ -566,10 +472,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     setBannerMessage("");
   }
 
-  function handleSaveAndSwitch(
-    nextJobId: string,
-    nextLocation: string
-  ): AuthActionResult {
+  function handleSaveAndSwitch(nextJobId: string, nextLocation: string): AuthActionResult {
     if (!isWorking || !startTime) {
       return { ok: false, message: "No active job to save." };
     }
@@ -593,28 +496,17 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       return { ok: false, message: "Select or enter the next location." };
     }
 
-    const stopTime = new Date().toISOString();
-    const totalMinutes = minutesBetween(startTime, stopTime);
-    const workedMinutes = Math.max(0, totalMinutes - breakMinutes);
-
-    const logItem: LogItem = {
-      id: makeUuid(),
-      loguId: makeUuid(),
-      ts: new Date(stopTime).getTime(),
-      fullname: currentUser.fullName,
+    const logItem = createPendingWorkLog({
+      currentUser,
       jobId,
       location,
       role,
       jobDocs,
       description,
-      startedAt: startTime,
-      stoppedAt: stopTime,
+      startTime,
+      stopTime: new Date().toISOString(),
       breakMinutes,
-      workedMinutes,
-      syncStatus: "pending",
-      syncMessage: "Waiting to sync",
-      stickyNote: "",
-    };
+    });
     const newStartTime = new Date().toISOString();
 
     setLogs((prev) => [logItem, ...prev]);
@@ -634,72 +526,13 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
   }
 
   async function syncOneItem(item: LogItem): Promise<number> {
-    setLogs((prev) =>
-      prev.map((log) =>
-        log.id === item.id
-          ? {
-              ...log,
-              syncStatus: "syncing",
-              syncMessage: "Syncing...",
-            }
-          : log
-      )
-    );
+    setLogs((prev) => markWorkLogSyncing(prev, item.id));
 
-    const cloud = getCloudProvider();
-
-    if (cloud.providerName === "aws") {
-      const result = await cloud.workLogs.upload(item);
-
-      if (!result.ok) {
-        throw new Error(result.message || "AWS work log upload failed.");
-      }
-
-      return Date.now();
-    }
-
-    if (!TB_URL) {
-      throw new Error(
-        "No AWS cloud provider selected and NEXT_PUBLIC_PROJECT_LOGU_SYNC_URL is not configured."
-      );
-    }
-
-    const payload = {
-      id: item.id,
-      loguId: item.loguId,
-      ts: item.ts,
-      fullname: item.fullname,
-      jobId: item.jobId,
-      stickyNote: item.stickyNote ?? "",
-      location: item.location,
-      role: item.role,
-      jobDocs: item.jobDocs,
-      description: item.description,
-      startedAt: item.startedAt,
-      stoppedAt: item.stoppedAt,
-      breakMinutes: item.breakMinutes,
-      workedMinutes: item.workedMinutes,
-    };
-
-    const res = await fetch(TB_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      throw new Error(`Sync failed with status ${res.status}`);
-    }
-
-    return Date.now();
+    return uploadWorkLogToAws(item);
   }
 
   async function handleSync(): Promise<void> {
-    const itemsToSync = logs.filter(
-      (item) => item.syncStatus === "pending" || item.syncStatus === "failed"
-    );
+    const itemsToSync = getSyncableWorkLogs(logs);
 
     if (itemsToSync.length === 0) {
       setBannerMessage("");
@@ -710,33 +543,11 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       try {
         const syncedAt = await syncOneItem(item);
 
-        setLogs((prev) =>
-          prev.map((log) =>
-            log.id === item.id
-              ? {
-                  ...log,
-                  syncedAt,
-                  syncStatus: "synced",
-                  syncMessage: "Synced successfully",
-                }
-              : log
-          )
-        );
+        setLogs((prev) => markWorkLogSynced(prev, item.id, syncedAt));
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Unknown sync error";
+        const message = error instanceof Error ? error.message : "Unknown sync error";
 
-        setLogs((prev) =>
-          prev.map((log) =>
-            log.id === item.id
-              ? {
-                  ...log,
-                  syncStatus: "failed",
-                  syncMessage: message,
-                }
-              : log
-          )
-        );
+        setLogs((prev) => markWorkLogFailed(prev, item.id, message));
       }
     }
 

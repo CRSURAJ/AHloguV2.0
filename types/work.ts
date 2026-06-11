@@ -40,20 +40,6 @@ export type AuthActionResult = {
   message: string;
 };
 
-export type CreateLocalUserInput = {
-  username: string;
-  fullName: string;
-  permissionLevel: PermissionLevel;
-  role: WorkerRole;
-  credentialType: CredentialType;
-  secret: string;
-};
-
-export type LocalAuthSession = {
-  userId: string;
-  signedInAt: string;
-};
-
 export type CurrentUser = {
   id: string;
   username: string;
@@ -62,17 +48,6 @@ export type CurrentUser = {
   role: WorkerRole;
   credentialType: CredentialType;
   mustChangeCredential: boolean;
-};
-
-export type OfflineUser = CurrentUser & {
-  credentialHash: string;
-  credentialSalt: string;
-  isActive: boolean;
-  isArchived?: boolean;
-  archivedAt?: string;
-  archivedBy?: string;
-  createdAt: string;
-  updatedAt: string;
 };
 
 export type ActiveSession = {
@@ -116,13 +91,11 @@ export type LogItem = {
   syncedAt?: number;
 };
 
-export type JobDrawing = {
+export type JobDocumentLink = {
   id: string;
-  fileName: string;
-  fileData: string;
-  mimeType: string;
-  sizeBytes: number;
-  uploadedAt: string;
+  title: string;
+  url: string;
+  addedAt: string;
 };
 
 export type Job = {
@@ -135,7 +108,7 @@ export type Job = {
   location: string;
   description: string;
   assignedRoles: WorkerRole[];
-  jobDrawings: JobDrawing[];
+  jobDocumentLinks: JobDocumentLink[];
   isActive: boolean;
   isArchived?: boolean;
   archivedAt?: string;

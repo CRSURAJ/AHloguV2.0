@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck"
+    "check": "npm run format:check && npm run typecheck && npm run lint && npm run build",
+    "format": "prettier --write \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx,css}\" \"hooks/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\" \"types/**/*.{ts,tsx}\" \"aws/lambda/AHloguApi/**/*.mjs\" \"public/**/*.js\" \"*.{md,json,ts,mjs}\"",
+    "format:check": "prettier --check \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx,css}\" \"hooks/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\" \"types/**/*.{ts,tsx}\" \"aws/lambda/AHloguApi/**/*.mjs\" \"public/**/*.js\" \"*.{md,json,ts,mjs}\""
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
@@ -32,6 +34,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
+    "prettier": "^3.8.3",
     "tailwindcss": "^4",
     "typescript": "^5"
   },

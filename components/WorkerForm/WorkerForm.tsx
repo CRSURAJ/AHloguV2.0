@@ -11,8 +11,6 @@ type WorkerFormProps = {
   availableJobs: Job[];
   location: string;
   setLocation: (value: string) => void;
-  jobDocs: string;
-  setJobDocs: (value: string) => void;
   description: string;
   setDescription: (value: string) => void;
   isWorking: boolean;
@@ -28,9 +26,7 @@ const SITE_ADDRESS_PLACEHOLDER = "Enter Site Address Here";
 const CUSTOM_JOB_OPTION = "__custom_job__";
 
 function getJobOptionLabel(job: Job): string {
-  const parts = [job.jobId, job.jobName].filter(
-    (part) => part.trim() !== ""
-  );
+  const parts = [job.jobId, job.jobName].filter((part) => part.trim() !== "");
 
   return parts.length > 0 ? parts.join(" · ") : "Untitled job";
 }
@@ -41,8 +37,6 @@ export default function WorkerForm({
   availableJobs,
   location,
   setLocation,
-  jobDocs,
-  setJobDocs,
   description,
   setDescription,
   isWorking,
@@ -52,17 +46,16 @@ export default function WorkerForm({
   handleStart,
   handleBreak,
 }: WorkerFormProps) {
-  const [locationPlaceholder, setLocationPlaceholder] = useState(
-    DEFAULT_LOCATION_PLACEHOLDER
-  );
+  const [locationPlaceholder, setLocationPlaceholder] = useState(DEFAULT_LOCATION_PLACEHOLDER);
   const [customJobMode, setCustomJobMode] = useState(false);
 
   const descriptionDisabled = !isWorking || isOnBreak;
   const hasAvailableJobs = availableJobs.length > 0;
-  const selectedJobIsAssigned = availableJobs.some((job) => job.jobId === jobId);
+  const selectedJob = availableJobs.find((job) => job.jobId === jobId);
+  const selectedJobIsAssigned = selectedJob !== undefined;
+  const selectedJobDocumentLinks = selectedJob?.jobDocumentLinks ?? [];
   const showCustomJobInput =
-    hasAvailableJobs &&
-    (customJobMode || (jobId.trim() !== "" && !selectedJobIsAssigned));
+    hasAvailableJobs && (customJobMode || (jobId.trim() !== "" && !selectedJobIsAssigned));
   const jobSelectValue = showCustomJobInput ? CUSTOM_JOB_OPTION : jobId;
   const isWarehouseSelected = location === "Warehouse";
   const isSiteAddressMode =
@@ -145,21 +138,30 @@ export default function WorkerForm({
           )}
         </div>
 
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="jobDocs">
-            Job Docs
-          </label>
+        <div className={`${styles.field} ${styles.jobDocumentsField}`}>
+          <span className={styles.label}>Job Drawings</span>
 
-          <input
-            id="jobDocs"
-            className={styles.input}
-            type="text"
-            value={jobDocs}
-            onChange={(event) => setJobDocs(event.target.value)}
-            disabled
-            readOnly
-            placeholder="Please contact your manager"
-          />
+          {selectedJobDocumentLinks.length > 0 ? (
+            <div className={styles.jobDocumentLinks}>
+              {selectedJobDocumentLinks.map((doc) => (
+                <a
+                  className={styles.jobDocumentLink}
+                  href={doc.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  key={doc.id}
+                >
+                  {doc.title}
+                </a>
+              ))}
+            </div>
+          ) : (
+            <div className={styles.helperText}>
+              {jobId.trim()
+                ? "No drawings attached to this job."
+                : "Select an active job to view drawings."}
+            </div>
+          )}
         </div>
 
         <div className={styles.field}>

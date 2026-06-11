@@ -8,10 +8,7 @@ export const PASSWORD_REQUIREMENTS = [
 
 export const PASSWORD_REQUIREMENTS_TEXT = PASSWORD_REQUIREMENTS.join("\n- ");
 
-export function getPasswordPolicyError(
-  password: string,
-  label = "Password",
-): string {
+export function getPasswordPolicyError(password: string, label = "Password"): string {
   const value = password.trim();
 
   if (value.length < 8) {
