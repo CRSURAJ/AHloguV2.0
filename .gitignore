@@ -43,11 +43,12 @@ next-env.d.ts
 
 # AWS Lambda build output
 aws/lambda/AHloguApi/node_modules/
-aws/lambda/AHloguApi/ahlogu-api.zip
+aws/lambda/AHloguApi/*.zip
 
-# AWS Lambda build output
-aws/lambda/AHloguApi/node_modules/
-aws/lambda/AHloguApi/ahlogu-api.zip
+# Claude Code local settings and review reports
+.claude/
+ahlogu-code-review.html
+ahlogu-deep-dive-review-*.html
 
 # Keep safe example environment file tracked
 !.env.example
