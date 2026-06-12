@@ -4,6 +4,7 @@ type ActionButtonsProps = {
   canStop: boolean;
   canSaveAndSwitch: boolean;
   canClearAll: boolean;
+  isSyncing: boolean;
   unsyncedCount: number;
   failedCount: number;
   handleStop: () => void;
@@ -16,6 +17,7 @@ export default function ActionButtons({
   canStop,
   canSaveAndSwitch,
   canClearAll,
+  isSyncing,
   unsyncedCount,
   failedCount,
   handleStop,
@@ -71,8 +73,13 @@ export default function ActionButtons({
           Clear All
         </button>
 
-        <button type="button" className={styles.syncButton} onClick={handleSync}>
-          Sync
+        <button
+          type="button"
+          className={styles.syncButton}
+          onClick={handleSync}
+          disabled={isSyncing}
+        >
+          {isSyncing ? "Syncing…" : "Sync"}
         </button>
 
         <div className={`${styles.syncStatusBox} ${syncToneClass}`}>

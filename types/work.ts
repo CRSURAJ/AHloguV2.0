@@ -58,7 +58,7 @@ export type ActiveSession = {
   breakMinutes: number;
   jobId: string;
   location: string;
-  role: string;
+  role: WorkerRole;
   jobDocs: string;
   description: string;
 };
@@ -66,7 +66,7 @@ export type ActiveSession = {
 export type DraftState = {
   jobId: string;
   location: string;
-  role: string;
+  role: WorkerRole;
   jobDocs: string;
   description: string;
 };
@@ -78,7 +78,7 @@ export type LogItem = {
   fullname: string;
   jobId: string;
   location: string;
-  role: string;
+  role: WorkerRole;
   jobDocs: string;
   description: string;
   startedAt: string;
@@ -157,12 +157,12 @@ export type AdminWorkLog = {
   stoppedAt: string;
   jobId: string;
   fullname: string;
-  role: string;
+  role: WorkerRole;
   description: string;
   location: string;
   workedMinutes: number;
   breakMinutes: number;
-  stickyNote: string;
+  stickyNote?: string;
   uploadedBy?: string;
   uploadedByEmail?: string;
   updatedAt?: string;

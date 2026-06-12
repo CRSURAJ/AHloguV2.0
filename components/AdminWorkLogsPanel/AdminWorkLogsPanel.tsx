@@ -2,8 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getCloudProvider } from "@/lib/cloud/client";
-import { formatMelbourneDateTime } from "@/lib/melbourneTime";
-import type { AdminWorkLog, PermissionLevel } from "@/types/work";
+import {
+  formatMelbourneDateTime,
+  melbourneDateTimeLocalToIso,
+  melbourneDayBoundaryMs,
+} from "@/lib/melbourneTime";
+import type { AdminWorkLog, PermissionLevel, WorkerRole } from "@/types/work";
 import styles from "./AdminWorkLogsPanel.module.css";
 
 const PAGE_SIZE = 50;
@@ -61,11 +65,10 @@ function toDateTimeLocalInput(value: string): string {
 function fromDateTimeLocalInput(value: string): string {
   if (!value) return "";
 
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toISOString();
+  // The edit form shows Melbourne wall-clock time, so the edited value must
+  // be parsed as Melbourne time too — new Date(value) would use the admin's
+  // browser timezone and silently shift the timestamps.
+  return melbourneDateTimeLocalToIso(value);
 }
 
 function calculateWorkedMinutes(
@@ -92,13 +95,13 @@ function matchesDateRange(log: AdminWorkLog, fromDate: string, toDate: string) {
   if (!Number.isFinite(candidateMs)) return false;
 
   if (fromDate) {
-    const fromMs = new Date(`${fromDate}T00:00:00`).getTime();
-    if (candidateMs < fromMs) return false;
+    const fromMs = melbourneDayBoundaryMs(fromDate, "start");
+    if (Number.isFinite(fromMs) && candidateMs < fromMs) return false;
   }
 
   if (toDate) {
-    const toMs = new Date(`${toDate}T23:59:59`).getTime();
-    if (candidateMs > toMs) return false;
+    const toMs = melbourneDayBoundaryMs(toDate, "end");
+    if (Number.isFinite(toMs) && candidateMs > toMs) return false;
   }
 
   return true;
@@ -345,7 +348,7 @@ export default function AdminWorkLogsPanel({
       "Job stopped time": "",
       "Job ID": "",
       "Full name": "",
-      Role: "",
+      Role: "" as WorkerRole,
       "Work description": "",
       Location: "",
       "Worked minutes": totalWorkedMinutes,

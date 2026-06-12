@@ -12,7 +12,6 @@ import AdminWorkLogsPanel from "@/components/AdminWorkLogsPanel/AdminWorkLogsPan
 import WorkLogger from "@/components/WorkLogger/WorkLogger";
 import { CognitoLoginCard, LoadingScreen } from "@/components/CognitoLoginCard/CognitoLoginCard";
 import {
-  changeCurrentCognitoPassword,
   completeNewCognitoPassword,
   getCurrentCognitoSession,
   signInWithCognito,
@@ -20,26 +19,18 @@ import {
   type CognitoSignInResult,
 } from "@/lib/auth/cognitoClient";
 import { getPasswordPolicyError } from "@/lib/auth/passwordPolicy";
-import type { AuthActionResult, CurrentUser, PermissionLevel, WorkerRole } from "@/types/work";
+import type { CurrentUser } from "@/types/work";
 import { isManagementPermission, normalizeLoginErrorMessage } from "@/lib/auth/currentUserProfile";
 import {
-  createAwsUserInCloud,
-  deleteAwsUserFromCloud,
-  fetchAwsUsersFromCloud,
+  clearCachedCurrentUser,
   fetchCurrentUserFromCloud,
-  resetAwsUserPasswordInCloud,
-  updateAwsUserActiveInCloud,
-  type AwsUserListItem,
+  isCloudAuthError,
+  loadCachedCurrentUser,
 } from "@/lib/cloud/awsUsersApi";
-
-type CreateAwsUserPayload = {
-  email: string;
-  fullName: string;
-  permissionLevel: PermissionLevel;
-  role: WorkerRole;
-  temporaryPassword: string;
-  confirmTemporaryPassword: string;
-};
+import { clearCloudJobsCache } from "@/lib/jobStorage";
+import { clearUserDataOnSignOut } from "@/lib/workStorage";
+import { useChangePassword } from "@/hooks/useChangePassword";
+import { useUserManagement } from "@/hooks/useUserManagement";
 
 export default function Page() {
   const [isReady, setIsReady] = useState(false);
@@ -53,19 +44,38 @@ export default function Page() {
   const [newPasswordUser, setNewPasswordUser] = useState<NonNullable<
     CognitoSignInResult["cognitoUser"]
   > | null>(null);
-  const [accountMessage, setAccountMessage] = useState("");
-  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
-  const [currentPasswordInput, setCurrentPasswordInput] = useState("");
-  const [newPasswordInput, setNewPasswordInput] = useState("");
-  const [confirmPasswordInput, setConfirmPasswordInput] = useState("");
-  const [changePasswordBusy, setChangePasswordBusy] = useState(false);
-  const [userManagementOpen, setUserManagementOpen] = useState(false);
-  const [awsUsers, setAwsUsers] = useState<AwsUserListItem[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [usersMessage, setUsersMessage] = useState("");
   const [jobManagementOpen, setJobManagementOpen] = useState(false);
   const [workerStatusOpen, setWorkerStatusOpen] = useState(false);
   const [workLogsOpen, setWorkLogsOpen] = useState(false);
+
+  const {
+    changePasswordOpen,
+    accountMessage,
+    currentPasswordInput,
+    newPasswordInput,
+    confirmPasswordInput,
+    changePasswordBusy,
+    handleOpenChangePassword,
+    handleCloseChangePassword,
+    handleChangePasswordSubmit,
+    setCurrentPasswordInput,
+    setNewPasswordInput,
+    setConfirmPasswordInput,
+    resetAccountMessage,
+  } = useChangePassword(currentUser, email);
+
+  const {
+    userManagementOpen,
+    awsUsers,
+    usersLoading,
+    usersMessage,
+    handleOpenUserManagement,
+    handleCloseUserManagement,
+    handleCreateAwsUser,
+    handleToggleAwsUserActive,
+    handleResetAwsUserPassword,
+    handleDeleteAwsUser,
+  } = useUserManagement(currentUser);
 
   const canManageUsers = isManagementPermission(currentUser?.permissionLevel);
 
@@ -85,18 +95,45 @@ export default function Page() {
           return;
         }
 
-        const restoredUser = await fetchCurrentUserFromCloud(session);
+        try {
+          const restoredUser = await fetchCurrentUserFromCloud(session);
 
-        if (!isMounted) {
-          return;
+          if (!isMounted) {
+            return;
+          }
+
+          setCurrentUser(restoredUser);
+        } catch (error) {
+          if (isCloudAuthError(error)) {
+            // The credentials were explicitly rejected — sign out for real.
+            signOutCognito();
+
+            if (isMounted) {
+              setMessage(error.message);
+            }
+
+            return;
+          }
+
+          // Network/server failure: keep the session so the worker can keep
+          // logging offline, and fall back to the last profile we saw.
+          const payload = session.getIdToken().decodePayload() as Record<string, unknown>;
+          const sub = typeof payload.sub === "string" ? payload.sub : "";
+          const cachedUser = loadCachedCurrentUser(sub);
+
+          if (!isMounted) {
+            return;
+          }
+
+          if (cachedUser) {
+            setCurrentUser(cachedUser);
+          } else {
+            setMessage("You appear to be offline. Reconnect to the internet to sign in.");
+          }
         }
-
-        setCurrentUser(restoredUser);
-      } catch (error) {
-        signOutCognito();
-
+      } catch {
         if (isMounted) {
-          setMessage(error instanceof Error ? error.message : "Could not restore your session.");
+          setMessage("Could not restore your session.");
         }
       } finally {
         if (isMounted) {
@@ -178,259 +215,18 @@ export default function Page() {
     }
   }
 
-  async function handleOpenUserManagement() {
-    setUserManagementOpen(true);
-    setUsersLoading(true);
-    setUsersMessage("");
-
-    try {
-      const users = await fetchAwsUsersFromCloud();
-      setAwsUsers(users);
-    } catch (error) {
-      setUsersMessage(error instanceof Error ? error.message : "Could not load Users.");
-    } finally {
-      setUsersLoading(false);
-    }
-  }
-
-  async function handleCreateAwsUser(input: CreateAwsUserPayload): Promise<AuthActionResult> {
-    setUsersMessage("");
-
-    if (input.temporaryPassword !== input.confirmTemporaryPassword) {
-      return {
-        ok: false,
-        message: "Passwords do not match.",
-      };
-    }
-
-    const passwordPolicyError = getPasswordPolicyError(
-      input.temporaryPassword,
-      "Temporary password",
-    );
-
-    if (passwordPolicyError) {
-      return {
-        ok: false,
-        message: passwordPolicyError,
-      };
-    }
-
-    try {
-      await createAwsUserInCloud({
-        email: input.email,
-        fullName: input.fullName,
-        role: input.role,
-        permissionLevel: input.permissionLevel,
-        temporaryPassword: input.temporaryPassword,
-      });
-
-      const users = await fetchAwsUsersFromCloud();
-      setAwsUsers(users);
-
-      return {
-        ok: true,
-        message:
-          "User created successfully. They will be asked to set a new password on first login.",
-      };
-    } catch (error) {
-      return {
-        ok: false,
-        message: error instanceof Error ? error.message : "Could not create User.",
-      };
-    }
-  }
-
-  async function handleToggleAwsUserActive(
-    userId: string,
-    isActive: boolean,
-  ): Promise<AuthActionResult> {
-    setUsersMessage("");
-
-    if (userId === currentUser?.id && !isActive) {
-      return {
-        ok: false,
-        message: "You cannot deactivate your own admin account.",
-      };
-    }
-
-    try {
-      await updateAwsUserActiveInCloud(userId, isActive);
-
-      const users = await fetchAwsUsersFromCloud();
-      setAwsUsers(users);
-
-      return {
-        ok: true,
-        message: isActive ? "User activated." : "User deactivated.",
-      };
-    } catch (error) {
-      return {
-        ok: false,
-        message: error instanceof Error ? error.message : "Could not update user.",
-      };
-    }
-  }
-
-  async function handleResetAwsUserPassword(
-    userId: string,
-    temporaryPassword: string,
-  ): Promise<AuthActionResult> {
-    setUsersMessage("");
-
-    if (userId === currentUser?.id) {
-      return {
-        ok: false,
-        message: "You cannot reset your own admin password from User Management.",
-      };
-    }
-
-    const passwordPolicyError = getPasswordPolicyError(temporaryPassword, "Temporary password");
-
-    if (passwordPolicyError) {
-      return {
-        ok: false,
-        message: passwordPolicyError,
-      };
-    }
-
-    try {
-      await resetAwsUserPasswordInCloud(userId, temporaryPassword);
-
-      return {
-        ok: true,
-        message: "Temporary password set. The user must set a new password on next sign-in.",
-      };
-    } catch (error) {
-      return {
-        ok: false,
-        message: error instanceof Error ? error.message : "Could not reset password.",
-      };
-    }
-  }
-
-  async function handleDeleteAwsUser(userId: string): Promise<AuthActionResult> {
-    setUsersMessage("");
-
-    if (userId === currentUser?.id) {
-      return {
-        ok: false,
-        message: "You cannot delete your own admin account.",
-      };
-    }
-
-    try {
-      await deleteAwsUserFromCloud(userId);
-
-      const users = await fetchAwsUsersFromCloud();
-      setAwsUsers(users);
-
-      return {
-        ok: true,
-        message: "User deleted.",
-      };
-    } catch (error) {
-      return {
-        ok: false,
-        message: error instanceof Error ? error.message : "Could not delete user.",
-      };
-    }
-  }
-
-  function handleOpenChangePassword() {
-    setAccountMessage("");
-    setCurrentPasswordInput("");
-    setNewPasswordInput("");
-    setConfirmPasswordInput("");
-    setChangePasswordOpen(true);
-  }
-
-  function handleCloseChangePassword() {
-    if (changePasswordBusy) {
-      return;
-    }
-
-    setChangePasswordOpen(false);
-    setCurrentPasswordInput("");
-    setNewPasswordInput("");
-    setConfirmPasswordInput("");
-  }
-
-  async function handleChangePasswordSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setAccountMessage("");
-
-    const currentPasswordValue = currentPasswordInput.trim();
-    const newPasswordValue = newPasswordInput.trim();
-    const confirmPasswordValue = confirmPasswordInput.trim();
-    const signInIdentifier = currentUser?.username || currentUser?.id || email;
-
-    setChangePasswordBusy(true);
-
-    try {
-      try {
-        const verificationResult = await signInWithCognito(signInIdentifier, currentPasswordValue);
-
-        if (!verificationResult.session) {
-          setAccountMessage("Incorrect Current Password.");
-          return;
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Incorrect password.";
-
-        setAccountMessage(
-          errorMessage.includes("Attempt limit exceeded")
-            ? "Too many attempts. Please wait a few minutes and try again."
-            : "Incorrect Current Password.",
-        );
-        return;
-      }
-
-      const passwordPolicyError = getPasswordPolicyError(newPasswordValue, "New password");
-
-      if (passwordPolicyError) {
-        setAccountMessage(passwordPolicyError);
-        return;
-      }
-
-      if (newPasswordValue !== confirmPasswordValue) {
-        setAccountMessage("New passwords do not match.");
-        return;
-      }
-
-      await changeCurrentCognitoPassword(currentPasswordValue, newPasswordValue);
-      setCurrentPasswordInput("");
-      setNewPasswordInput("");
-      setConfirmPasswordInput("");
-      setChangePasswordOpen(false);
-      setAccountMessage("Password changed successfully.");
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Could not change password.";
-
-      setAccountMessage(
-        errorMessage === "Incorrect username or password."
-          ? "Incorrect Current Password."
-          : errorMessage.includes("Attempt limit exceeded")
-            ? "Too many attempts. Please wait a few minutes and try again."
-            : errorMessage,
-      );
-    } finally {
-      setChangePasswordBusy(false);
-    }
-  }
-
   function handleSignOut() {
     signOutCognito();
+    clearCloudJobsCache();
+    if (currentUser) {
+      clearCachedCurrentUser(currentUser.id);
+      void clearUserDataOnSignOut(currentUser.id);
+    }
     setCurrentUser(null);
     setPassword("");
     setNewPassword("");
     setConfirmNewPassword("");
     setNewPasswordUser(null);
-    setAccountMessage("");
-    setChangePasswordOpen(false);
-    setCurrentPasswordInput("");
-    setNewPasswordInput("");
-    setConfirmPasswordInput("");
-    setUserManagementOpen(false);
     setJobManagementOpen(false);
     setWorkerStatusOpen(false);
     setWorkLogsOpen(false);
@@ -474,7 +270,7 @@ export default function Page() {
           onSignOut={handleSignOut}
         />
 
-        <AccountMessageDialog message={accountMessage} onClose={() => setAccountMessage("")} />
+        <AccountMessageDialog message={accountMessage} onClose={resetAccountMessage} />
 
         <ChangePasswordDialog
           open={changePasswordOpen}
@@ -496,7 +292,7 @@ export default function Page() {
             currentUserId={currentUser.id}
             loading={usersLoading}
             message={usersMessage}
-            onClose={() => setUserManagementOpen(false)}
+            onClose={handleCloseUserManagement}
             onRefresh={() => void handleOpenUserManagement()}
             onCreateUser={handleCreateAwsUser}
             onToggleActive={handleToggleAwsUserActive}
@@ -542,7 +338,7 @@ export default function Page() {
 
       <AccountMessageDialog
         message={!changePasswordOpen ? accountMessage : ""}
-        onClose={() => setAccountMessage("")}
+        onClose={resetAccountMessage}
       />
 
       <WorkLogger

@@ -61,7 +61,7 @@ async function listCloudJobsWithGuard(): Promise<Job[]> {
   return inFlightCloudJobs;
 }
 
-function clearCloudJobsCache(): void {
+export function clearCloudJobsCache(): void {
   cachedCloudJobs = null;
   cachedCloudJobsAt = 0;
   inFlightCloudJobs = null;

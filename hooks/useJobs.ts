@@ -151,7 +151,7 @@ export function useJobs(): UseJobsReturn {
 
       try {
         const job = await createJob(input);
-        await refreshJobs();
+        setJobs((prev) => [job, ...prev.filter((j) => j.id !== job.id)]);
 
         const message = `Created ${getJobLabel(job)}.`;
         setJobMessage(message);
@@ -164,7 +164,7 @@ export function useJobs(): UseJobsReturn {
         return { ok: false, message };
       }
     },
-    [jobs, refreshJobs],
+    [jobs],
   );
 
   const handleUpdateJob = useCallback(
@@ -185,7 +185,7 @@ export function useJobs(): UseJobsReturn {
           return { ok: false, message };
         }
 
-        await refreshJobs();
+        setJobs((prev) => prev.map((j) => (j.id === id ? updatedJob : j)));
 
         const message = `Updated ${getJobLabel(updatedJob)}.`;
         setJobMessage(message);
@@ -198,7 +198,7 @@ export function useJobs(): UseJobsReturn {
         return { ok: false, message };
       }
     },
-    [jobs, refreshJobs],
+    [jobs],
   );
 
   const handleDeleteJob = useCallback(
@@ -213,7 +213,7 @@ export function useJobs(): UseJobsReturn {
 
       try {
         await deleteJob(id);
-        await refreshJobs();
+        setJobs((prev) => prev.filter((j) => j.id !== id));
 
         const message = `Deleted ${getJobLabel(job)}.`;
         setJobMessage(message);
@@ -226,7 +226,7 @@ export function useJobs(): UseJobsReturn {
         return { ok: false, message };
       }
     },
-    [jobs, refreshJobs],
+    [jobs],
   );
 
   const handleArchiveJob = useCallback(
@@ -248,7 +248,7 @@ export function useJobs(): UseJobsReturn {
           return { ok: false, message };
         }
 
-        await refreshJobs();
+        setJobs((prev) => prev.map((j) => (j.id === id ? archivedJob : j)));
 
         const message = `${getJobLabel(job)} archived successfully.`;
         setJobMessage(message);
@@ -259,7 +259,7 @@ export function useJobs(): UseJobsReturn {
         return { ok: false, message };
       }
     },
-    [jobs, refreshJobs],
+    [jobs],
   );
 
   const handleToggleJobActive = useCallback(
@@ -283,7 +283,7 @@ export function useJobs(): UseJobsReturn {
           return { ok: false, message };
         }
 
-        await refreshJobs();
+        setJobs((prev) => prev.map((j) => (j.id === id ? updatedJob : j)));
 
         const message = updatedJob.isActive
           ? `Activated ${getJobLabel(updatedJob)}.`
@@ -299,7 +299,7 @@ export function useJobs(): UseJobsReturn {
         return { ok: false, message };
       }
     },
-    [jobs, refreshJobs],
+    [jobs],
   );
 
   const getJobById = useCallback((id: string) => jobs.find((job) => job.id === id), [jobs]);

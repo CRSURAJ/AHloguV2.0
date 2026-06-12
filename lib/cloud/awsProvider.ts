@@ -1,3 +1,4 @@
+import { getCurrentCognitoSession } from "@/lib/auth/cognitoClient";
 import type { AdminWorkLog, Job, LogItem, WorkerLiveStatus } from "@/types/work";
 
 import type { CloudProvider, CloudSyncResult } from "./types";
@@ -18,31 +19,21 @@ function getErrorMessage(error: unknown) {
   return "Unknown AWS cloud error";
 }
 
-function getCognitoIdToken(): string {
+async function getAuthHeaders(): Promise<Record<string, string>> {
   if (typeof window === "undefined") {
-    return "";
+    return {};
   }
 
-  const tokenKey = Object.keys(window.localStorage).find(
-    (key) => key.includes("CognitoIdentityServiceProvider") && key.endsWith(".idToken"),
-  );
+  // getCurrentCognitoSession() refreshes expired tokens via the SDK, so
+  // long-lived sessions keep working instead of sending a stale idToken.
+  const session = await getCurrentCognitoSession();
 
-  if (!tokenKey) {
-    return "";
-  }
-
-  return window.localStorage.getItem(tokenKey) ?? "";
-}
-
-function getAuthHeaders(): Record<string, string> {
-  const token = getCognitoIdToken();
-
-  if (!token) {
+  if (!session) {
     return {};
   }
 
   return {
-    Authorization: `Bearer ${token}`,
+    Authorization: `Bearer ${session.getIdToken().getJwtToken()}`,
   };
 }
 
@@ -51,9 +42,45 @@ export type AwsCurrentUserProfile = {
   email: string;
   fullName: string;
   role: string;
+  permissionLevel: string;
   isAdmin: boolean;
   isActive: boolean;
 };
+
+// List endpoints respond with either a bare array (legacy) or a paginated
+// { items, nextToken } envelope — accept both.
+function extractListItems(data: unknown): unknown[] | null {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (
+    data &&
+    typeof data === "object" &&
+    "items" in data &&
+    Array.isArray((data as { items: unknown }).items)
+  ) {
+    return (data as { items: unknown[] }).items;
+  }
+
+  return null;
+}
+
+function isJobShape(x: unknown): x is Job {
+  return typeof x === "object" && x !== null && "id" in x && "jobId" in x;
+}
+
+function isAdminWorkLogShape(x: unknown): x is AdminWorkLog {
+  return typeof x === "object" && x !== null && "id" in x && "jobId" in x && "startedAt" in x;
+}
+
+function isWorkerLiveStatusShape(x: unknown): x is WorkerLiveStatus {
+  return typeof x === "object" && x !== null && "userId" in x && "status" in x;
+}
+
+function isAwsCurrentUserProfileShape(x: unknown): x is AwsCurrentUserProfile {
+  return typeof x === "object" && x !== null && "id" in x && "email" in x && "permissionLevel" in x;
+}
 
 export async function getAwsCurrentUser(): Promise<AwsCurrentUserProfile | null> {
   const baseUrl = getAwsApiBaseUrl();
@@ -65,14 +92,16 @@ export async function getAwsCurrentUser(): Promise<AwsCurrentUserProfile | null>
   try {
     const response = await fetch(`${baseUrl}/me`, {
       method: "GET",
-      headers: getAuthHeaders(),
+      headers: await getAuthHeaders(),
     });
 
     if (!response.ok) {
       return null;
     }
 
-    return (await response.json()) as AwsCurrentUserProfile;
+    const data: unknown = await response.json();
+    if (!isAwsCurrentUserProfileShape(data)) return null;
+    return data;
   } catch {
     return null;
   }
@@ -99,7 +128,7 @@ async function requestJson<TPayload>(
       method: options.method,
       headers: {
         "Content-Type": "application/json",
-        ...getAuthHeaders(),
+        ...(await getAuthHeaders()),
       },
       body:
         options.method === "GET" || options.payload === undefined
@@ -184,7 +213,7 @@ export const awsCloudProvider: CloudProvider = {
 
       const response = await fetch(`${baseUrl}/jobs`, {
         method: "GET",
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
       });
 
       const data: unknown = await response.json().catch(() => null);
@@ -198,11 +227,13 @@ export const awsCloudProvider: CloudProvider = {
         throw new Error(message);
       }
 
-      if (!Array.isArray(data)) {
-        throw new Error("AWS jobs list returned an invalid response.");
+      const items = extractListItems(data);
+
+      if (!items || !items.every(isJobShape)) {
+        throw new Error("AWS jobs list returned an unexpected response shape.");
       }
 
-      return data as Job[];
+      return items;
     },
 
     async create(job: Job) {
@@ -242,7 +273,7 @@ export const awsCloudProvider: CloudProvider = {
 
       const response = await fetch(`${baseUrl}/work-logs`, {
         method: "GET",
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
       });
 
       const data: unknown = await response.json().catch(() => null);
@@ -256,11 +287,13 @@ export const awsCloudProvider: CloudProvider = {
         throw new Error(message);
       }
 
-      if (!Array.isArray(data)) {
-        throw new Error("AWS work logs list returned an invalid response.");
+      const items = extractListItems(data);
+
+      if (!items || !items.every(isAdminWorkLogShape)) {
+        throw new Error("AWS work logs list returned an unexpected response shape.");
       }
 
-      return data as AdminWorkLog[];
+      return items;
     },
 
     async update(log: AdminWorkLog) {
@@ -302,7 +335,7 @@ export const awsCloudProvider: CloudProvider = {
 
       const response = await fetch(`${baseUrl}/worker-status`, {
         method: "GET",
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
       });
 
       const data: unknown = await response.json().catch(() => null);
@@ -316,11 +349,13 @@ export const awsCloudProvider: CloudProvider = {
         throw new Error(message);
       }
 
-      if (!Array.isArray(data)) {
-        throw new Error("AWS worker status list returned an invalid response.");
+      const items = extractListItems(data);
+
+      if (!items || !items.every(isWorkerLiveStatusShape)) {
+        throw new Error("AWS worker status list returned an unexpected response shape.");
       }
 
-      return data as WorkerLiveStatus[];
+      return items;
     },
 
     async updateMine(status: WorkerLiveStatus) {

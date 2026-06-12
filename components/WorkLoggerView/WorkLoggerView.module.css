@@ -264,10 +264,6 @@
   gap: 8px;
   flex-wrap: wrap;
 }
-.cloudSyncSection {
-  margin-top: 24px;
-  margin-bottom: 20px;
-}
 
 .switchChip {
   min-height: 34px;

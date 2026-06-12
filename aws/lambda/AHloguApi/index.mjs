@@ -4,6 +4,7 @@ import {
   AdminDeleteUserCommand,
   AdminDisableUserCommand,
   AdminEnableUserCommand,
+  AdminGetUserCommand,
   AdminSetUserPasswordCommand,
   CognitoIdentityProviderClient,
 } from "@aws-sdk/client-cognito-identity-provider";
@@ -82,6 +83,24 @@ function requireEnv(name, value) {
   }
 
   return value;
+}
+
+// Issue 8 — pagination helpers
+function parsePaginationParams(event) {
+  const qs = event.queryStringParameters || {};
+  const limit = parseInt(qs.limit, 10);
+  const nextToken = qs.nextToken || undefined;
+  return {
+    limit: Number.isFinite(limit) && limit > 0 && limit <= 1000 ? limit : undefined,
+    exclusiveStartKey: nextToken
+      ? JSON.parse(Buffer.from(nextToken, "base64").toString("utf8"))
+      : undefined,
+  };
+}
+
+function encodeNextToken(lastEvaluatedKey) {
+  if (!lastEvaluatedKey) return undefined;
+  return Buffer.from(JSON.stringify(lastEvaluatedKey)).toString("base64");
 }
 
 async function getUserProfile(event) {
@@ -253,6 +272,64 @@ function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function cleanText(value, maxLength) {
+  return cleanString(value).slice(0, maxLength);
+}
+
+const MAX_SHIFT_MINUTES = 24 * 60;
+
+function clampNonNegativeInt(value, max) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) return 0;
+
+  return Math.min(Math.max(0, Math.round(parsed)), max);
+}
+
+// Shared by single + bulk upload. Identity fields come from the
+// authenticated profile (not the body), and minute totals are bounded by
+// the shift's own timestamps so payroll data cannot be inflated.
+function normalizeWorkLogInput(inputLog, profile, now) {
+  const loguId = cleanText(inputLog.loguId, 120);
+  // Idempotency: derive the key from uploader + client loguId so offline
+  // retries of the same log map to the same record instead of duplicating it.
+  const id = loguId ? `${profile.user.id}::${loguId}` : randomUUID();
+
+  const startedAt = cleanText(inputLog.startedAt, 40);
+  const stoppedAt = cleanText(inputLog.stoppedAt, 40);
+  const startMs = Date.parse(startedAt);
+  const stopMs = Date.parse(stoppedAt);
+  const grossMinutes =
+    Number.isFinite(startMs) && Number.isFinite(stopMs)
+      ? Math.max(0, Math.round((stopMs - startMs) / 60_000))
+      : MAX_SHIFT_MINUTES;
+  const maxMinutes = Math.min(grossMinutes, MAX_SHIFT_MINUTES);
+
+  return {
+    id,
+    loguId,
+    ts: typeof inputLog.ts === "number" ? inputLog.ts : Date.now(),
+    fullname:
+      cleanText(profile.user.fullName, 120) ||
+      cleanText(inputLog.fullname || inputLog.fullName, 120),
+    jobId: cleanText(inputLog.jobId, 120),
+    location: cleanText(inputLog.location, 300),
+    role: normalizeUserRole(inputLog.role || profile.user.role),
+    jobDocs: cleanText(inputLog.jobDocs, 2000),
+    description: cleanText(inputLog.description, 2000),
+    startedAt,
+    stoppedAt,
+    breakMinutes: clampNonNegativeInt(inputLog.breakMinutes, maxMinutes),
+    workedMinutes: clampNonNegativeInt(inputLog.workedMinutes, maxMinutes),
+    stickyNote: cleanText(inputLog.stickyNote, 2000),
+    syncStatus: "synced",
+    uploadedBy: profile.user.id,
+    uploadedByEmail: profile.user.email || "",
+    uploadedAt: now,
+    syncedAt: now,
+  };
+}
+
 function normalizeUserRole(value) {
   const role = cleanString(value).toLowerCase();
 
@@ -286,6 +363,7 @@ function normalizeJobIdForCompare(value) {
   return cleanString(value).toLowerCase();
 }
 
+// Issue 4 — add ProjectionExpression to only fetch the two fields needed
 async function findDuplicateJobByJobId(tableName, jobId, ignoreJobRecordId = "") {
   const normalizedJobId = normalizeJobIdForCompare(jobId);
 
@@ -296,6 +374,7 @@ async function findDuplicateJobByJobId(tableName, jobId, ignoreJobRecordId = "")
   const result = await dynamo.send(
     new ScanCommand({
       TableName: tableName,
+      ProjectionExpression: "id, jobId",
     }),
   );
 
@@ -359,30 +438,68 @@ async function createUser(event) {
     });
   }
 
-  const created = await cognito.send(
-    new AdminCreateUserCommand({
-      UserPoolId: userPoolId,
-      Username: email,
-      TemporaryPassword: temporaryPassword,
-      MessageAction: "SUPPRESS",
-      UserAttributes: [
-        {
-          Name: "email",
-          Value: email,
-        },
-        {
-          Name: "email_verified",
-          Value: "true",
-        },
-        {
-          Name: "name",
-          Value: fullName,
-        },
-      ],
-    }),
-  );
+  let userSub;
 
-  const userSub = getCreatedUserSub(created.User);
+  try {
+    const created = await cognito.send(
+      new AdminCreateUserCommand({
+        UserPoolId: userPoolId,
+        Username: email,
+        TemporaryPassword: temporaryPassword,
+        MessageAction: "SUPPRESS",
+        UserAttributes: [
+          {
+            Name: "email",
+            Value: email,
+          },
+          {
+            Name: "email_verified",
+            Value: "true",
+          },
+          {
+            Name: "name",
+            Value: fullName,
+          },
+        ],
+      }),
+    );
+
+    userSub = getCreatedUserSub(created.User);
+  } catch (error) {
+    if (error?.name !== "UsernameExistsException") {
+      throw error;
+    }
+
+    // A previous attempt may have created the Cognito user and then died
+    // before writing the DynamoDB profile. If the profile is missing,
+    // backfill it instead of failing on every retry forever.
+    const existing = await cognito.send(
+      new AdminGetUserCommand({
+        UserPoolId: userPoolId,
+        Username: email,
+      }),
+    );
+
+    const existingSub =
+      existing.UserAttributes?.find((attribute) => attribute.Name === "sub")?.Value || "";
+
+    if (!existingSub) {
+      return json(409, { error: "A user with this email already exists." });
+    }
+
+    const existingProfile = await dynamo.send(
+      new GetCommand({
+        TableName: tableName,
+        Key: { id: existingSub },
+      }),
+    );
+
+    if (existingProfile.Item) {
+      return json(409, { error: "A user with this email already exists." });
+    }
+
+    userSub = existingSub;
+  }
 
   if (!userSub) {
     return json(500, {
@@ -428,6 +545,7 @@ async function createUser(event) {
   });
 }
 
+// Issue 8 — listUsers with pagination
 async function listUsers(event) {
   const profile = await requireAdminUser(event);
 
@@ -437,10 +555,13 @@ async function listUsers(event) {
 
   const tableName = requireEnv("USERS_TABLE", USERS_TABLE);
   const actorPermissionLevel = getUserPermissionLevel(profile.user);
+  const { limit, exclusiveStartKey } = parsePaginationParams(event);
 
   const result = await dynamo.send(
     new ScanCommand({
       TableName: tableName,
+      ...(limit && { Limit: limit }),
+      ...(exclusiveStartKey && { ExclusiveStartKey: exclusiveStartKey }),
     }),
   );
 
@@ -472,7 +593,7 @@ async function listUsers(event) {
       return a.email.localeCompare(b.email);
     });
 
-  return json(200, users);
+  return json(200, { items: users, nextToken: encodeNextToken(result.LastEvaluatedKey) });
 }
 
 async function updateUserActive(event, path) {
@@ -753,12 +874,19 @@ async function deleteUser(event, path) {
     });
   }
 
-  await cognito.send(
-    new AdminDeleteUserCommand({
-      UserPoolId: userPoolId,
-      Username: cognitoUsername,
-    }),
-  );
+  try {
+    await cognito.send(
+      new AdminDeleteUserCommand({
+        UserPoolId: userPoolId,
+        Username: cognitoUsername,
+      }),
+    );
+  } catch (error) {
+    if (error?.name !== "UserNotFoundException") {
+      throw error;
+    }
+    // Already gone from Cognito — still remove the orphaned profile row.
+  }
 
   await dynamo.send(
     new DeleteCommand({
@@ -795,6 +923,7 @@ async function deleteUser(event, path) {
   });
 }
 
+// Issue 8 — listJobs with pagination
 async function listJobs(event) {
   const profile = await requireActiveUser(event);
 
@@ -803,10 +932,13 @@ async function listJobs(event) {
   }
 
   const tableName = requireEnv("JOBS_TABLE", JOBS_TABLE);
+  const { limit, exclusiveStartKey } = parsePaginationParams(event);
 
   const result = await dynamo.send(
     new ScanCommand({
       TableName: tableName,
+      ...(limit && { Limit: limit }),
+      ...(exclusiveStartKey && { ExclusiveStartKey: exclusiveStartKey }),
     }),
   );
 
@@ -816,9 +948,10 @@ async function listJobs(event) {
     ),
   );
 
-  return json(200, jobs);
+  return json(200, { items: jobs, nextToken: encodeNextToken(result.LastEvaluatedKey) });
 }
 
+// Issues 1, 2, 13 — explicit allowlist, server-side ID, server-side createdAt, ConditionExpression
 async function createJob(event) {
   const profile = await requireAdminUser(event);
 
@@ -845,20 +978,36 @@ async function createJob(event) {
   }
 
   const now = new Date().toISOString();
-  const id = body.id || randomUUID();
+  // Issue 2 — always generate ID server-side
+  const id = randomUUID();
 
+  // Issue 1 — explicit allowlist; Issue 13 — createdAt always server-side
   const job = {
-    ...body,
     id,
     jobId,
-    createdAt: body.createdAt || now,
+    caseNo: cleanString(body.caseNo),
+    orderNo: cleanString(body.orderNo),
+    jobName: cleanString(body.jobName),
+    customerName: cleanString(body.customerName),
+    location: cleanString(body.location),
+    description: cleanString(body.description),
+    assignedRoles: Array.isArray(body.assignedRoles)
+      ? body.assignedRoles.filter((r) => ALLOWED_USER_ROLES.has(String(r).toLowerCase()))
+      : [],
+    jobDocumentLinks: Array.isArray(body.jobDocumentLinks) ? body.jobDocumentLinks : [],
+    isActive: typeof body.isActive === "boolean" ? body.isActive : true,
+    createdAt: now,
     updatedAt: now,
+    createdBy: profile.user.id,
+    createdByEmail: profile.user.email || "",
   };
 
+  // Issue 2 — ConditionExpression prevents overwriting an existing record
   await dynamo.send(
     new PutCommand({
       TableName: tableName,
       Item: job,
+      ConditionExpression: "attribute_not_exists(id)",
     }),
   );
 
@@ -869,6 +1018,7 @@ async function createJob(event) {
   });
 }
 
+// Issues 1, 2 — explicit allowlist, server-side ID
 async function updateJob(event, path) {
   const profile = await requireAdminUser(event);
 
@@ -935,14 +1085,42 @@ async function updateJob(event, path) {
     });
   }
 
+  // Issue 1 — explicit allowlist; merge existing fields for fields not provided
+  const existing = existingResult.Item;
   const job = {
-    ...body,
     id,
     jobId,
+    caseNo: body.caseNo !== undefined ? cleanString(body.caseNo) : cleanString(existing.caseNo),
+    orderNo: body.orderNo !== undefined ? cleanString(body.orderNo) : cleanString(existing.orderNo),
+    jobName: body.jobName !== undefined ? cleanString(body.jobName) : cleanString(existing.jobName),
+    customerName:
+      body.customerName !== undefined
+        ? cleanString(body.customerName)
+        : cleanString(existing.customerName),
+    location:
+      body.location !== undefined ? cleanString(body.location) : cleanString(existing.location),
+    description:
+      body.description !== undefined
+        ? cleanString(body.description)
+        : cleanString(existing.description),
+    assignedRoles: Array.isArray(body.assignedRoles)
+      ? body.assignedRoles.filter((r) => ALLOWED_USER_ROLES.has(String(r).toLowerCase()))
+      : Array.isArray(existing.assignedRoles)
+        ? existing.assignedRoles
+        : [],
+    jobDocumentLinks: Array.isArray(body.jobDocumentLinks)
+      ? body.jobDocumentLinks
+      : Array.isArray(existing.jobDocumentLinks)
+        ? existing.jobDocumentLinks
+        : [],
+    isActive: typeof body.isActive === "boolean" ? body.isActive : existing.isActive !== false,
     isArchived: false,
-    archivedAt: undefined,
-    archivedBy: undefined,
+    createdAt: cleanString(existing.createdAt),
+    createdBy: cleanString(existing.createdBy),
+    createdByEmail: cleanString(existing.createdByEmail),
     updatedAt: new Date().toISOString(),
+    updatedBy: profile.user.id,
+    updatedByEmail: profile.user.email || "",
   };
 
   await dynamo.send(
@@ -959,6 +1137,7 @@ async function updateJob(event, path) {
   });
 }
 
+// Issue 10 — cap parallel DynamoDB writes in batches of 25
 async function archiveJob(event, path) {
   const profile = await requireFullAdminUser(event);
   if (!profile.ok) {
@@ -1017,11 +1196,13 @@ async function archiveJob(event, path) {
       );
 
       const logs = scanResult.Items || [];
+      const logsToUpdate = logs.filter((log) => log?.id);
+      const UPDATE_BATCH_SIZE = 25;
 
-      await Promise.all(
-        logs
-          .filter((log) => log?.id)
-          .map((log) =>
+      for (let i = 0; i < logsToUpdate.length; i += UPDATE_BATCH_SIZE) {
+        const batchSlice = logsToUpdate.slice(i, i + UPDATE_BATCH_SIZE);
+        await Promise.all(
+          batchSlice.map((log) =>
             dynamo.send(
               new UpdateCommand({
                 TableName: workLogsTableName,
@@ -1037,9 +1218,10 @@ async function archiveJob(event, path) {
               }),
             ),
           ),
-      );
+        );
+      }
 
-      updatedLogCount += logs.length;
+      updatedLogCount += logsToUpdate.length;
       ExclusiveStartKey = scanResult.LastEvaluatedKey;
     } while (ExclusiveStartKey);
   }
@@ -1130,6 +1312,7 @@ function normalizeWorkLogForAdmin(item) {
   };
 }
 
+// Issue 8 — listWorkLogs with pagination
 async function listWorkLogs(event) {
   const profile = await requireAdminUser(event);
 
@@ -1138,10 +1321,13 @@ async function listWorkLogs(event) {
   }
 
   const tableName = requireEnv("WORK_LOGS_TABLE", WORK_LOGS_TABLE);
+  const { limit, exclusiveStartKey } = parsePaginationParams(event);
 
   const result = await dynamo.send(
     new ScanCommand({
       TableName: tableName,
+      ...(limit && { Limit: limit }),
+      ...(exclusiveStartKey && { ExclusiveStartKey: exclusiveStartKey }),
     }),
   );
 
@@ -1156,7 +1342,7 @@ async function listWorkLogs(event) {
       ),
     );
 
-  return json(200, logs);
+  return json(200, { items: logs, nextToken: encodeNextToken(result.LastEvaluatedKey) });
 }
 
 async function updateWorkLog(event, path) {
@@ -1176,36 +1362,50 @@ async function updateWorkLog(event, path) {
   const body = parseBody(event);
   const now = new Date().toISOString();
 
+  // Only the admin-editable fields — provenance attributes (uploadedBy,
+  // uploadedByEmail, loguId, uploadedAt, syncedAt) must survive edits.
   const patch = {
-    uploadedAt: cleanString(body.uploadedAt || body.syncedAt),
-    syncedAt: cleanString(body.syncedAt || body.uploadedAt),
     startedAt: cleanString(body.startedAt),
     stoppedAt: cleanString(body.stoppedAt),
     jobId: cleanString(body.jobId),
-    fullname: cleanString(body.fullname || body.fullName),
-    role: cleanString(body.role),
     description: cleanString(body.description),
     location: cleanString(body.location),
     workedMinutes: Number.isFinite(Number(body.workedMinutes)) ? Number(body.workedMinutes) : 0,
     breakMinutes: Number.isFinite(Number(body.breakMinutes)) ? Number(body.breakMinutes) : 0,
     stickyNote: cleanString(body.stickyNote),
-    isJobArchived: body.isJobArchived === true || body.isJobArchived === "true",
-    jobArchivedAt: cleanString(body.jobArchivedAt),
-    jobArchivedBy: cleanString(body.jobArchivedBy),
     updatedAt: now,
     updatedBy: profile.user.id,
     updatedByEmail: profile.user.email || "",
   };
 
-  await dynamo.send(
-    new PutCommand({
-      TableName: tableName,
-      Item: {
-        id,
-        ...patch,
-      },
-    }),
-  );
+  const updateExpression = `SET ${Object.keys(patch)
+    .map((field) => `#${field} = :${field}`)
+    .join(", ")}`;
+
+  let updated;
+  try {
+    updated = await dynamo.send(
+      new UpdateCommand({
+        TableName: tableName,
+        Key: { id },
+        UpdateExpression: updateExpression,
+        ExpressionAttributeNames: Object.fromEntries(
+          Object.keys(patch).map((field) => [`#${field}`, field]),
+        ),
+        ExpressionAttributeValues: Object.fromEntries(
+          Object.entries(patch).map(([field, value]) => [`:${field}`, value]),
+        ),
+        ConditionExpression: "attribute_exists(id)",
+        ReturnValues: "ALL_NEW",
+      }),
+    );
+  } catch (error) {
+    if (error?.name === "ConditionalCheckFailedException") {
+      return json(404, { error: "Work log not found.", id });
+    }
+
+    throw error;
+  }
 
   await putSyncEvent({
     type: "workLog.update",
@@ -1217,10 +1417,7 @@ async function updateWorkLog(event, path) {
   return json(200, {
     ok: true,
     cloudId: id,
-    log: {
-      id,
-      ...patch,
-    },
+    log: updated.Attributes,
   });
 }
 
@@ -1254,6 +1451,7 @@ async function deleteWorkLog(event, path) {
   return json(200, { ok: true, cloudId: id });
 }
 
+// Issues 1, 2 — explicit allowlist, server-side ID, ConditionExpression
 async function uploadWorkLog(event) {
   const profile = await requireActiveUser(event);
 
@@ -1264,22 +1462,29 @@ async function uploadWorkLog(event) {
   const tableName = requireEnv("WORK_LOGS_TABLE", WORK_LOGS_TABLE);
   const body = parseBody(event);
   const now = new Date().toISOString();
-  const id = body.id || randomUUID();
+  const log = normalizeWorkLogInput(body, profile, now);
+  const id = log.id;
 
-  const log = {
-    ...body,
-    id,
-    uploadedBy: profile.user.id,
-    uploadedByEmail: profile.user.email || "",
-    uploadedAt: now,
-  };
+  try {
+    await dynamo.send(
+      new PutCommand({
+        TableName: tableName,
+        Item: log,
+        ConditionExpression: "attribute_not_exists(id)",
+      }),
+    );
+  } catch (error) {
+    if (error?.name === "ConditionalCheckFailedException") {
+      // Same log already stored by an earlier attempt — idempotent success.
+      return json(200, {
+        ok: true,
+        cloudId: id,
+        duplicate: true,
+      });
+    }
 
-  await dynamo.send(
-    new PutCommand({
-      TableName: tableName,
-      Item: log,
-    }),
-  );
+    throw error;
+  }
 
   await putSyncEvent({
     type: "workLog.upload",
@@ -1294,6 +1499,7 @@ async function uploadWorkLog(event) {
   });
 }
 
+// Issues 1, 2, 3 — explicit allowlist, server-side IDs, 200-log cap, parallel batches of 25
 async function uploadWorkLogsBulk(event) {
   const profile = await requireActiveUser(event);
 
@@ -1311,28 +1517,42 @@ async function uploadWorkLogsBulk(event) {
     });
   }
 
+  // Issue 3 — cap bulk uploads
+  const MAX_BULK_LOGS = 200;
+  if (logs.length > MAX_BULK_LOGS) {
+    return json(400, { error: `Cannot upload more than ${MAX_BULK_LOGS} logs at once.` });
+  }
+
   const now = new Date().toISOString();
+  const BATCH_SIZE = 25;
   const savedIds = [];
 
-  for (const inputLog of logs) {
-    const id = inputLog.id || randomUUID();
+  // Issue 3 — process in parallel batches of 25
+  for (let i = 0; i < logs.length; i += BATCH_SIZE) {
+    const batch = logs.slice(i, i + BATCH_SIZE);
+    const batchIds = await Promise.all(
+      batch.map(async (inputLog) => {
+        const log = normalizeWorkLogInput(inputLog, profile, now);
 
-    const log = {
-      ...inputLog,
-      id,
-      uploadedBy: profile.user.id,
-      uploadedByEmail: profile.user.email || "",
-      uploadedAt: now,
-    };
+        try {
+          await dynamo.send(
+            new PutCommand({
+              TableName: tableName,
+              Item: log,
+              ConditionExpression: "attribute_not_exists(id)",
+            }),
+          );
+        } catch (error) {
+          if (error?.name !== "ConditionalCheckFailedException") {
+            throw error;
+          }
+          // Already stored by an earlier attempt — idempotent success.
+        }
 
-    await dynamo.send(
-      new PutCommand({
-        TableName: tableName,
-        Item: log,
+        return log.id;
       }),
     );
-
-    savedIds.push(id);
+    savedIds.push(...batchIds);
   }
 
   await putSyncEvent({
@@ -1357,26 +1577,24 @@ function normalizeWorkerStatus(body, profile) {
 
   return {
     userId: profile.user.id,
-    fullName: cleanString(body.fullName) || cleanString(profile.user.fullName),
-    email: cleanString(body.email) || cleanString(profile.user.email),
+    // Identity shown on the admin status board comes from the server-side
+    // profile so a worker cannot impersonate someone else.
+    fullName: cleanText(profile.user.fullName, 120) || cleanText(body.fullName, 120),
+    email: cleanString(profile.user.email),
     role: normalizeUserRole(body.role || profile.user.role),
     status: allowedStatuses.has(status) ? status : "online",
 
-    currentJobId: cleanString(body.currentJobId),
-    currentJobName: cleanString(body.currentJobName),
-    currentJobLocation: cleanString(body.currentJobLocation),
+    currentJobId: cleanText(body.currentJobId, 120),
+    currentJobName: cleanText(body.currentJobName, 300),
+    currentJobLocation: cleanText(body.currentJobLocation, 300),
 
-    startedAt: cleanString(body.startedAt),
-    breakStartedAt: cleanString(body.breakStartedAt),
-    breakMinutes: Number.isFinite(Number(body.breakMinutes)) ? Number(body.breakMinutes) : 0,
+    startedAt: cleanText(body.startedAt, 40),
+    breakStartedAt: cleanText(body.breakStartedAt, 40),
+    breakMinutes: clampNonNegativeInt(body.breakMinutes, MAX_SHIFT_MINUTES),
 
-    pendingSyncCount: Number.isFinite(Number(body.pendingSyncCount))
-      ? Number(body.pendingSyncCount)
-      : 0,
-    failedSyncCount: Number.isFinite(Number(body.failedSyncCount))
-      ? Number(body.failedSyncCount)
-      : 0,
-    oldestPendingSyncAt: cleanString(body.oldestPendingSyncAt),
+    pendingSyncCount: clampNonNegativeInt(body.pendingSyncCount, 100_000),
+    failedSyncCount: clampNonNegativeInt(body.failedSyncCount, 100_000),
+    oldestPendingSyncAt: cleanText(body.oldestPendingSyncAt, 40),
 
     lastSeenAt: now,
     updatedAt: now,
@@ -1395,6 +1613,7 @@ function isWorkerStatusVisibleUser(user) {
   return true;
 }
 
+// Issue 8 — listWorkerStatus with pagination on both table scans
 async function listWorkerStatus(event) {
   const profile = await requireAdminUser(event);
 
@@ -1404,16 +1623,21 @@ async function listWorkerStatus(event) {
 
   const usersTableName = requireEnv("USERS_TABLE", USERS_TABLE);
   const workerStatusTableName = requireEnv("WORKER_STATUS_TABLE", WORKER_STATUS_TABLE);
+  const { limit, exclusiveStartKey } = parsePaginationParams(event);
 
   const [usersResult, statusResult] = await Promise.all([
     dynamo.send(
       new ScanCommand({
         TableName: usersTableName,
+        ...(limit && { Limit: limit }),
+        ...(exclusiveStartKey && { ExclusiveStartKey: exclusiveStartKey }),
       }),
     ),
     dynamo.send(
       new ScanCommand({
         TableName: workerStatusTableName,
+        ...(limit && { Limit: limit }),
+        ...(exclusiveStartKey && { ExclusiveStartKey: exclusiveStartKey }),
       }),
     ),
   ]);
@@ -1617,11 +1841,31 @@ export const handler = async (event) => {
       path,
     });
   } catch (error) {
-    console.error("AHloguApi error:", error);
+    // Map known failures to real status codes so the offline client can tell
+    // permanent errors (don't retry) from transient ones (retry later).
+    if (error instanceof SyntaxError || error?.message === "Invalid JSON body.") {
+      return json(400, { error: "Invalid request body." });
+    }
 
-    return json(500, {
-      error: "Internal server error",
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
+    switch (error?.name) {
+      case "UsernameExistsException":
+        return json(409, { error: "A user with this email already exists." });
+      case "InvalidPasswordException":
+        return json(400, { error: "Password does not meet the password policy." });
+      case "InvalidParameterException":
+        return json(400, { error: "Invalid request parameters." });
+      case "UserNotFoundException":
+        return json(404, { error: "User not found." });
+      case "ConditionalCheckFailedException":
+        return json(409, { error: "The record was modified or does not exist." });
+      case "LimitExceededException":
+      case "TooManyRequestsException":
+      case "ProvisionedThroughputExceededException":
+        return json(429, { error: "Too many requests. Please try again shortly." });
+    }
+
+    // Log full error server-side, return no internal details to client
+    console.error("AHloguApi unhandled error:", error);
+    return json(500, { error: "Internal server error" });
   }
 };

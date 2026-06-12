@@ -36,7 +36,10 @@ export function buildWorkerLiveStatusPayload({
     .filter((value): value is string => Boolean(value))
     .sort()[0];
 
-  const trimmedJobId = jobId.trim();
+  // Only an active job is live status; while idle, jobId/location are just
+  // half-typed form input and must not feed the payload (or its signature,
+  // which would otherwise trigger a network publish per keystroke).
+  const trimmedJobId = isWorking ? jobId.trim() : "";
   const currentJob = availableJobs.find(
     (job) => job.jobId === trimmedJobId || job.id === trimmedJobId,
   );
@@ -52,7 +55,7 @@ export function buildWorkerLiveStatusPayload({
 
     currentJobId: trimmedJobId || undefined,
     currentJobName: currentJob?.jobName || undefined,
-    currentJobLocation: location.trim() || undefined,
+    currentJobLocation: isWorking ? location.trim() || undefined : undefined,
 
     startedAt: isWorking && startTime ? startTime : undefined,
     breakStartedAt: isWorking && isOnBreak && breakStartTime ? breakStartTime : undefined,

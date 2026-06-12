@@ -1,11 +1,11 @@
 import { minutesBetween } from "@/lib/workUtils";
-import type { CurrentUser, LogItem } from "@/types/work";
+import type { CurrentUser, LogItem, WorkerRole } from "@/types/work";
 
 type CreatePendingWorkLogInput = {
   currentUser: CurrentUser;
   jobId: string;
   location: string;
-  role: string;
+  role: WorkerRole;
   jobDocs: string;
   description: string;
   startTime: string;

@@ -141,6 +141,7 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
               canStop={props.canStop}
               canSaveAndSwitch={props.canSaveAndSwitch}
               canClearAll={props.canClearAll}
+              isSyncing={props.isSyncing}
               unsyncedCount={props.unsyncedCount}
               failedCount={props.failedCount}
               handleStop={props.handleStop}
@@ -264,7 +265,6 @@ export default function WorkLoggerView(props: WorkLoggerViewProps) {
                 </div>
               </div>
             ) : null}
-            <div className={styles.cloudSyncSection}></div>
             <LogsList
               logs={props.logs}
               expandedLogId={props.expandedLogId}

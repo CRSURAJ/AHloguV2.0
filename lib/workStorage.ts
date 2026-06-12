@@ -2,7 +2,9 @@ import {
   clearDraftForUser,
   clearLogsForUser,
   clearSessionForUser,
+  deleteLogForUser,
   isIndexedDbAvailable,
+  putLogs,
   readDraft,
   readLogs,
   readSession,
@@ -10,9 +12,34 @@ import {
   writeLogs,
   writeSession,
 } from "@/lib/offlineDb";
-import type { ActiveSession, DraftState, LogItem, SyncStatus } from "@/types/work";
+import type { ActiveSession, DraftState, LogItem, SyncStatus, WorkerRole } from "@/types/work";
+import { WORKER_ROLE_OPTIONS } from "@/types/work";
 
 const LEGACY_LOGS_KEY = "project_logu_logs";
+const LOGS_CHANNEL_NAME = "ahlogu:logs-changed";
+
+function notifyLogsChanged(userId: string): void {
+  if (typeof BroadcastChannel === "undefined") return;
+
+  const channel = new BroadcastChannel(LOGS_CHANNEL_NAME);
+  channel.postMessage({ userId });
+  channel.close();
+}
+
+/** Calls onChange whenever another tab persists this user's logs. */
+export function subscribeToLogsChanges(userId: string, onChange: () => void): () => void {
+  if (typeof BroadcastChannel === "undefined") return () => {};
+
+  const channel = new BroadcastChannel(LOGS_CHANNEL_NAME);
+
+  channel.onmessage = (event: MessageEvent) => {
+    if (event.data && event.data.userId === userId) {
+      onChange();
+    }
+  };
+
+  return () => channel.close();
+}
 
 function getStorageKeys(userId: string) {
   return {
@@ -22,8 +49,19 @@ function getStorageKeys(userId: string) {
   };
 }
 
+const VALID_ROLES = new Set<string>(WORKER_ROLE_OPTIONS.map((o) => o.value));
+
+function safeRole(value: unknown): WorkerRole {
+  if (typeof value === "string" && VALID_ROLES.has(value)) {
+    return value as WorkerRole;
+  }
+  return "other";
+}
+
 function safeStatus(value: unknown): SyncStatus {
-  if (value === "pending" || value === "syncing" || value === "synced" || value === "failed") {
+  // "syncing" persisted to storage means the app died mid-upload; the retry
+  // selector only picks pending/failed, so it must rehydrate as retriable.
+  if (value === "pending" || value === "synced" || value === "failed") {
     return value;
   }
 
@@ -55,7 +93,7 @@ function normalizeLog(item: Partial<LogItem>, index: number): LogItem {
     fullname: typeof item.fullname === "string" ? item.fullname : "",
     jobId: typeof item.jobId === "string" ? item.jobId : "",
     location: typeof item.location === "string" ? item.location : "",
-    role: typeof item.role === "string" ? item.role : "",
+    role: safeRole(item.role),
     jobDocs: typeof item.jobDocs === "string" ? item.jobDocs : "",
     description: typeof item.description === "string" ? item.description : "",
     startedAt: typeof item.startedAt === "string" ? item.startedAt : "",
@@ -76,7 +114,7 @@ function normalizeSession(item: Partial<ActiveSession>): ActiveSession {
     breakMinutes: typeof item.breakMinutes === "number" ? item.breakMinutes : 0,
     jobId: typeof item.jobId === "string" ? item.jobId : "",
     location: typeof item.location === "string" ? item.location : "",
-    role: typeof item.role === "string" ? item.role : "",
+    role: safeRole(item.role),
     jobDocs: typeof item.jobDocs === "string" ? item.jobDocs : "",
     description: typeof item.description === "string" ? item.description : "",
   };
@@ -86,7 +124,7 @@ function normalizeDraft(item: Partial<DraftState>): DraftState {
   return {
     jobId: typeof item.jobId === "string" ? item.jobId : "",
     location: typeof item.location === "string" ? item.location : "",
-    role: typeof item.role === "string" ? item.role : "",
+    role: safeRole(item.role),
     jobDocs: typeof item.jobDocs === "string" ? item.jobDocs : "",
     description: typeof item.description === "string" ? item.description : "",
   };
@@ -151,6 +189,19 @@ function clearLocalCopies(userId: string): void {
   window.localStorage.removeItem(LEGACY_LOGS_KEY);
 }
 
+export async function clearUserDataOnSignOut(userId: string): Promise<void> {
+  await clearSession(userId);
+  await clearDraft(userId);
+
+  // Unsynced work must survive sign-out (it would be unrecoverable);
+  // only fully synced history is wiped for privacy on shared devices.
+  const logs = await loadLogs(userId);
+
+  if (logs.length > 0 && logs.every((log) => log.syncStatus === "synced")) {
+    await clearLogs(userId);
+  }
+}
+
 export async function loadLogs(userId: string): Promise<LogItem[]> {
   if (typeof window === "undefined") return [];
 
@@ -161,7 +212,7 @@ export async function loadLogs(userId: string): Promise<LogItem[]> {
   try {
     const existing = await readLogs(userId);
     if (existing.length > 0) {
-      return existing;
+      return existing.map(normalizeLog);
     }
 
     const migrated = loadLogsFromLocalStorage(userId);
@@ -183,11 +234,13 @@ export async function saveLogs(userId: string, logs: LogItem[]): Promise<void> {
   if (!isIndexedDbAvailable()) {
     const keys = getStorageKeys(userId);
     window.localStorage.setItem(keys.logs, JSON.stringify(logs));
+    notifyLogsChanged(userId);
     return;
   }
 
   try {
-    await writeLogs(userId, logs);
+    // Upsert-only: another tab's logs are not deleted by this tab's snapshot.
+    await putLogs(userId, logs);
     const keys = getStorageKeys(userId);
     window.localStorage.removeItem(keys.logs);
     window.localStorage.removeItem(LEGACY_LOGS_KEY);
@@ -195,6 +248,23 @@ export async function saveLogs(userId: string, logs: LogItem[]): Promise<void> {
     const keys = getStorageKeys(userId);
     window.localStorage.setItem(keys.logs, JSON.stringify(logs));
   }
+
+  notifyLogsChanged(userId);
+}
+
+export async function deleteLog(userId: string, logId: string): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  if (isIndexedDbAvailable()) {
+    try {
+      await deleteLogForUser(userId, logId);
+    } catch {
+      // The localStorage fallback path persists the full array via saveLogs,
+      // so a failed IndexedDB delete needs no separate handling here.
+    }
+  }
+
+  notifyLogsChanged(userId);
 }
 
 export async function clearLogs(userId: string): Promise<void> {
@@ -203,6 +273,7 @@ export async function clearLogs(userId: string): Promise<void> {
   if (!isIndexedDbAvailable()) {
     const keys = getStorageKeys(userId);
     window.localStorage.removeItem(keys.logs);
+    notifyLogsChanged(userId);
     return;
   }
 
@@ -212,6 +283,7 @@ export async function clearLogs(userId: string): Promise<void> {
     const keys = getStorageKeys(userId);
     window.localStorage.removeItem(keys.logs);
     window.localStorage.removeItem(LEGACY_LOGS_KEY);
+    notifyLogsChanged(userId);
   }
 }
 

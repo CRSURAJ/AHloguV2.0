@@ -6,15 +6,16 @@ import {
   clearDraft,
   clearLogs,
   clearSession,
+  deleteLog,
   loadDraft,
   loadLogs,
   loadSession,
   saveDraft,
   saveLogs,
   saveSession,
+  subscribeToLogsChanges,
 } from "@/lib/workStorage";
 import { getJobsForRole, JOBS_CHANGED_EVENT } from "@/lib/jobStorage";
-import { getCloudProvider } from "@/lib/cloud/client";
 import { getWorkingStatusText, minutesBetween } from "@/lib/workUtils";
 import { createPendingWorkLog } from "@/lib/workLogger/workLogItem";
 import { uploadWorkLogToAws } from "@/lib/workLogger/workLogSync";
@@ -23,6 +24,7 @@ import {
   markWorkLogFailed,
   markWorkLogSynced,
   markWorkLogSyncing,
+  mergeWorkLogs,
   updateWorkLogStickyNote,
 } from "@/lib/workLogger/workLogStatus";
 import {
@@ -30,11 +32,15 @@ import {
   createDraftSnapshot,
   hasMeaningfulDraft,
 } from "@/lib/workLogger/workLoggerPersistence";
-import {
-  buildWorkerLiveStatusPayload,
-  getWorkerLiveStatusSignature,
-} from "@/lib/workLogger/workerStatusPayload";
-import type { AuthActionResult, CurrentUser, Job, LogItem, SyncStatus } from "@/types/work";
+import { useWorkerHeartbeat } from "@/hooks/useWorkerHeartbeat";
+import type {
+  AuthActionResult,
+  CurrentUser,
+  Job,
+  LogItem,
+  SyncStatus,
+  WorkerRole,
+} from "@/types/work";
 
 export type WorkLoggerState = {
   currentUserFullName: string;
@@ -43,8 +49,8 @@ export type WorkLoggerState = {
   availableJobs: Job[];
   location: string;
   setLocation: Dispatch<SetStateAction<string>>;
-  role: string;
-  setRole: Dispatch<SetStateAction<string>>;
+  role: WorkerRole;
+  setRole: Dispatch<SetStateAction<WorkerRole>>;
   jobDocs: string;
   setJobDocs: Dispatch<SetStateAction<string>>;
   description: string;
@@ -60,6 +66,7 @@ export type WorkLoggerState = {
   canStop: boolean;
   canSaveAndSwitch: boolean;
   canClearAll: boolean;
+  isSyncing: boolean;
   unsyncedCount: number;
   syncedCount: number;
   failedCount: number;
@@ -80,7 +87,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
   const [jobId, setJobId] = useState("");
   const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
   const [location, setLocation] = useState("");
-  const [role, setRole] = useState<string>(currentUser.role);
+  const [role, setRole] = useState<WorkerRole>(currentUser.role);
   const [jobDocs, setJobDocs] = useState("");
   const [description, setDescription] = useState("");
   const [isWorking, setIsWorking] = useState(false);
@@ -92,11 +99,15 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
   const [bannerMessage, setBannerMessage] = useState("");
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
-  const lastWorkerStatusSignatureRef = useRef("");
-  const workerStatusInFlightRef = useRef(false);
-  const lastWorkerStatusSentAtRef = useRef(0);
+  const [isSyncing, setIsSyncing] = useState(false);
   const lastJobsRefreshAtRef = useRef(0);
   const jobsRefreshInFlightRef = useRef(false);
+  const syncInFlightRef = useRef(false);
+  const logsRef = useRef<LogItem[]>(logs);
+
+  useEffect(() => {
+    logsRef.current = logs;
+  }, [logs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -209,6 +220,22 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
   useEffect(() => {
     if (!isHydrated) return;
 
+    return subscribeToLogsChanges(currentUser.id, () => {
+      void loadLogs(currentUser.id).then((stored) => {
+        setLogs((prev) => {
+          const merged = mergeWorkLogs(stored, prev);
+
+          // Same content → keep the same reference, so the persistence
+          // effect doesn't re-save and ping-pong broadcasts between tabs.
+          return JSON.stringify(merged) === JSON.stringify(prev) ? prev : merged;
+        });
+      });
+    });
+  }, [currentUser.id, isHydrated]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+
     if (isWorking) {
       const session = createActiveSessionSnapshot({
         isWorking,
@@ -288,94 +315,20 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
 
   const workingStatusText = getWorkingStatusText(isWorking, isOnBreak);
 
-  const publishWorkerStatus = useCallback(
-    async (options: { force?: boolean } = {}) => {
-      if (!isHydrated) return;
-
-      const statusPayload = buildWorkerLiveStatusPayload({
-        currentUser,
-        logs,
-        availableJobs,
-        jobId,
-        location,
-        isWorking,
-        isOnBreak,
-        startTime,
-        breakStartTime,
-        breakMinutes,
-        failedCount,
-      });
-
-      const signature = getWorkerLiveStatusSignature(statusPayload);
-
-      const nowMs = Date.now();
-
-      if (
-        !options.force &&
-        signature === lastWorkerStatusSignatureRef.current &&
-        nowMs - lastWorkerStatusSentAtRef.current < 10 * 60 * 1000
-      ) {
-        return;
-      }
-
-      if (workerStatusInFlightRef.current) return;
-
-      workerStatusInFlightRef.current = true;
-
-      try {
-        const result = await getCloudProvider().workerStatus.updateMine(statusPayload);
-
-        if (!result.ok) {
-          console.warn("Worker live status update failed:", result.message);
-          return;
-        }
-
-        lastWorkerStatusSignatureRef.current = signature;
-        lastWorkerStatusSentAtRef.current = nowMs;
-      } catch (error) {
-        console.warn("Worker live status update failed:", error);
-      } finally {
-        workerStatusInFlightRef.current = false;
-      }
-    },
-    [
-      availableJobs,
-      breakMinutes,
-      breakStartTime,
-      currentUser,
-      failedCount,
-      isHydrated,
-      isOnBreak,
-      isWorking,
-      jobId,
-      location,
-      logs,
-      startTime,
-    ],
-  );
-
-  useEffect(() => {
-    void publishWorkerStatus();
-  }, [publishWorkerStatus]);
-
-  useEffect(() => {
-    if (!isHydrated) return;
-
-    const sendHeartbeat = () => {
-      void publishWorkerStatus({ force: true });
-    };
-
-    const intervalId = window.setInterval(sendHeartbeat, 10 * 60 * 1000);
-
-    window.addEventListener("focus", sendHeartbeat);
-    window.addEventListener("online", sendHeartbeat);
-
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", sendHeartbeat);
-      window.removeEventListener("online", sendHeartbeat);
-    };
-  }, [isHydrated, publishWorkerStatus]);
+  useWorkerHeartbeat({
+    isHydrated,
+    currentUser,
+    logs,
+    availableJobs,
+    jobId,
+    location,
+    isWorking,
+    isOnBreak,
+    startTime,
+    breakStartTime,
+    breakMinutes,
+    failedCount,
+  });
 
   function handleStickyNoteChange(id: string, value: string) {
     setLogs((prev) => updateWorkLogStickyNote(prev, id, value));
@@ -400,7 +353,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     const validationError = validateBeforeStart();
 
     if (validationError) {
-      setBannerMessage("");
+      setBannerMessage(validationError);
       return;
     }
 
@@ -441,12 +394,12 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     if (!isWorking || !startTime) return;
 
     if (isOnBreak) {
-      setBannerMessage("");
+      setBannerMessage("Resume from break before stopping.");
       return;
     }
 
     if (description.trim() === "") {
-      setBannerMessage("");
+      setBannerMessage("Add a description before stopping.");
       return;
     }
 
@@ -532,6 +485,10 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
   }
 
   async function handleSync(): Promise<void> {
+    // A second tap before the first run finishes would re-upload the same
+    // logs from a stale snapshot, so syncs are strictly one at a time.
+    if (syncInFlightRef.current) return;
+
     const itemsToSync = getSyncableWorkLogs(logs);
 
     if (itemsToSync.length === 0) {
@@ -539,16 +496,31 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
       return;
     }
 
-    for (const item of itemsToSync) {
-      try {
-        const syncedAt = await syncOneItem(item);
+    syncInFlightRef.current = true;
+    setIsSyncing(true);
 
-        setLogs((prev) => markWorkLogSynced(prev, item.id, syncedAt));
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown sync error";
+    try {
+      for (const item of itemsToSync) {
+        // Re-read from live state: the user may have edited the sticky note
+        // while earlier items were uploading, and the click-time snapshot
+        // would silently upload the pre-edit version.
+        const latest = logsRef.current.find((log) => log.id === item.id) ?? item;
 
-        setLogs((prev) => markWorkLogFailed(prev, item.id, message));
+        if (latest.syncStatus === "synced") continue;
+
+        try {
+          const syncedAt = await syncOneItem(latest);
+
+          setLogs((prev) => markWorkLogSynced(prev, latest.id, syncedAt));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Unknown sync error";
+
+          setLogs((prev) => markWorkLogFailed(prev, latest.id, message));
+        }
       }
+    } finally {
+      syncInFlightRef.current = false;
+      setIsSyncing(false);
     }
 
     setBannerMessage("");
@@ -576,6 +548,8 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
   function handleDeleteLog(id: string) {
     setLogs((prev) => prev.filter((log) => log.id !== id));
     setExpandedLogId((prev) => (prev === id ? null : prev));
+    // Persistence is upsert-only, so removals need an explicit storage delete.
+    void deleteLog(currentUser.id, id);
   }
 
   function getSyncBadgeClass(status: SyncStatus) {
@@ -616,6 +590,7 @@ export function useWorkLogger(currentUser: CurrentUser): WorkLoggerState {
     canStop,
     canSaveAndSwitch,
     canClearAll,
+    isSyncing,
     unsyncedCount,
     syncedCount,
     failedCount,

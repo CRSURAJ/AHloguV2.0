@@ -41,6 +41,56 @@ export function getApiBaseUrl(): string {
   return apiBaseUrl.replace(/\/$/, "");
 }
 
+export class CloudAuthError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CloudAuthError";
+  }
+}
+
+export function isCloudAuthError(error: unknown): error is CloudAuthError {
+  return error instanceof Error && error.name === "CloudAuthError";
+}
+
+function getCachedProfileKey(userId: string) {
+  return `ahlogu:current-user:${userId}`;
+}
+
+function cacheCurrentUser(user: CurrentUser): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(getCachedProfileKey(user.id), JSON.stringify(user));
+  } catch {
+    // Quota/private-mode failures only cost the offline fallback.
+  }
+}
+
+export function loadCachedCurrentUser(userId: string): CurrentUser | null {
+  if (typeof window === "undefined" || !userId) return null;
+
+  const raw = window.localStorage.getItem(getCachedProfileKey(userId));
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return null;
+
+    const record = parsed as ProfileRecord;
+    const id = getStringValue(record, ["id"]);
+    if (!id) return null;
+
+    return convertProfileToCurrentUser(record, getStringValue(record, ["username"]), id);
+  } catch {
+    return null;
+  }
+}
+
+export function clearCachedCurrentUser(userId: string): void {
+  if (typeof window === "undefined" || !userId) return;
+  window.localStorage.removeItem(getCachedProfileKey(userId));
+}
+
 export async function fetchAwsUsersFromCloud(): Promise<AwsUserListItem[]> {
   const session = await getCurrentCognitoSession();
 
@@ -72,11 +122,17 @@ export async function fetchAwsUsersFromCloud(): Promise<AwsUserListItem[]> {
     throw new Error(message);
   }
 
-  if (!Array.isArray(responseJson)) {
-    return [];
-  }
+  const items =
+    responseJson &&
+    typeof responseJson === "object" &&
+    "items" in responseJson &&
+    Array.isArray((responseJson as { items: unknown }).items)
+      ? (responseJson as { items: unknown[] }).items
+      : Array.isArray(responseJson)
+        ? responseJson
+        : [];
 
-  return responseJson.map((item) => {
+  return items.map((item) => {
     const record = item && typeof item === "object" ? (item as ProfileRecord) : {};
 
     const rawPermissionLevel = getStringValue(record, ["permissionLevel"]).toLowerCase();
@@ -118,7 +174,15 @@ export async function fetchCurrentUserFromCloud(session: CognitoSession): Promis
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(errorText || `Could not load AHlogu user profile. Status ${response.status}.`);
+    const message = errorText || `Could not load AHlogu user profile. Status ${response.status}.`;
+
+    // Only an explicit rejection of the credentials is an auth error;
+    // anything else (5xx, gateway issues) must not destroy the session.
+    if (response.status === 401 || response.status === 403) {
+      throw new CloudAuthError(message);
+    }
+
+    throw new Error(message);
   }
 
   const responseJson = (await response.json()) as unknown;
@@ -127,10 +191,12 @@ export async function fetchCurrentUserFromCloud(session: CognitoSession): Promis
   const isActiveRaw = profile.isActive ?? profile.is_active;
 
   if (isActiveRaw === false || isActiveRaw === "false") {
-    throw new Error("This AHlogu user is inactive.");
+    throw new CloudAuthError("This AHlogu user is inactive.");
   }
 
-  return convertProfileToCurrentUser(profile, fallbackEmail, fallbackSub);
+  const currentUser = convertProfileToCurrentUser(profile, fallbackEmail, fallbackSub);
+  cacheCurrentUser(currentUser);
+  return currentUser;
 }
 
 async function getAwsAuthHeaders(): Promise<Record<string, string>> {

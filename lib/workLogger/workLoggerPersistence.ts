@@ -1,4 +1,4 @@
-import type { ActiveSession, DraftState } from "@/types/work";
+import type { ActiveSession, DraftState, WorkerRole } from "@/types/work";
 
 type CreateActiveSessionSnapshotInput = {
   isWorking: boolean;
@@ -8,7 +8,7 @@ type CreateActiveSessionSnapshotInput = {
   breakMinutes: number;
   jobId: string;
   location: string;
-  role: string;
+  role: WorkerRole;
   jobDocs: string;
   description: string;
 };
@@ -16,7 +16,7 @@ type CreateActiveSessionSnapshotInput = {
 type CreateDraftSnapshotInput = {
   jobId: string;
   location: string;
-  role: string;
+  role: WorkerRole;
   jobDocs: string;
   description: string;
 };

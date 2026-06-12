@@ -80,14 +80,56 @@ async function openDatabase(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
+function isLogRecord(x: unknown): x is LogRecord {
+  return typeof x === "object" && x !== null && "id" in x && "userId" in x && "value" in x;
+}
+
+function isSessionRecord(x: unknown): x is SessionRecord {
+  return typeof x === "object" && x !== null && "userId" in x && "value" in x;
+}
+
+function isDraftRecord(x: unknown): x is DraftRecord {
+  return typeof x === "object" && x !== null && "userId" in x && "value" in x;
+}
+
 export async function readLogs(userId: string): Promise<LogItem[]> {
   const db = await openDatabase();
   const tx = db.transaction(LOGS_STORE, "readonly");
   const index = tx.objectStore(LOGS_STORE).index("byUserId");
-  const records = (await requestToPromise(index.getAll(userId))) as LogRecord[];
+  const raw = await requestToPromise<unknown[]>(index.getAll(userId));
+  const records = (Array.isArray(raw) ? raw : []).filter(isLogRecord);
   await transactionDone(tx);
 
   return records.map((record) => record.value).sort((a, b) => b.ts - a.ts);
+}
+
+/**
+ * Upsert without deleting other records — safe for concurrent tabs, which
+ * each hold their own in-memory array (a full rewrite would erase logs
+ * another tab created). Removals go through deleteLogForUser/clearLogsForUser.
+ */
+export async function putLogs(userId: string, logs: LogItem[]): Promise<void> {
+  const db = await openDatabase();
+  const tx = db.transaction(LOGS_STORE, "readwrite");
+  const store = tx.objectStore(LOGS_STORE);
+
+  logs.forEach((log) => {
+    const record: LogRecord = {
+      id: `${userId}::${log.id}`,
+      userId,
+      value: log,
+    };
+    store.put(record);
+  });
+
+  await transactionDone(tx);
+}
+
+export async function deleteLogForUser(userId: string, logId: string): Promise<void> {
+  const db = await openDatabase();
+  const tx = db.transaction(LOGS_STORE, "readwrite");
+  tx.objectStore(LOGS_STORE).delete(`${userId}::${logId}`);
+  await transactionDone(tx);
 }
 
 export async function writeLogs(userId: string, logs: LogItem[]): Promise<void> {
@@ -96,9 +138,9 @@ export async function writeLogs(userId: string, logs: LogItem[]): Promise<void> 
   const store = tx.objectStore(LOGS_STORE);
   const index = store.index("byUserId");
 
-  const existingKeys = (await requestToPromise(
+  const existingKeys = await requestToPromise<IDBValidKey[]>(
     index.getAllKeys(IDBKeyRange.only(userId)),
-  )) as IDBValidKey[];
+  );
 
   existingKeys.forEach((key) => {
     store.delete(key);
@@ -122,9 +164,9 @@ export async function clearLogsForUser(userId: string): Promise<void> {
   const store = tx.objectStore(LOGS_STORE);
   const index = store.index("byUserId");
 
-  const existingKeys = (await requestToPromise(
+  const existingKeys = await requestToPromise<IDBValidKey[]>(
     index.getAllKeys(IDBKeyRange.only(userId)),
-  )) as IDBValidKey[];
+  );
 
   existingKeys.forEach((key) => {
     store.delete(key);
@@ -136,9 +178,8 @@ export async function clearLogsForUser(userId: string): Promise<void> {
 export async function readSession(userId: string): Promise<ActiveSession | null> {
   const db = await openDatabase();
   const tx = db.transaction(SESSIONS_STORE, "readonly");
-  const record = (await requestToPromise(tx.objectStore(SESSIONS_STORE).get(userId))) as
-    | SessionRecord
-    | undefined;
+  const raw = await requestToPromise<unknown>(tx.objectStore(SESSIONS_STORE).get(userId));
+  const record: SessionRecord | undefined = isSessionRecord(raw) ? raw : undefined;
   await transactionDone(tx);
 
   return record?.value ?? null;
@@ -168,9 +209,8 @@ export async function clearSessionForUser(userId: string): Promise<void> {
 export async function readDraft(userId: string): Promise<DraftState | null> {
   const db = await openDatabase();
   const tx = db.transaction(DRAFTS_STORE, "readonly");
-  const record = (await requestToPromise(tx.objectStore(DRAFTS_STORE).get(userId))) as
-    | DraftRecord
-    | undefined;
+  const raw = await requestToPromise<unknown>(tx.objectStore(DRAFTS_STORE).get(userId));
+  const record: DraftRecord | undefined = isDraftRecord(raw) ? raw : undefined;
   await transactionDone(tx);
 
   return record?.value ?? null;
