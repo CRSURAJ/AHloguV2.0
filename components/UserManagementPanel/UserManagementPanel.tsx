@@ -453,10 +453,6 @@ export default function UserManagementPanel({
         <div className={styles.header}>
           <div>
             <h3 className={styles.title}>User Management</h3>
-            <p className={styles.subtitle}>
-              Create users, assign Admin/Manager/Worker access and trade role, then store the
-              matching profile in AHloguUsers.
-            </p>
           </div>
 
           <button type="button" className={styles.closeButton} onClick={onClose}>

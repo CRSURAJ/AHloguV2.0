@@ -296,7 +296,7 @@ export default function AdminWorkLogsPanel({
   }
   async function deleteWorkLog(log: AdminWorkLog) {
     const confirmed = window.confirm(
-      `Are you sure you want to delete this work log?\n\nWorker: ${log.fullname}\nJob ID: ${log.jobId}\nStarted: ${formatDateTime(log.startedAt)}`,
+      `Are you sure you want to delete this work log?\n\nUser: ${log.fullname}\nJob ID: ${log.jobId}\nStarted: ${formatDateTime(log.startedAt)}`,
     );
 
     if (!confirmed) return;
@@ -428,8 +428,7 @@ export default function AdminWorkLogsPanel({
         <div className={styles.header}>
           <div>
             <h2 className={styles.title}>Work Logs</h2>
-            <p className={styles.subtitle}>Review, filter, edit, and export synced worker logs.</p>
-          </div>
+            </div>
 
           <div className={styles.headerActions}>
             <button

@@ -384,11 +384,7 @@ export default function JobManagementPanel({
         <div className={styles.header}>
           <div>
             <h2>Job Management</h2>
-            <p className={styles.subtitle}>
-              Create jobs and assign them to worker roles. Jobs are stored in AWS and cached locally
-              for offline viewing. Job document links are saved with the job and can open OneDrive
-              or SharePoint documents.
-            </p>
+            
           </div>
 
           <button className={styles.closeButton} type="button" onClick={onClose}>
@@ -488,9 +484,7 @@ export default function JobManagementPanel({
                 + Add drawings
               </button>
 
-              <span className={styles.docsHelp}>
-                Add OneDrive or SharePoint drawing links without uploading files.
-              </span>
+         
             </div>
           </div>
 
@@ -544,7 +538,7 @@ export default function JobManagementPanel({
                       setJobDocumentTitle(event.target.value);
                       if (jobDocumentMessage) setJobDocumentMessage("");
                     }}
-                    placeholder="Mechanical drawing"
+                    placeholder="Please name the drawing"
                   />
                 </label>
 

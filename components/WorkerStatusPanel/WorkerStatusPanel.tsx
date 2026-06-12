@@ -128,7 +128,7 @@ export default function WorkerStatusPanel({ onClose }: WorkerStatusPanelProps) {
       <section className={styles.panel}>
         <header className={styles.header}>
           <div>
-            <h2 className={styles.title}>Worker Status</h2>
+            <h2 className={styles.title}>User Status</h2>
           </div>
 
           <div className={styles.headerActions}>
@@ -166,15 +166,15 @@ export default function WorkerStatusPanel({ onClose }: WorkerStatusPanelProps) {
         {message ? <div className={styles.message}>{message}</div> : null}
 
         {isLoading ? (
-          <p className={styles.emptyText}>Loading worker status...</p>
+          <p className={styles.emptyText}>Loading user status...</p>
         ) : statuses.length === 0 ? (
-          <p className={styles.emptyText}>No workers found yet.</p>
+          <p className={styles.emptyText}>No user found yet.</p>
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Worker</th>
+                  <th>User</th>
                   <th>Status</th>
                   <th>Current Job</th>
                   <th>Sync</th>

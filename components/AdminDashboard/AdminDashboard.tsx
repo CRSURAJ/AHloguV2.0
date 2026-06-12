@@ -134,7 +134,7 @@ export default function AdminDashboard({
                 <span className={styles.actionContent}>
                   <span className={styles.actionTitle}>User Management</span>
                   <span className={styles.actionText}>
-                    Create users, reset credentials, and manage worker access.
+                    Create users, reset credentials, and manage user access.
                   </span>
                 </span>
 
@@ -149,7 +149,7 @@ export default function AdminDashboard({
                 <span className={styles.actionContent}>
                   <span className={styles.actionTitle}>Job Management</span>
                   <span className={styles.actionText}>
-                    Add jobs and assign them to existing worker roles.
+                    Add jobs and assign them to existing user roles.
                   </span>
                 </span>
 
@@ -162,8 +162,8 @@ export default function AdminDashboard({
                 </span>
 
                 <span className={styles.actionContent}>
-                  <span className={styles.actionTitle}>Worker Status</span>
-                  <span className={styles.actionText}>View live worker status</span>
+                  <span className={styles.actionTitle}>User Status</span>
+                  <span className={styles.actionText}>View live user status</span>
                 </span>
 
                 <span className={styles.actionArrow}>→</span>
@@ -177,7 +177,7 @@ export default function AdminDashboard({
                 <span className={styles.actionContent}>
                   <span className={styles.actionTitle}>Work Logs</span>
                   <span className={styles.actionText}>
-                    Review submitted logs, sync status, and future exports.
+                    Review submitted logs, sync status, and exports.
                   </span>
                 </span>
 
