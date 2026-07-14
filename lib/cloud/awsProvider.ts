@@ -1,5 +1,5 @@
 import { getCurrentCognitoSession } from "@/lib/auth/cognitoClient";
-import type { AdminWorkLog, Job, LogItem, WorkerLiveStatus } from "@/types/work";
+import type { AdminWorkLog, Job, LogItem, Project, WorkerLiveStatus } from "@/types/work";
 
 import type { CloudProvider, CloudSyncResult } from "./types";
 
@@ -68,6 +68,10 @@ function extractListItems(data: unknown): unknown[] | null {
 
 function isJobShape(x: unknown): x is Job {
   return typeof x === "object" && x !== null && "id" in x && "jobId" in x;
+}
+
+function isProjectShape(x: unknown): x is Project {
+  return typeof x === "object" && x !== null && "id" in x && "projectRef" in x;
 }
 
 function isAdminWorkLogShape(x: unknown): x is AdminWorkLog {
@@ -259,6 +263,60 @@ export const awsCloudProvider: CloudProvider = {
     async archive(jobId: string) {
       return requestJson(`/jobs/${encodeURIComponent(jobId)}/archive`, {
         method: "POST",
+      });
+    },
+  },
+
+  projects: {
+    async list() {
+      const baseUrl = getAwsApiBaseUrl();
+
+      if (!baseUrl) {
+        throw new Error("Missing NEXT_PUBLIC_AHLOGU_API_URL.");
+      }
+
+      const response = await fetch(`${baseUrl}/projects`, {
+        method: "GET",
+        headers: await getAuthHeaders(),
+      });
+
+      const data: unknown = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message =
+          data && typeof data === "object" && "error" in data && typeof data.error === "string"
+            ? data.error
+            : `AWS projects list failed with status ${response.status}.`;
+
+        throw new Error(message);
+      }
+
+      const items = extractListItems(data);
+
+      if (!items || !items.every(isProjectShape)) {
+        throw new Error("AWS projects list returned an unexpected response shape.");
+      }
+
+      return items;
+    },
+
+    async create(project: Project) {
+      return requestJson("/projects", {
+        method: "POST",
+        payload: project,
+      });
+    },
+
+    async update(project: Project) {
+      return requestJson(`/projects/${encodeURIComponent(project.id)}`, {
+        method: "PUT",
+        payload: project,
+      });
+    },
+
+    async delete(projectId: string) {
+      return requestJson(`/projects/${encodeURIComponent(projectId)}`, {
+        method: "DELETE",
       });
     },
   },

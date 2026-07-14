@@ -314,6 +314,7 @@ export default function Page() {
           <JobManagementPanel
             onClose={() => setJobManagementOpen(false)}
             currentPermissionLevel={currentUser?.permissionLevel ?? "worker"}
+            currentUserName={currentUser?.fullName ?? ""}
           />
         ) : null}
       </>

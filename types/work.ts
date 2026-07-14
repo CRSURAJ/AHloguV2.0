@@ -98,6 +98,89 @@ export type JobDocumentLink = {
   addedAt: string;
 };
 
+export type ProjectStageKey =
+  | "handover"
+  | "procurement"
+  | "engineering"
+  | "build"
+  | "qa"
+  | "dispatch"
+  | "commissioning"
+  | "closed";
+
+export type ProjectDepartment = "install" | "service";
+
+/**
+ * A recorded approval on an exit-criterion or trade sub-step. The record is
+ * kept for audit — a comment is required when no document link is attached.
+ */
+export type ProjectSignOff = {
+  by: string;
+  at: string;
+  comment: string;
+  documentUrl?: string;
+  documentTitle?: string;
+};
+
+export type TradeState = "not_started" | "in_progress" | "complete" | "signed_off";
+
+export type ProjectTradeChecklistItem = {
+  label: string;
+  signoff: ProjectSignOff | null;
+};
+
+export type ProjectTrade = {
+  state: TradeState;
+  blocked: boolean;
+  reason: string;
+  checklist: ProjectTradeChecklistItem[];
+};
+
+/** Per-stage → per-criterion sign-off. `null` means the criterion is unmet. */
+export type ProjectGates = Record<string, Record<string, ProjectSignOff | null>>;
+
+/** Keyed by trade key (plumbing/electrical/prefab/controller). */
+export type ProjectTrades = Record<string, ProjectTrade>;
+
+export type ProjectDateField = "target" | "delivery";
+
+export type ProjectDateLogEntry = {
+  field: ProjectDateField;
+  from: string | null;
+  to: string;
+  at: string;
+  by: string;
+  reason: string;
+};
+
+/**
+ * A Project is the post-sale delivery pipeline entity — it starts at Handover
+ * and advances through stage gates to Closed. Projects are what the delivery
+ * board tracks. Jobs (worker work orders) are created under a project once it
+ * reaches the Build phase and link back via `Job.projectId`.
+ */
+export type Project = {
+  id: string;
+  /** Human reference, e.g. "AH-1088". Unique (case-insensitive). */
+  projectRef: string;
+  customerName: string;
+  location: string;
+  description: string;
+  department: ProjectDepartment;
+  /** Display-only contract value, e.g. "$186k". */
+  value: string;
+  stage: ProjectStageKey;
+  gates: ProjectGates;
+  trades: ProjectTrades;
+  targetDate: string | null;
+  deliveryDate: string | null;
+  dateLog: ProjectDateLogEntry[];
+  isArchived?: boolean;
+  archivedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Job = {
   id: string;
   caseNo: string;
@@ -115,6 +198,8 @@ export type Job = {
   archivedBy?: string;
   createdAt: string;
   updatedAt: string;
+  /** Record id of the Project this job was created under (Build phase). */
+  projectId?: string;
 };
 
 export type WorkerLiveStatusValue =

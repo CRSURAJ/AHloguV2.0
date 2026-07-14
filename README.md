@@ -19,7 +19,7 @@ The app uses AWS Cognito for sign-in and AWS API Gateway/Lambda/DynamoDB for clo
 - First-login new password flow
 - Admin, Manager, and Worker permission levels
 - User management
-- Job management
+- Project & job management
 - Worker time logging
 - Save & Switch Job
 - Break tracking

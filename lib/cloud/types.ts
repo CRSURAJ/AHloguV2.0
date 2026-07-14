@@ -1,4 +1,4 @@
-import type { AdminWorkLog, Job, LogItem, WorkerLiveStatus } from "@/types/work";
+import type { AdminWorkLog, Job, LogItem, Project, WorkerLiveStatus } from "@/types/work";
 
 export type CloudSyncResult = {
   ok: boolean;
@@ -22,6 +22,13 @@ export type CloudProvider = {
     update: (job: Job) => Promise<CloudSyncResult>;
     delete: (jobId: string) => Promise<CloudSyncResult>;
     archive: (jobId: string) => Promise<CloudSyncResult>;
+  };
+
+  projects: {
+    list: () => Promise<Project[]>;
+    create: (project: Project) => Promise<CloudSyncResult>;
+    update: (project: Project) => Promise<CloudSyncResult>;
+    delete: (projectId: string) => Promise<CloudSyncResult>;
   };
 
   workLogs: {

@@ -22,6 +22,7 @@ const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "ap-s
 
 const USERS_TABLE = process.env.USERS_TABLE;
 const JOBS_TABLE = process.env.JOBS_TABLE;
+const PROJECTS_TABLE = process.env.PROJECTS_TABLE;
 const WORK_LOGS_TABLE = process.env.WORK_LOGS_TABLE;
 const WORKER_STATUS_TABLE = process.env.WORKER_STATUS_TABLE;
 const SYNC_EVENTS_TABLE = process.env.SYNC_EVENTS_TABLE;
@@ -391,6 +392,142 @@ async function findDuplicateJobByJobId(tableName, jobId, ignoreJobRecordId = "")
 
 function getJobLabel(job) {
   return cleanString(job.jobName) || cleanString(job.jobId) || cleanString(job.caseNo) || "job";
+}
+
+// --- Project-management field sanitizers -----------------------------------
+// The delivery-board workflow (stage, gates, trades, dates) is stored on the
+// job record. Everything below is sanitized server-side before persistence so
+// a malicious client cannot store arbitrary shapes.
+const PROJECT_STAGE_KEYS = new Set([
+  "handover",
+  "procurement",
+  "engineering",
+  "build",
+  "qa",
+  "dispatch",
+  "commissioning",
+  "closed",
+]);
+const PROJECT_TRADE_STATES = new Set(["not_started", "in_progress", "complete", "signed_off"]);
+
+function cleanProjectStage(value) {
+  return PROJECT_STAGE_KEYS.has(value) ? value : "handover";
+}
+
+function cleanProjectDepartment(value) {
+  return value === "install" || value === "service" ? value : "install";
+}
+
+function cleanIsoDateOrNull(value) {
+  const str = cleanString(value);
+  if (!str) return null;
+
+  return Number.isNaN(Date.parse(str)) ? null : str;
+}
+
+function cleanSignOff(value) {
+  if (!value || typeof value !== "object") return null;
+
+  const by = cleanText(value.by, 200);
+  if (!by) return null;
+
+  const at = cleanString(value.at);
+  const signoff = {
+    by,
+    at: at && !Number.isNaN(Date.parse(at)) ? at : new Date().toISOString(),
+    comment: cleanText(value.comment, 2000),
+  };
+
+  const documentUrl = cleanText(value.documentUrl, 2000);
+  const documentTitle = cleanText(value.documentTitle, 300);
+  if (documentUrl) signoff.documentUrl = documentUrl;
+  if (documentTitle) signoff.documentTitle = documentTitle;
+
+  return signoff;
+}
+
+function cleanProjectTrades(value) {
+  if (!value || typeof value !== "object") return {};
+
+  const out = {};
+
+  for (const [key, trade] of Object.entries(value)) {
+    if (!trade || typeof trade !== "object") continue;
+
+    const cleanKey = cleanText(key, 60);
+    if (!cleanKey) continue;
+
+    const checklist = Array.isArray(trade.checklist)
+      ? trade.checklist
+          .slice(0, 50)
+          .map((entry) => {
+            if (!entry || typeof entry !== "object") return null;
+
+            const label = cleanText(entry.label, 300);
+            if (!label) return null;
+
+            return { label, signoff: cleanSignOff(entry.signoff) };
+          })
+          .filter(Boolean)
+      : [];
+
+    out[cleanKey] = {
+      state: PROJECT_TRADE_STATES.has(trade.state) ? trade.state : "not_started",
+      blocked: trade.blocked === true,
+      reason: cleanText(trade.reason, 500),
+      checklist,
+    };
+  }
+
+  return out;
+}
+
+function cleanProjectGates(value) {
+  if (!value || typeof value !== "object") return {};
+
+  const out = {};
+
+  for (const [stageKey, criteria] of Object.entries(value)) {
+    if (!PROJECT_STAGE_KEYS.has(stageKey) || !criteria || typeof criteria !== "object") continue;
+
+    const stageGate = {};
+
+    for (const [criterionId, signoff] of Object.entries(criteria)) {
+      const id = cleanText(criterionId, 60);
+      if (!id) continue;
+
+      stageGate[id] = cleanSignOff(signoff);
+    }
+
+    out[stageKey] = stageGate;
+  }
+
+  return out;
+}
+
+function cleanProjectDateLog(value) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .slice(0, 200)
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+
+      const field =
+        entry.field === "delivery" ? "delivery" : entry.field === "target" ? "target" : null;
+      const to = cleanIsoDateOrNull(entry.to);
+      if (!field || !to) return null;
+
+      return {
+        field,
+        from: cleanIsoDateOrNull(entry.from),
+        to,
+        at: cleanIsoDateOrNull(entry.at) || new Date().toISOString(),
+        by: cleanText(entry.by, 200),
+        reason: cleanText(entry.reason, 500),
+      };
+    })
+    .filter(Boolean);
 }
 
 async function createUser(event) {
@@ -996,6 +1133,7 @@ async function createJob(event) {
       : [],
     jobDocumentLinks: Array.isArray(body.jobDocumentLinks) ? body.jobDocumentLinks : [],
     isActive: typeof body.isActive === "boolean" ? body.isActive : true,
+    projectId: cleanText(body.projectId, 120),
     createdAt: now,
     updatedAt: now,
     createdBy: profile.user.id,
@@ -1114,6 +1252,10 @@ async function updateJob(event, path) {
         ? existing.jobDocumentLinks
         : [],
     isActive: typeof body.isActive === "boolean" ? body.isActive : existing.isActive !== false,
+    projectId:
+      body.projectId !== undefined
+        ? cleanText(body.projectId, 120)
+        : cleanText(existing.projectId, 120),
     isArchived: false,
     createdAt: cleanString(existing.createdAt),
     createdBy: cleanString(existing.createdBy),
@@ -1253,6 +1395,269 @@ async function deleteJob(event, path) {
   if (!id) {
     return json(400, {
       error: "Missing job id.",
+    });
+  }
+
+  await dynamo.send(
+    new DeleteCommand({
+      TableName: tableName,
+      Key: {
+        id,
+      },
+    }),
+  );
+
+  return json(200, {
+    ok: true,
+    cloudId: id,
+  });
+}
+
+// --- Projects ---------------------------------------------------------------
+// A Project is the post-sale delivery pipeline entity (Handover → … → Closed)
+// tracked on the delivery board. Jobs (worker work orders) are created under a
+// project in the Build phase and link back via job.projectId.
+
+async function findDuplicateProjectByRef(tableName, projectRef, ignoreRecordId = "") {
+  const normalizedRef = normalizeJobIdForCompare(projectRef);
+
+  if (!normalizedRef) {
+    return null;
+  }
+
+  const result = await dynamo.send(
+    new ScanCommand({
+      TableName: tableName,
+      ProjectionExpression: "id, projectRef",
+    }),
+  );
+
+  return (
+    (result.Items ?? []).find((project) => {
+      if (ignoreRecordId && String(project.id || "") === ignoreRecordId) {
+        return false;
+      }
+
+      return normalizeJobIdForCompare(project.projectRef) === normalizedRef;
+    }) || null
+  );
+}
+
+function getProjectLabel(project) {
+  return cleanString(project.customerName) || cleanString(project.projectRef) || "project";
+}
+
+// Same allowlist + sanitize approach as jobs — a client cannot store
+// arbitrary shapes in gates/trades/dateLog.
+function buildProjectItem(body, existing = {}) {
+  return {
+    projectRef: cleanText(body.projectRef ?? existing.projectRef, 60),
+    customerName: cleanText(body.customerName ?? existing.customerName, 300),
+    location: cleanText(body.location ?? existing.location, 300),
+    description: cleanText(body.description ?? existing.description, 2000),
+    department:
+      body.department !== undefined
+        ? cleanProjectDepartment(body.department)
+        : cleanProjectDepartment(existing.department),
+    value: body.value !== undefined ? cleanText(body.value, 60) : cleanText(existing.value, 60),
+    stage:
+      body.stage !== undefined ? cleanProjectStage(body.stage) : cleanProjectStage(existing.stage),
+    gates:
+      body.gates !== undefined ? cleanProjectGates(body.gates) : cleanProjectGates(existing.gates),
+    trades:
+      body.trades !== undefined
+        ? cleanProjectTrades(body.trades)
+        : cleanProjectTrades(existing.trades),
+    targetDate:
+      body.targetDate !== undefined
+        ? cleanIsoDateOrNull(body.targetDate)
+        : cleanIsoDateOrNull(existing.targetDate),
+    deliveryDate:
+      body.deliveryDate !== undefined
+        ? cleanIsoDateOrNull(body.deliveryDate)
+        : cleanIsoDateOrNull(existing.deliveryDate),
+    dateLog:
+      body.dateLog !== undefined
+        ? cleanProjectDateLog(body.dateLog)
+        : cleanProjectDateLog(existing.dateLog),
+  };
+}
+
+async function listProjects(event) {
+  const profile = await requireAdminUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("PROJECTS_TABLE", PROJECTS_TABLE);
+  const { limit, exclusiveStartKey } = parsePaginationParams(event);
+
+  const result = await dynamo.send(
+    new ScanCommand({
+      TableName: tableName,
+      ...(limit && { Limit: limit }),
+      ...(exclusiveStartKey && { ExclusiveStartKey: exclusiveStartKey }),
+    }),
+  );
+
+  const projects = (result.Items ?? []).sort((a, b) =>
+    String(b.updatedAt || b.createdAt || "").localeCompare(
+      String(a.updatedAt || a.createdAt || ""),
+    ),
+  );
+
+  return json(200, { items: projects, nextToken: encodeNextToken(result.LastEvaluatedKey) });
+}
+
+async function createProject(event) {
+  const profile = await requireAdminUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("PROJECTS_TABLE", PROJECTS_TABLE);
+  const body = parseBody(event);
+  const projectRef = cleanString(body.projectRef);
+
+  if (!projectRef) {
+    return json(400, {
+      error: "Project reference is required.",
+    });
+  }
+
+  if (!cleanString(body.customerName)) {
+    return json(400, {
+      error: "Customer / site is required.",
+    });
+  }
+
+  const duplicate = await findDuplicateProjectByRef(tableName, projectRef);
+
+  if (duplicate) {
+    return json(409, {
+      error: `Project reference already exists on ${getProjectLabel(duplicate)}. Use a unique reference.`,
+    });
+  }
+
+  const now = new Date().toISOString();
+  const id = randomUUID();
+
+  const project = {
+    id,
+    ...buildProjectItem(body),
+    isArchived: false,
+    createdAt: now,
+    updatedAt: now,
+    createdBy: profile.user.id,
+    createdByEmail: profile.user.email || "",
+  };
+
+  await dynamo.send(
+    new PutCommand({
+      TableName: tableName,
+      Item: project,
+      ConditionExpression: "attribute_not_exists(id)",
+    }),
+  );
+
+  return json(201, {
+    ok: true,
+    cloudId: id,
+    project,
+  });
+}
+
+async function updateProject(event, path) {
+  const profile = await requireAdminUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("PROJECTS_TABLE", PROJECTS_TABLE);
+  const id = decodeURIComponent(path.replace("/projects/", ""));
+  const body = parseBody(event);
+
+  if (!id) {
+    return json(400, {
+      error: "Missing project id.",
+    });
+  }
+
+  const existingResult = await dynamo.send(
+    new GetCommand({
+      TableName: tableName,
+      Key: {
+        id,
+      },
+    }),
+  );
+
+  if (!existingResult.Item) {
+    return json(404, {
+      error: "Project not found.",
+      id,
+    });
+  }
+
+  const existing = existingResult.Item;
+  const projectRef = cleanString(body.projectRef ?? existing.projectRef);
+
+  if (!projectRef) {
+    return json(400, {
+      error: "Project reference is required.",
+    });
+  }
+
+  const duplicate = await findDuplicateProjectByRef(tableName, projectRef, id);
+
+  if (duplicate) {
+    return json(409, {
+      error: `Project reference already exists on ${getProjectLabel(duplicate)}. Use a unique reference.`,
+    });
+  }
+
+  const project = {
+    id,
+    ...buildProjectItem(body, existing),
+    isArchived: existing.isArchived === true || existing.isArchived === "true",
+    createdAt: cleanString(existing.createdAt),
+    createdBy: cleanString(existing.createdBy),
+    createdByEmail: cleanString(existing.createdByEmail),
+    updatedAt: new Date().toISOString(),
+    updatedBy: profile.user.id,
+    updatedByEmail: profile.user.email || "",
+  };
+
+  await dynamo.send(
+    new PutCommand({
+      TableName: tableName,
+      Item: project,
+    }),
+  );
+
+  return json(200, {
+    ok: true,
+    cloudId: id,
+    project,
+  });
+}
+
+async function deleteProject(event, path) {
+  const profile = await requireFullAdminUser(event);
+
+  if (!profile.ok) {
+    return profile.response;
+  }
+
+  const tableName = requireEnv("PROJECTS_TABLE", PROJECTS_TABLE);
+  const id = decodeURIComponent(path.replace("/projects/", ""));
+
+  if (!id) {
+    return json(400, {
+      error: "Missing project id.",
     });
   }
 
@@ -1808,6 +2213,23 @@ export const handler = async (event) => {
     if (method === "DELETE" && path.startsWith("/jobs/")) {
       return deleteJob(event, path);
     }
+
+    if (method === "GET" && path === "/projects") {
+      return listProjects(event);
+    }
+
+    if (method === "POST" && path === "/projects") {
+      return createProject(event);
+    }
+
+    if (method === "PUT" && path.startsWith("/projects/")) {
+      return updateProject(event, path);
+    }
+
+    if (method === "DELETE" && path.startsWith("/projects/")) {
+      return deleteProject(event, path);
+    }
+
     if (method === "GET" && path === "/worker-status") {
       return listWorkerStatus(event);
     }

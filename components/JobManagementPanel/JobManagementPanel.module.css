@@ -6,6 +6,7 @@
   backdrop-filter: blur(10px);
   padding: 24px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .panel {
@@ -176,6 +177,7 @@
 }
 
 .formGrid input,
+.formGrid select,
 .fullWidthLabel textarea {
   width: 100%;
   min-height: 46px;
@@ -187,8 +189,14 @@
   font: inherit;
 }
 
-.formGrid input {
+.formGrid input,
+.formGrid select {
   padding: 0 14px;
+}
+
+.formGrid select:focus {
+  border-color: rgba(83, 188, 123, 0.45);
+  box-shadow: 0 0 0 3px rgba(83, 188, 123, 0.14);
 }
 
 .fullWidthLabel textarea {
@@ -698,4 +706,59 @@
 
 .modalInput::placeholder {
   color: rgba(238, 247, 243, 0.46);
+}
+
+/* --- Project & Job Management: view toggle + wide board panel ------------ */
+.panelWide {
+  width: 100%;
+  max-width: none;
+  min-height: calc(100vh - 48px);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  /* Board view sits directly on the page background — no panel chrome. */
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+/* In board view the card chrome wraps only the top strip: this header is the
+   card's upper half — the board toolbar (in deliveryBoard.module.css) forms
+   the seamless lower half. */
+.panelWide .header {
+  margin-bottom: 0;
+  background: rgba(17, 48, 45, 0.96);
+  border: 1px solid rgba(178, 223, 220, 0.14);
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+  padding: 16px 18px 10px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.viewToggle {
+  display: flex;
+  border: 1px solid rgba(178, 223, 220, 0.16);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.viewToggle button {
+  border: 0;
+  background: rgba(8, 34, 32, 0.8);
+  color: rgba(238, 247, 243, 0.66);
+  padding: 0 16px;
+  min-height: 42px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.viewToggle button.viewToggleActive {
+  background: #53bc7b;
+  color: #072c29;
 }

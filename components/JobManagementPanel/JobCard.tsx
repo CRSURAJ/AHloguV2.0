@@ -7,6 +7,8 @@ import styles from "./JobManagementPanel.module.css";
 
 type JobCardProps = {
   job: Job;
+  /** Display label of the project this job belongs to, if linked. */
+  projectLabel?: string;
   canArchiveOrDeleteJobs: boolean;
   onEdit: (job: Job) => void;
   onToggleStatus: (job: Job) => Promise<void>;
@@ -16,6 +18,7 @@ type JobCardProps = {
 
 export default function JobCard({
   job,
+  projectLabel,
   canArchiveOrDeleteJobs,
   onEdit,
   onToggleStatus,
@@ -40,6 +43,7 @@ export default function JobCard({
       </div>
 
       <p className={styles.jobMeta}>
+        {projectLabel ? `Project: ${projectLabel} · ` : ""}
         {job.customerName || "No customer / site"} ·{" "}
         {jobDocumentLinks.length === 0
           ? "No job documents"
@@ -52,7 +56,7 @@ export default function JobCard({
 
       {jobDocumentLinks.length > 0 ? (
         <div className={styles.savedDocs}>
-          <p className={styles.savedDocsTitle}>Job Documents / Drawings</p>
+          <p className={styles.savedDocsTitle}>Job Documents / Technical Documents</p>
 
           <div className={styles.savedDocsList}>
             {jobDocumentLinks.map((doc) => (

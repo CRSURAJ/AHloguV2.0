@@ -17,6 +17,8 @@ export type CreateJobInput = {
   assignedRoles: WorkerRole[];
   jobDocumentLinks?: Job["jobDocumentLinks"];
   isActive?: boolean;
+  /** Record id of the Project this job belongs to (created in Build phase). */
+  projectId?: string;
 };
 
 export type UpdateJobInput = Partial<CreateJobInput>;
@@ -166,8 +168,10 @@ function normalizeJob(value: unknown, index: number): Job | null {
       (item as { jobDocumentLinks?: unknown }).jobDocumentLinks,
     ),
     isActive: typeof item.isActive === "boolean" ? item.isActive : true,
+    isArchived: item.isArchived === true ? true : undefined,
     createdAt,
     updatedAt,
+    projectId: cleanString(item.projectId) || undefined,
   };
 }
 
@@ -222,6 +226,7 @@ export async function createJob(input: CreateJobInput): Promise<Job> {
     isActive: input.isActive ?? true,
     createdAt: now,
     updatedAt: now,
+    projectId: input.projectId?.trim() || undefined,
   };
 
   if (shouldUseAwsJobs()) {
@@ -260,6 +265,10 @@ export async function updateJob(id: string, updates: UpdateJobInput): Promise<Jo
     jobDocumentLinks: updates.jobDocumentLinks ?? existingJob.jobDocumentLinks,
     isActive: updates.isActive ?? existingJob.isActive,
     updatedAt: new Date().toISOString(),
+    projectId:
+      updates.projectId !== undefined
+        ? updates.projectId.trim() || undefined
+        : existingJob.projectId,
   };
 
   if (shouldUseAwsJobs()) {

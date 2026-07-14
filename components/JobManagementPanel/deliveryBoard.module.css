@@ -1,0 +1,1219 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  --surface: #11302d;
+  --col: #0a2220;
+  --ink: #eef7f3;
+  --muted: rgba(238, 247, 243, 0.66);
+  --faint: rgba(238, 247, 243, 0.52);
+  --border: rgba(178, 223, 220, 0.18);
+  --accent: #53bc7b;
+  --accent2: #3ea978;
+  --accent-soft: rgba(83, 188, 123, 0.12);
+  --on: #0a1f1a;
+  --heat: #e2ad3f;
+  --heat-soft: rgba(226, 173, 63, 0.12);
+  --ok: #62d39a;
+  --ok-soft: rgba(83, 188, 123, 0.12);
+  --warn: #e2ad3f;
+  --warn-soft: rgba(226, 173, 63, 0.12);
+  --danger: #e05555;
+  --danger-soft: rgba(166, 58, 58, 0.16);
+  color: var(--ink);
+  position: relative;
+  font-size: 14px;
+  /* Mono type across the whole board — gives it the ops-console look and
+     makes refs/dates/values read like instrumentation. */
+  font-family:
+    ui-monospace, "Cascadia Mono", "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  letter-spacing: 0.01em;
+}
+
+.root * {
+  box-sizing: border-box;
+}
+
+.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.02em;
+}
+
+.root button,
+.root input,
+.root textarea,
+.root select {
+  font-family: inherit;
+}
+
+.root input,
+.root textarea,
+.root select {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.root input:focus,
+.root textarea:focus,
+.root select:focus {
+  outline: none;
+  border-color: var(--accent2);
+  box-shadow: 0 0 0 3px rgba(54, 179, 100, 0.18);
+}
+
+/* --- Toolbar ------------------------------------------------------------- */
+/* Lower half of the top-strip card — pairs with .panelWide .header in
+   JobManagementPanel.module.css (same background, joined edge). */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: rgba(17, 48, 45, 0.96);
+  border: 1px solid rgba(178, 223, 220, 0.14);
+  border-top: 0;
+  border-radius: 0 0 14px 14px;
+  padding: 8px 18px 14px;
+  margin-bottom: 16px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.seg {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.seg button {
+  border: 0;
+  background: var(--surface);
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.seg button.on {
+  background: var(--accent);
+  color: var(--on);
+}
+
+/* --- Board -------------------------------------------------------------- */
+.board {
+  display: flex;
+  gap: 14px;
+  /* No side padding — first/last column edges align flush with the
+     header card above. */
+  padding: 4px 0 12px;
+  /* Columns hug their content — a lane only grows tall when it actually
+     holds projects, so empty stages read as shallow trays, not towers. */
+  align-items: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.column {
+  flex: 1 1 0;
+  min-width: 234px;
+  height: auto;
+  max-height: 100%;
+  background: var(--col);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.colhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 8px;
+}
+
+.colhead .lbl {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.colhead .cnt {
+  font-size: 11px;
+  color: var(--faint);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.cards {
+  padding: 7px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 46px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 11px 12px;
+  cursor: grab;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  transition:
+    border-color 0.12s,
+    transform 0.12s;
+}
+
+.card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.card.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+.card .cust {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.card .ref {
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 2px;
+}
+
+.card .foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 9px;
+}
+
+.card .val {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dept {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+
+.dept.install {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.dept.service {
+  background: var(--heat-soft);
+  color: var(--heat);
+}
+
+.gauge {
+  display: flex;
+  gap: 3px;
+  margin-top: 9px;
+}
+
+.gauge .g {
+  flex: 1;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.blockflag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--danger);
+  margin-top: 7px;
+  font-weight: 500;
+}
+
+.cardgate {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  margin-top: 8px;
+  color: var(--faint);
+}
+
+.cardgate.ok {
+  color: var(--ok);
+}
+
+.due {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  margin-top: 8px;
+}
+
+.dchip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 10px;
+}
+
+.toneGood {
+  color: var(--ok);
+}
+.toneWarn {
+  color: var(--warn);
+}
+.toneBad {
+  color: var(--danger);
+}
+.toneMute {
+  color: var(--faint);
+}
+.dchip.toneGood {
+  background: var(--ok-soft);
+}
+.dchip.toneWarn {
+  background: var(--warn-soft);
+}
+.dchip.toneBad {
+  background: var(--danger-soft);
+}
+.dchip.toneMute {
+  background: var(--col);
+}
+
+.pipe {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--col);
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.pipe > i {
+  display: block;
+  height: 100%;
+  background: var(--accent2);
+}
+
+.column.dropOk {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+  background: var(--accent-soft);
+}
+
+.column.dropNo {
+  opacity: 0.5;
+}
+
+.emptyCol {
+  font-size: 11px;
+  color: var(--faint);
+  text-align: center;
+  padding: 14px 10px;
+  border: 1px dashed rgba(178, 223, 220, 0.16);
+  border-radius: 9px;
+}
+
+/* --- Drawer ------------------------------------------------------------- */
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 31, 30, 0.62);
+  z-index: 70;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 480px;
+  max-width: 96%;
+  background: var(--col);
+  border-left: 1px solid var(--border);
+  box-shadow: -18px 0 45px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  z-index: 71;
+}
+
+.dhead {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dtop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dhead h2 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.close {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--faint);
+  padding: 2px;
+  border-radius: 6px;
+}
+
+.close:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.facts {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.fact .k {
+  font-size: 11px;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fact .v {
+  font-size: 14px;
+  font-weight: 500;
+  margin-top: 1px;
+}
+
+/* --- Dates -------------------------------------------------------------- */
+.dates {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dk {
+  font-size: 11px;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: 84px;
+}
+
+.drow input[type="date"] {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  color-scheme: dark;
+}
+
+.mutedHint {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.datereason {
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px;
+}
+
+.datereason label {
+  font-size: 11px;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 5px;
+}
+
+.datereason input[type="text"] {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.datelog {
+  margin-top: 2px;
+}
+
+.logrow {
+  font-size: 12px;
+  color: var(--ink);
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+
+.logrow .lf {
+  font-weight: 600;
+}
+
+.logrow .lr {
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 2px;
+}
+
+/* --- Stepper ------------------------------------------------------------ */
+.stepwrap {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.stepline {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.steps {
+  display: flex;
+  gap: 4px;
+}
+
+.steps .s {
+  flex: 1;
+  height: 8px;
+  border-radius: 3px;
+  background: var(--border);
+}
+
+.steps .s.done {
+  background: var(--ok);
+}
+
+.steps .s.cur {
+  background: var(--accent);
+}
+
+.steps .s.clk {
+  cursor: pointer;
+}
+
+.steps .s.view {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* --- Drawer body -------------------------------------------------------- */
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.auditbanner {
+  background: var(--warn-soft);
+  color: var(--warn);
+  border-radius: 8px;
+  padding: 8px 11px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.sectitle {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0 0 2px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.sectip {
+  font-size: 12px;
+  color: var(--faint);
+  margin: 0 0 11px;
+}
+
+.crit {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  margin-bottom: 7px;
+}
+
+.crit.locked {
+  background: var(--col);
+}
+
+.crithead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+}
+
+.cbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid var(--faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--on);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.cbox.on {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
+.cbox.auto {
+  border-style: dashed;
+  cursor: default;
+}
+
+.cbox.auto.on {
+  background: var(--ok);
+  border-color: var(--ok);
+  border-style: solid;
+}
+
+.clabel {
+  font-size: 13px;
+  flex: 1;
+  line-height: 1.3;
+}
+
+.crit.done .clabel {
+  color: var(--muted);
+}
+
+.signline {
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 2px;
+}
+
+.owner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.evchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.autohint {
+  font-size: 10px;
+  color: var(--faint);
+  margin-top: 2px;
+}
+
+.signbtn {
+  font-family: inherit;
+  border: 1px solid var(--accent);
+  background: var(--surface);
+  color: var(--accent);
+  border-radius: 7px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.signbtn:hover {
+  background: var(--accent-soft);
+}
+
+.detailev {
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--col);
+  border-radius: 7px;
+  padding: 8px 10px;
+  margin: 0 11px 10px;
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+}
+
+.undo {
+  font-size: 11px;
+  color: var(--accent);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+}
+
+.signform {
+  border-top: 1px solid var(--border);
+  padding: 11px;
+  background: var(--accent-soft);
+  border-radius: 0 0 9px 9px;
+}
+
+.signform label {
+  font-size: 11px;
+  color: var(--muted);
+  display: block;
+  margin: 0 0 3px;
+}
+
+.signform input[type="text"],
+.signform input[type="url"],
+.signform textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.signform textarea {
+  min-height: 50px;
+  resize: vertical;
+}
+
+.formacts {
+  display: flex;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+/* --- Trades ------------------------------------------------------------- */
+.trade {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.trade.open {
+  border-color: var(--accent);
+}
+
+.trhead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  cursor: pointer;
+}
+
+.trhead .nm {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.trbody {
+  padding: 0 12px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.trmeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 11px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.track {
+  height: 6px;
+  background: var(--col);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3ea978, #53bc7b);
+  transition: width 0.2s;
+}
+
+.substep {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 7px;
+}
+
+.subhead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+}
+
+.box {
+  width: 17px;
+  height: 17px;
+  border-radius: 5px;
+  border: 1.5px solid var(--faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: var(--on);
+  cursor: pointer;
+}
+
+.box.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.sublbl {
+  font-size: 13px;
+  flex: 1;
+}
+
+.substep.done .sublbl {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+
+.acts {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 11px;
+}
+
+button.b {
+  font-family: inherit;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 7px;
+  padding: 6px 11px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+button.b:hover:not(:disabled) {
+  background: var(--col);
+}
+
+button.b:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+button.b.warn {
+  color: var(--danger);
+}
+
+.reason {
+  font-size: 12px;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-radius: 7px;
+  padding: 8px 10px;
+  margin-top: 9px;
+  display: flex;
+  gap: 6px;
+}
+
+.reason input {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 7px;
+  font: inherit;
+  font-size: 12px;
+}
+
+/* --- Drawer footer ------------------------------------------------------ */
+.foota {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--col);
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--on);
+  border: 0;
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(76, 207, 122, 0.25);
+}
+
+.primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ghost:hover:not(:disabled) {
+  background: var(--surface);
+}
+
+.ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.lockmsg {
+  font-size: 11px;
+  color: var(--faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* --- Flash toast -------------------------------------------------------- */
+.flash {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #064445;
+  color: var(--ink);
+  border: 1px solid var(--border);
+  padding: 9px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.4);
+  max-width: 80%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root * {
+    transition: none !important;
+  }
+}
+
+/* --- Project dialog ------------------------------------------------------ */
+.dialogBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  background: rgba(8, 31, 30, 0.62);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.dialog {
+  width: min(440px, 100%);
+  background: var(--col);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dialogTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.dialogField {
+  display: grid;
+  gap: 5px;
+}
+
+.dialogField span {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.dialogField input,
+.dialogField select {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--ink);
+  min-height: 38px;
+}
+
+.dialogField input[type="date"] {
+  color-scheme: dark;
+}
+
+.dialogRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.dialogActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* --- Linked jobs (drawer) ------------------------------------------------- */
+.jobrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 9px 11px;
+  margin-bottom: 7px;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+
+.jobrow:hover {
+  border-color: var(--accent);
+}
+
+.jobname {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jobmeta {
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 1px;
+}
+
+/* --- Stage paging --------------------------------------------------------- */
+.boardWrap {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Floating brand "jet arrow" — vertically centered over the board edge. */
+.navArrow {
+  position: absolute;
+  top: 50%;
+  z-index: 5;
+  border: 0;
+  background: transparent;
+  padding: 12px 8px;
+  cursor: pointer;
+  line-height: 0;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+  transition:
+    transform 0.12s,
+    filter 0.12s;
+  transform: translateY(-50%);
+}
+
+.navArrow:hover {
+  transform: translateY(-50%) scale(1.12);
+  filter: drop-shadow(0 0 14px rgba(83, 188, 123, 0.55));
+}
+
+.navArrow:active {
+  transform: translateY(-50%) scale(1.02);
+}
+
+.navArrowLeft {
+  left: -42px;
+  /* Grow inward on hover — outer edge stays put so nothing overflows. */
+  transform-origin: left center;
+}
+
+.navArrowRight {
+  right: -42px;
+  transform-origin: right center;
+}
+
+.stageRange {
+  font-size: 12px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+/* --- Card header: delivery date headlines top-right ----------------------- */
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.deliveryBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+.deliveryLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+}
+
+.deliveryDate {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* --- Card stage ticks (replaces the old thin progress pipe) --------------- */
+.cardSteps {
+  display: flex;
+  gap: 3px;
+  margin-top: 10px;
+}
+
+.cardSteps .cs {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(178, 223, 220, 0.14);
+}
+
+.cardSteps .csDone {
+  background: var(--ok);
+}
+
+.cardSteps .csCur {
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(83, 188, 123, 0.5);
+}

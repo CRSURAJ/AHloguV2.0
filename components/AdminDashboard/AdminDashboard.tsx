@@ -147,7 +147,7 @@ export default function AdminDashboard({
                 </span>
 
                 <span className={styles.actionContent}>
-                  <span className={styles.actionTitle}>Job Management</span>
+                  <span className={styles.actionTitle}>Project & Job Management</span>
                   <span className={styles.actionText}>
                     Add jobs and assign them to existing user roles.
                   </span>

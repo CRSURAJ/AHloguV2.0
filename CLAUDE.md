@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**AHlogu** is an offline-first work logging and time tracking PWA for field teams at Automatic Heating. Workers log time against jobs (with break tracking) in the field — even without internet — and the app syncs to the cloud when connectivity is restored.
+**AHlogu** is an offline-first work logging and time tracking PWA for field teams at Automatic Heating. Workers log time against jobs (with break tracking) in the field — even without internet — and the app syncs to the cloud when connectivity is restored. Admins and managers also track post-sale project delivery on a stage-gated kanban board (see **Project & Job Management** below).
 
 ## Commands
 
@@ -39,6 +39,8 @@ There are no unit or e2e tests configured.
 | `lib/cloud/` | `awsProvider.ts` (REST client), `awsUsersApi.ts` |
 | `lib/workLogger/` | Work log sync, status, persistence logic |
 | `lib/jobStorage.ts` | Job CRUD — cloud-backed with localStorage cache, offline writes queued |
+| `lib/projectStorage.ts` | Project CRUD — cloud-backed with localStorage cache, normalization of gates/trades/dateLog |
+| `lib/projectManagement.ts` | Delivery-board domain: stages, trades, exit-criteria, and pure gate/date/progress logic |
 | `lib/workStorage.ts` | Logs/session/draft persistence over IndexedDB |
 | `lib/offlineDb.ts` | IndexedDB wrapper — three stores: `logs`, `sessions`, `drafts` |
 | `types/work.ts` | All domain types |
@@ -50,7 +52,7 @@ There are no unit or e2e tests configured.
 
 1. **LoadingScreen** — until session check completes
 2. **CognitoLoginCard** — when unauthenticated (also handles new-password-required challenge)
-3. **AdminDashboard** — for `admin` and `manager` roles (with modals for Job, User, WorkLog, and WorkerStatus panels)
+3. **AdminDashboard** — for `admin` and `manager` roles (with modals for Project & Job, User, WorkLog, and WorkerStatus panels)
 4. **WorkLogger** — for `worker` role only
 
 ChangePasswordDialog and AccountMessageDialog are mounted for both admin and worker views.
@@ -62,6 +64,7 @@ Components are pure presenters — all domain logic lives in hooks:
 - **`useWorkLogger`** is the single source of truth for worker state (`isWorking`, `isOnBreak`, `logs`, form fields, computed flags like `canStart`/`canStop`). It handles session persistence, draft persistence, job refresh (on focus/online/storage/`JOBS_CHANGED_EVENT`, throttled), and work-log upload via `handleSync()`.
 - **`useWorkerHeartbeat`** (called by `useWorkLogger`) publishes `WorkerLiveStatus` — every 10 minutes, on focus/online, and whenever the payload signature changes (deduped via `workerStatusPayload.ts` signature).
 - **`useJobs`** manages job CRUD for admin/manager users. Validates duplicate `jobId` (case-insensitive).
+- **`useProjects`** manages project CRUD for the delivery board. Validates duplicate `projectRef` (case-insensitive).
 - **`useUserManagement`** — admin/manager user CRUD against `lib/cloud/awsUsersApi.ts` (create, activate/deactivate, reset password, delete).
 - **`useChangePassword`** — change-password dialog state; verifies the current password by re-signing-in before calling Cognito's change-password.
 
@@ -87,6 +90,27 @@ pending → syncing → synced
 **Job mutations (admin/manager)**: `lib/jobStorage.ts` calls the cloud API directly and mirrors results into a localStorage jobs cache; offline job edits fail with an error (jobs are online-only — there is no offline queue for them).
 
 DynamoDB is the cloud source of truth for both.
+
+### Project & Job Management (delivery board)
+
+**Projects and jobs are distinct entities.** A **Project** (`types/work.ts` `Project`, DynamoDB `PROJECTS_TABLE`) is the post-sale delivery pipeline record — it starts at Handover and advances through stage gates to Closed. A **Job** is a worker work order — the thing workers log time against. Jobs are typically created once a project reaches the **Build** phase and link back via `Job.projectId`; one project can have many jobs (a job can also be stand-alone).
+
+`JobManagementPanel` has two views toggled in its header:
+
+- **Board** (default) — `DeliveryBoard.tsx`, a drag-and-drop kanban of **projects** across delivery stages. Projects are created/edited/deleted via a dialog on the board (delete is admin-only). `ProjectDrawer.tsx` opens per project for stage sign-offs, trades, dates, and linked jobs.
+- **Jobs** — the job create/edit form + list (fields worker time-logging depends on: `jobId`, `assignedRoles`, `jobDocumentLinks`), plus an optional **Project** selector that sets `projectId`.
+
+Project fields: `projectRef` (unique, case-insensitive — e.g. "AH-1088"), `customerName`, `location`, `department` (install/service), `value` (display-only), `stage`, `gates`, `trades`, `targetDate`, `deliveryDate`, `dateLog`.
+
+- **Stages** (`STAGES` in `lib/projectManagement.ts`): handover → procurement → engineering → build → qa → dispatch → commissioning → closed. Projects move **one stage at a time**, and forward moves are blocked until every exit criterion for the current stage is signed off (`stageComplete`). Enforced in both drag-drop and the drawer's advance button.
+- **Exit criteria** (`EXIT_CRITERIA`, per stage) — each is signed off with a `ProjectSignOff` (`by` + timestamp + comment and/or **document link**; a comment is required when no link is attached). Owners are role labels, not real users; sign-offs are attributed to the logged-in user (`currentUser.fullName`, passed from `page.tsx`).
+- **Trades** (`TRADES`: plumbing/electrical/prefab/controller) appear in the Build stage — each has a checklist, a state machine (`not_started → in_progress → complete → signed_off`), and a block/reason flag. The Build "all trades complete" criterion is `auto` — it clears from trade state rather than a manual sign-off.
+- **Linked jobs & logged hours** — from Build onward, the drawer lists the project's jobs (`job.projectId`) with **real labour hours** aggregated from synced work logs (`GET /work-logs`, summed by `AdminWorkLog.jobId` — the human job code). "New job for this project" jumps to the Jobs form pre-filled with `projectId`, customer, and location. Board cards show job count + total logged time.
+- **Dates** — `targetDate` (Target) and `deliveryDate` are edited in the drawer; each change requires a reason and is appended to `dateLog` for audit.
+
+Persistence mirrors the jobs pattern: `useProjects` → `lib/projectStorage.ts` (localStorage cache + cloud) → `/projects` API → `PROJECTS_TABLE`. The Lambda sanitizes every project field server-side (allowlisted stage/department, bounded strings, structured `gates`/`trades`/`dateLog`) and enforces unique `projectRef`.
+
+Sign-off documents are **links** (OneDrive/SharePoint), consistent with `jobDocumentLinks` — no file uploads.
 
 ### IndexedDB schema
 
@@ -124,7 +148,11 @@ All endpoints require a Cognito JWT Bearer token except `/health`.
 | `POST` | `/jobs` | admin/manager |
 | `PUT` | `/jobs/{id}` | admin/manager |
 | `POST` | `/jobs/{id}/archive` | admin/manager |
-| `DELETE` | `/jobs/{id}` | admin/manager |
+| `DELETE` | `/jobs/{id}` | admin |
+| `GET` | `/projects` | admin/manager |
+| `POST` | `/projects` | admin/manager |
+| `PUT` | `/projects/{id}` | admin/manager |
+| `DELETE` | `/projects/{id}` | admin |
 | `GET` | `/users` | admin/manager |
 | `POST` | `/users` | admin/manager |
 | `PUT` | `/users/{id}` | admin/manager |
@@ -140,7 +168,7 @@ All endpoints require a Cognito JWT Bearer token except `/health`.
 
 ### DynamoDB tables
 
-Configured via Lambda environment variables: `USERS_TABLE`, `JOBS_TABLE`, `WORK_LOGS_TABLE`, `WORKER_STATUS_TABLE`, `SYNC_EVENTS_TABLE`.
+Configured via Lambda environment variables: `USERS_TABLE`, `JOBS_TABLE`, `PROJECTS_TABLE`, `WORK_LOGS_TABLE`, `WORKER_STATUS_TABLE`, `SYNC_EVENTS_TABLE`. All tables use partition key `id` (string).
 
 ## Environment
 
