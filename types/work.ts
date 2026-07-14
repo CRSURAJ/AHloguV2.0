@@ -146,12 +146,35 @@ export type ProjectDateField = "target" | "delivery";
 
 export type ProjectDateLogEntry = {
   field: ProjectDateField;
+  /** For "target" entries: which stage's target was changed. Absent on legacy entries. */
+  stage?: ProjectStageKey;
   from: string | null;
   to: string;
   at: string;
   by: string;
   reason: string;
 };
+
+export type ProjectActivityKind = "stage" | "field" | "blocked";
+
+/**
+ * One audit-trail entry: a stage move, a project-detail edit, or a
+ * block/unblock. Date changes have their own log (`dateLog`).
+ */
+export type ProjectActivityEntry = {
+  kind: ProjectActivityKind;
+  /** Field name for "field" entries; empty otherwise. */
+  field: string;
+  from: string;
+  to: string;
+  at: string;
+  by: string;
+  /** Block reason for "blocked" entries; empty otherwise. */
+  note: string;
+};
+
+/** Per-stage completion targets (ISO date), keyed by stage key. */
+export type ProjectStageTargets = Partial<Record<ProjectStageKey, string | null>>;
 
 /**
  * A Project is the post-sale delivery pipeline entity — it starts at Handover
@@ -167,14 +190,22 @@ export type Project = {
   location: string;
   description: string;
   department: ProjectDepartment;
-  /** Display-only contract value, e.g. "$186k". */
+  /** Contract value as typed, e.g. "$186k" — kept for display. */
   value: string;
+  /** Contract value in whole dollars for sums; null when not parseable/set. */
+  valueAmount: number | null;
   stage: ProjectStageKey;
   gates: ProjectGates;
   trades: ProjectTrades;
+  /** Whole-project hold — forward stage moves are refused while set. */
+  blocked: boolean;
+  blockedReason: string;
+  /** Due date for completing the *current* stage (mirrors `stageTargets[stage]`). */
   targetDate: string | null;
   deliveryDate: string | null;
+  stageTargets: ProjectStageTargets;
   dateLog: ProjectDateLogEntry[];
+  activityLog: ProjectActivityEntry[];
   isArchived?: boolean;
   archivedAt?: string;
   createdAt: string;

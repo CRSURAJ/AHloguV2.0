@@ -8,13 +8,18 @@ import {
   canDropOn,
   deliveryStatus,
   DEPARTMENT_OPTIONS,
+  diffProjectFields,
   dueStatus,
   formatDate,
   formatMinutes,
   fromDateInputValue,
   gateProgress,
   getStage,
+  getStageTarget,
+  getStageTargets,
   getTrades,
+  isProjectBlocked,
+  makeActivityEntry,
   stageComplete,
   stageIndex,
   STAGES,
@@ -43,6 +48,10 @@ type DeliveryBoardProps = {
   isLoadingProjects: boolean;
   currentUserName: string;
   canDeleteProjects: boolean;
+  /** Opens this project's drawer on mount (jump-in from BaajBoard). */
+  initialSelectedProjectId?: string | null;
+  /** History section to expand in that drawer ("activity" | "dates"). */
+  initialDrawerFocus?: "activity" | "dates" | null;
   onCreateProject: (input: CreateProjectInput) => Promise<AuthActionResult>;
   onUpdateProject: (id: string, updates: UpdateProjectInput) => Promise<AuthActionResult>;
   onDeleteProject: (id: string) => Promise<AuthActionResult>;
@@ -151,6 +160,8 @@ function BoardCard({
   const isBuild = stage === "build";
   const trades = getTrades(project);
   const anyBlocked = TRADES.some((t) => trades[t.key]?.blocked);
+  const projectBlocked = isProjectBlocked(project);
+  const stageTarget = getStageTarget(project, stage);
   const [gd, gt] = gateProgress(project);
   const ready = gt > 0 && gd === gt;
   const status = dueStatus(project);
@@ -208,6 +219,13 @@ function BoardCard({
         </div>
       ) : null}
 
+      {projectBlocked ? (
+        <div className={styles.blockflag} title={project.blockedReason || undefined}>
+          <AlertTriangle size={12} /> Blocked
+          {project.blockedReason ? ` — ${project.blockedReason}` : ""}
+        </div>
+      ) : null}
+
       {isBuild && anyBlocked ? (
         <div className={styles.blockflag}>
           <AlertTriangle size={12} /> Trade blocked
@@ -229,7 +247,7 @@ function BoardCard({
       ) : null}
 
       <div className={`${styles.due} ${toneClass(status.tone)}`}>
-        <Calendar size={12} /> Stage due {project.targetDate ? formatDate(project.targetDate) : "—"}
+        <Calendar size={12} /> Stage due {stageTarget ? formatDate(stageTarget) : "—"}
         {status.days !== null ? (
           <span className={`${styles.dchip} ${toneClass(status.tone)}`}>{status.label}</span>
         ) : null}
@@ -374,6 +392,8 @@ export default function DeliveryBoard({
   isLoadingProjects,
   currentUserName,
   canDeleteProjects,
+  initialSelectedProjectId = null,
+  initialDrawerFocus = null,
   onCreateProject,
   onUpdateProject,
   onDeleteProject,
@@ -382,7 +402,9 @@ export default function DeliveryBoard({
 }: DeliveryBoardProps) {
   const [filter, setFilter] = useState<DeptFilter>("all");
   const [dragId, setDragId] = useState<string | null>(null);
-  const [selId, setSelId] = useState<string | null>(null);
+  const [selId, setSelId] = useState<string | null>(initialSelectedProjectId);
+  // Applies only to the jump-in selection; cleared when a card is opened by hand.
+  const [drawerFocus, setDrawerFocus] = useState<"activity" | "dates" | null>(initialDrawerFocus);
   const [openTrade, setOpenTrade] = useState("plumbing");
   const [flashMsg, setFlashMsg] = useState<string | null>(null);
   const [dialog, setDialog] = useState<"create" | "edit" | null>(null);
@@ -530,12 +552,61 @@ export default function DeliveryBoard({
     });
   };
 
+  const withActivity = (project: Project, entry: ReturnType<typeof makeActivityEntry>) => [
+    ...(project.activityLog ?? []),
+    entry,
+  ];
+
+  /**
+   * Moves the project and rolls `targetDate` to the destination stage's
+   * target, preserving the outgoing stage's target in `stageTargets`.
+   */
+  const applyStageMove = (project: Project, targetKey: ProjectStageKey) => {
+    const fromStage = getStage(project);
+    const stageTargets = {
+      ...getStageTargets(project),
+      [fromStage]: getStageTarget(project, fromStage),
+    };
+
+    void persist(project.id, {
+      stage: targetKey,
+      stageTargets,
+      targetDate: stageTargets[targetKey] ?? null,
+      activityLog: withActivity(
+        project,
+        makeActivityEntry("stage", currentUserName, {
+          from: STAGES[stageIndex(fromStage)].label,
+          to: STAGES[stageIndex(targetKey)].label,
+        }),
+      ),
+    });
+  };
+
   const moveStage = (project: Project, dir: -1 | 1) => {
     const current = stageIndex(getStage(project));
     const next = current + dir;
     if (next < 0 || next >= STAGES.length) return;
+    if (dir > 0 && isProjectBlocked(project)) {
+      flash("Project is blocked — unblock it before advancing.");
+      return;
+    }
     if (dir > 0 && !stageComplete(project)) return;
-    void persist(project.id, { stage: STAGES[next].key });
+    applyStageMove(project, STAGES[next].key);
+  };
+
+  const setProjectBlocked = (project: Project, blocked: boolean, reason: string) => {
+    void persist(project.id, {
+      blocked,
+      blockedReason: blocked ? reason : "",
+      activityLog: withActivity(
+        project,
+        makeActivityEntry("blocked", currentUserName, {
+          from: isProjectBlocked(project) ? "blocked" : "active",
+          to: blocked ? "blocked" : "active",
+          note: blocked ? reason : "",
+        }),
+      ),
+    });
   };
 
   const commitDate = (
@@ -543,17 +614,32 @@ export default function DeliveryBoard({
     field: ProjectDateField,
     toIso: string | null,
     reason: string,
+    stage?: ProjectStageKey,
   ) => {
-    const from = field === "target" ? project.targetDate : project.deliveryDate;
+    const targetStage = stage ?? getStage(project);
+    const from = field === "target" ? getStageTarget(project, targetStage) : project.deliveryDate;
     const dateLog = toIso
       ? [
           ...(project.dateLog ?? []),
-          { field, from, to: toIso, at: new Date().toISOString(), by: currentUserName, reason },
+          {
+            field,
+            ...(field === "target" ? { stage: targetStage } : {}),
+            from,
+            to: toIso,
+            at: new Date().toISOString(),
+            by: currentUserName,
+            reason,
+          },
         ]
       : (project.dateLog ?? []);
 
     const dateUpdate: UpdateProjectInput =
-      field === "target" ? { targetDate: toIso } : { deliveryDate: toIso };
+      field === "target"
+        ? {
+            stageTargets: { ...getStageTargets(project), [targetStage]: toIso },
+            ...(targetStage === getStage(project) ? { targetDate: toIso } : {}),
+          }
+        : { deliveryDate: toIso };
 
     void persist(project.id, { ...dateUpdate, dateLog });
   };
@@ -572,13 +658,17 @@ export default function DeliveryBoard({
         flash("Projects move one stage at a time — you can't skip a step.");
         return;
       }
+      if (isProjectBlocked(project)) {
+        flash("Project is blocked — unblock it before advancing.");
+        return;
+      }
       if (!stageComplete(project)) {
         flash(`Not complete — sign off all ${STAGES[current].label} steps first.`);
         return;
       }
     }
 
-    void persist(project.id, { stage: targetKey });
+    applyStageMove(project, targetKey);
   };
 
   const submitCreate = async (form: ProjectFormState) => {
@@ -602,13 +692,23 @@ export default function DeliveryBoard({
   const submitEdit = async (form: ProjectFormState) => {
     if (!sel) return;
 
-    const result = await onUpdateProject(sel.id, {
+    const details = {
       projectRef: form.projectRef,
       customerName: form.customerName,
       location: form.location,
       department: form.department,
       value: form.value,
-      targetDate: fromDateInputValue(form.targetDate),
+    };
+    const activityEntries = diffProjectFields(sel, details, currentUserName);
+    const targetIso = fromDateInputValue(form.targetDate);
+
+    const result = await onUpdateProject(sel.id, {
+      ...details,
+      targetDate: targetIso,
+      stageTargets: { ...getStageTargets(sel), [getStage(sel)]: targetIso },
+      ...(activityEntries.length > 0
+        ? { activityLog: [...(sel.activityLog ?? []), ...activityEntries] }
+        : {}),
     });
 
     if (!result.ok) {
@@ -736,6 +836,7 @@ export default function DeliveryBoard({
                           dragging={project.id === dragId}
                           onOpen={() => {
                             setSelId(project.id);
+                            setDrawerFocus(null);
                             setOpenTrade("plumbing");
                           }}
                           onDragStart={() => setDragId(project.id)}
@@ -774,6 +875,7 @@ export default function DeliveryBoard({
           linkedJobs={jobsByProjectId.get(sel.id) ?? []}
           minutesByJobId={minutesByJobId}
           currentUserName={currentUserName}
+          initialFocus={drawerFocus}
           openTrade={openTrade}
           setOpenTrade={setOpenTrade}
           onClose={() => setSelId(null)}
@@ -790,7 +892,10 @@ export default function DeliveryBoard({
           onSetTradeState={(tradeKey, state) => setTradeState(sel, tradeKey, state)}
           onSetBlocked={(tradeKey, blocked) => setBlocked(sel, tradeKey, blocked)}
           onSetReason={(tradeKey, reason) => setReason(sel, tradeKey, reason)}
-          onCommitDate={(field, toIso, reason) => commitDate(sel, field, toIso, reason)}
+          onSetProjectBlocked={(blocked, reason) => setProjectBlocked(sel, blocked, reason)}
+          onCommitDate={(field, toIso, reason, stage) =>
+            commitDate(sel, field, toIso, reason, stage)
+          }
         />
       ) : null}
 
@@ -815,7 +920,7 @@ export default function DeliveryBoard({
             location: sel.location,
             department: sel.department,
             value: sel.value,
-            targetDate: toDateInputValue(sel.targetDate),
+            targetDate: toDateInputValue(getStageTarget(sel, getStage(sel))),
           }}
           canDelete={canDeleteProjects}
           onSubmit={(form) => void submitEdit(form)}

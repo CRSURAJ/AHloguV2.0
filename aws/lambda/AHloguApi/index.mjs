@@ -414,6 +414,31 @@ function cleanProjectStage(value) {
   return PROJECT_STAGE_KEYS.has(value) ? value : "handover";
 }
 
+// Parses a human contract-value string ("$186k", "1.2M", "186,000") into
+// whole dollars — mirrors parseMoney in lib/projectManagement.ts.
+function parseProjectMoney(input) {
+  if (typeof input !== "string") return null;
+
+  const raw = input
+    .trim()
+    .toLowerCase()
+    .replace(/aud/g, "")
+    .replace(/[$,\s]/g, "");
+  if (!raw) return null;
+
+  const match = raw.match(/^(\d+(?:\.\d+)?)(k|m)?$/);
+  if (!match) return null;
+
+  const multiplier = match[2] === "k" ? 1e3 : match[2] === "m" ? 1e6 : 1;
+  return Math.round(parseFloat(match[1]) * multiplier);
+}
+
+function cleanProjectValueAmount(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.round(value)
+    : null;
+}
+
 function cleanProjectDepartment(value) {
   return value === "install" || value === "service" ? value : "install";
 }
@@ -518,7 +543,7 @@ function cleanProjectDateLog(value) {
       const to = cleanIsoDateOrNull(entry.to);
       if (!field || !to) return null;
 
-      return {
+      const out = {
         field,
         from: cleanIsoDateOrNull(entry.from),
         to,
@@ -526,8 +551,51 @@ function cleanProjectDateLog(value) {
         by: cleanText(entry.by, 200),
         reason: cleanText(entry.reason, 500),
       };
+
+      if (PROJECT_STAGE_KEYS.has(entry.stage)) {
+        out.stage = entry.stage;
+      }
+
+      return out;
     })
     .filter(Boolean);
+}
+
+const PROJECT_ACTIVITY_KINDS = new Set(["stage", "field", "blocked"]);
+
+function cleanProjectActivityLog(value) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .slice(0, 500)
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      if (!PROJECT_ACTIVITY_KINDS.has(entry.kind)) return null;
+
+      return {
+        kind: entry.kind,
+        field: cleanText(entry.field, 100),
+        from: cleanText(entry.from, 500),
+        to: cleanText(entry.to, 500),
+        at: cleanIsoDateOrNull(entry.at) || new Date().toISOString(),
+        by: cleanText(entry.by, 200),
+        note: cleanText(entry.note, 500),
+      };
+    })
+    .filter(Boolean);
+}
+
+function cleanProjectStageTargets(value) {
+  if (!value || typeof value !== "object") return {};
+
+  const out = {};
+
+  for (const [key, raw] of Object.entries(value)) {
+    if (!PROJECT_STAGE_KEYS.has(key)) continue;
+    out[key] = cleanIsoDateOrNull(raw);
+  }
+
+  return out;
 }
 
 async function createUser(event) {
@@ -1460,6 +1528,12 @@ function buildProjectItem(body, existing = {}) {
         ? cleanProjectDepartment(body.department)
         : cleanProjectDepartment(existing.department),
     value: body.value !== undefined ? cleanText(body.value, 60) : cleanText(existing.value, 60),
+    valueAmount:
+      body.valueAmount !== undefined
+        ? cleanProjectValueAmount(body.valueAmount)
+        : body.value !== undefined
+          ? parseProjectMoney(body.value)
+          : (cleanProjectValueAmount(existing.valueAmount) ?? parseProjectMoney(existing.value)),
     stage:
       body.stage !== undefined ? cleanProjectStage(body.stage) : cleanProjectStage(existing.stage),
     gates:
@@ -1468,6 +1542,11 @@ function buildProjectItem(body, existing = {}) {
       body.trades !== undefined
         ? cleanProjectTrades(body.trades)
         : cleanProjectTrades(existing.trades),
+    blocked: body.blocked !== undefined ? body.blocked === true : existing.blocked === true,
+    blockedReason:
+      body.blockedReason !== undefined
+        ? cleanText(body.blockedReason, 500)
+        : cleanText(existing.blockedReason, 500),
     targetDate:
       body.targetDate !== undefined
         ? cleanIsoDateOrNull(body.targetDate)
@@ -1476,10 +1555,18 @@ function buildProjectItem(body, existing = {}) {
       body.deliveryDate !== undefined
         ? cleanIsoDateOrNull(body.deliveryDate)
         : cleanIsoDateOrNull(existing.deliveryDate),
+    stageTargets:
+      body.stageTargets !== undefined
+        ? cleanProjectStageTargets(body.stageTargets)
+        : cleanProjectStageTargets(existing.stageTargets),
     dateLog:
       body.dateLog !== undefined
         ? cleanProjectDateLog(body.dateLog)
         : cleanProjectDateLog(existing.dateLog),
+    activityLog:
+      body.activityLog !== undefined
+        ? cleanProjectActivityLog(body.activityLog)
+        : cleanProjectActivityLog(existing.activityLog),
   };
 }
 

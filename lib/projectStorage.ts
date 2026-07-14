@@ -1,12 +1,15 @@
 import { getCloudProvider } from "@/lib/cloud/client";
-import { DEFAULT_STAGE, makeInitialTrades, STAGE_KEYS } from "@/lib/projectManagement";
+import { DEFAULT_STAGE, makeInitialTrades, parseMoney, STAGE_KEYS } from "@/lib/projectManagement";
 import type {
   Project,
+  ProjectActivityEntry,
+  ProjectActivityKind,
   ProjectDateLogEntry,
   ProjectDepartment,
   ProjectGates,
   ProjectSignOff,
   ProjectStageKey,
+  ProjectStageTargets,
   ProjectTrade,
   ProjectTradeChecklistItem,
   ProjectTrades,
@@ -24,12 +27,17 @@ export type CreateProjectInput = {
   description?: string;
   department?: ProjectDepartment;
   value?: string;
+  valueAmount?: number | null;
   stage?: ProjectStageKey;
+  blocked?: boolean;
+  blockedReason?: string;
   targetDate?: string | null;
   deliveryDate?: string | null;
+  stageTargets?: ProjectStageTargets;
   gates?: ProjectGates;
   trades?: ProjectTrades;
   dateLog?: ProjectDateLogEntry[];
+  activityLog?: ProjectActivityEntry[];
 };
 
 export type UpdateProjectInput = Partial<CreateProjectInput>;
@@ -117,6 +125,12 @@ function cleanStage(value: unknown): ProjectStageKey {
 
 function cleanDepartment(value: unknown): ProjectDepartment {
   return value === "install" || value === "service" ? value : "install";
+}
+
+function cleanValueAmount(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.round(value)
+    : null;
 }
 
 function cleanNullableDate(value: unknown): string | null {
@@ -223,7 +237,7 @@ function cleanDateLog(value: unknown): ProjectDateLogEntry[] {
 
       if (!field || !to) return null;
 
-      return {
+      const out: ProjectDateLogEntry = {
         field,
         from: typeof item.from === "string" && item.from ? item.from : null,
         to,
@@ -231,8 +245,57 @@ function cleanDateLog(value: unknown): ProjectDateLogEntry[] {
         by: cleanString(item.by),
         reason: cleanString(item.reason),
       };
+
+      if (
+        typeof item.stage === "string" &&
+        (STAGE_KEYS as readonly string[]).includes(item.stage)
+      ) {
+        out.stage = item.stage;
+      }
+
+      return out;
     })
     .filter((entry): entry is ProjectDateLogEntry => entry !== null);
+}
+
+const ACTIVITY_KINDS = new Set<ProjectActivityKind>(["stage", "field", "blocked"]);
+
+function cleanActivityLog(value: unknown): ProjectActivityEntry[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((entry): ProjectActivityEntry | null => {
+      if (!entry || typeof entry !== "object") return null;
+
+      const item = entry as Partial<ProjectActivityEntry>;
+      if (typeof item.kind !== "string" || !ACTIVITY_KINDS.has(item.kind as ProjectActivityKind)) {
+        return null;
+      }
+
+      return {
+        kind: item.kind as ProjectActivityKind,
+        field: cleanString(item.field),
+        from: cleanString(item.from),
+        to: cleanString(item.to),
+        at: cleanDate(item.at, new Date().toISOString()),
+        by: cleanString(item.by),
+        note: cleanString(item.note),
+      };
+    })
+    .filter((entry): entry is ProjectActivityEntry => entry !== null);
+}
+
+function cleanStageTargets(value: unknown): ProjectStageTargets {
+  if (!value || typeof value !== "object") return {};
+
+  const out: ProjectStageTargets = {};
+
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (!(STAGE_KEYS as readonly string[]).includes(key)) continue;
+    out[key as ProjectStageKey] = cleanNullableDate(raw);
+  }
+
+  return out;
 }
 
 function normalizeProject(value: unknown, index: number): Project | null {
@@ -253,12 +316,17 @@ function normalizeProject(value: unknown, index: number): Project | null {
     description: cleanString(item.description),
     department: cleanDepartment(item.department),
     value: cleanString(item.value),
+    valueAmount: cleanValueAmount(item.valueAmount) ?? parseMoney(cleanString(item.value)),
     stage: cleanStage(item.stage),
     gates: cleanGates(item.gates),
     trades: cleanTrades(item.trades),
+    blocked: item.blocked === true,
+    blockedReason: cleanString(item.blockedReason),
     targetDate: cleanNullableDate(item.targetDate),
     deliveryDate: cleanNullableDate(item.deliveryDate),
+    stageTargets: cleanStageTargets(item.stageTargets),
     dateLog: cleanDateLog(item.dateLog),
+    activityLog: cleanActivityLog(item.activityLog),
     isArchived: item.isArchived === true ? true : undefined,
     createdAt,
     updatedAt,
@@ -330,12 +398,18 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
     description: input.description?.trim() ?? "",
     department: input.department ?? "install",
     value: input.value?.trim() ?? "",
+    valueAmount:
+      input.valueAmount !== undefined ? input.valueAmount : parseMoney(input.value ?? ""),
     stage: input.stage ?? DEFAULT_STAGE,
     gates: input.gates ?? {},
     trades: input.trades ?? makeInitialTrades(),
+    blocked: input.blocked === true,
+    blockedReason: input.blockedReason?.trim() ?? "",
     targetDate: input.targetDate ?? null,
     deliveryDate: input.deliveryDate ?? null,
+    stageTargets: input.stageTargets ?? {},
     dateLog: input.dateLog ?? [],
+    activityLog: input.activityLog ?? [],
     createdAt: now,
     updatedAt: now,
   };
@@ -376,13 +450,26 @@ export async function updateProject(
     description: updates.description?.trim() ?? existingProject.description,
     department: updates.department ?? existingProject.department,
     value: updates.value?.trim() ?? existingProject.value,
+    valueAmount:
+      updates.valueAmount !== undefined
+        ? updates.valueAmount
+        : updates.value !== undefined
+          ? parseMoney(updates.value)
+          : existingProject.valueAmount,
     stage: updates.stage ?? existingProject.stage,
     gates: updates.gates ?? existingProject.gates,
     trades: updates.trades ?? existingProject.trades,
+    blocked: updates.blocked !== undefined ? updates.blocked : existingProject.blocked,
+    blockedReason:
+      updates.blockedReason !== undefined
+        ? updates.blockedReason.trim()
+        : existingProject.blockedReason,
     targetDate: updates.targetDate !== undefined ? updates.targetDate : existingProject.targetDate,
     deliveryDate:
       updates.deliveryDate !== undefined ? updates.deliveryDate : existingProject.deliveryDate,
+    stageTargets: updates.stageTargets ?? existingProject.stageTargets,
     dateLog: updates.dateLog ?? existingProject.dateLog,
+    activityLog: updates.activityLog ?? existingProject.activityLog,
     updatedAt: new Date().toISOString(),
   };
 

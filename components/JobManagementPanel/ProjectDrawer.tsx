@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -32,6 +32,7 @@ import {
   checklistDone,
   checklistPct,
   criterionMet,
+  describeActivity,
   dueStatus,
   EXIT_CRITERIA,
   formatDate,
@@ -41,7 +42,9 @@ import {
   gateProgress,
   getGates,
   getStage,
+  getStageTarget,
   getTrades,
+  isProjectBlocked,
   stageComplete,
   stageIndex,
   STAGES,
@@ -52,6 +55,7 @@ import type { ExitCriterion, TradeDef } from "@/lib/projectManagement";
 import type {
   Job,
   Project,
+  ProjectActivityEntry,
   ProjectDateField,
   ProjectSignOff,
   ProjectStageKey,
@@ -86,6 +90,8 @@ export type ProjectDrawerProps = {
   /** Total logged minutes per human job code (AdminWorkLog.jobId). */
   minutesByJobId: Record<string, number>;
   currentUserName: string;
+  /** History section to expand on open (jump-in from BaajBoard). */
+  initialFocus?: "activity" | "dates" | null;
   openTrade: string;
   setOpenTrade: (key: string) => void;
   onClose: () => void;
@@ -100,8 +106,17 @@ export type ProjectDrawerProps = {
   onSetTradeState: (tradeKey: string, state: TradeState) => void;
   onSetBlocked: (tradeKey: string, blocked: boolean) => void;
   onSetReason: (tradeKey: string, reason: string) => void;
-  onCommitDate: (field: ProjectDateField, toIso: string | null, reason: string) => void;
+  onSetProjectBlocked: (blocked: boolean, reason: string) => void;
+  onCommitDate: (
+    field: ProjectDateField,
+    toIso: string | null,
+    reason: string,
+    stage?: ProjectStageKey,
+  ) => void;
 };
+
+const stageLabel = (key: ProjectStageKey): string =>
+  STAGES.find((stage) => stage.key === key)?.label ?? key;
 
 function makeSignOff(by: string, comment: string, url: string, title: string): ProjectSignOff {
   const signoff: ProjectSignOff = {
@@ -523,38 +538,67 @@ function TradeRow({
 
 function DatesPanel({
   project,
+  defaultShowLog = false,
   onCommitDate,
 }: {
   project: Project;
-  onCommitDate: (field: ProjectDateField, toIso: string | null, reason: string) => void;
+  defaultShowLog?: boolean;
+  onCommitDate: (
+    field: ProjectDateField,
+    toIso: string | null,
+    reason: string,
+    stage?: ProjectStageKey,
+  ) => void;
 }) {
   const [pendingField, setPendingField] = useState<ProjectDateField | null>(null);
+  const [pendingStage, setPendingStage] = useState<ProjectStageKey | null>(null);
   const [pendingIso, setPendingIso] = useState<string | null>(null);
   const [reason, setReason] = useState("");
-  const [showLog, setShowLog] = useState(false);
+  const [showLog, setShowLog] = useState(defaultShowLog);
+  const [showTargets, setShowTargets] = useState(false);
+  const stage = getStage(project);
   const status = dueStatus(project);
   const log = project.dateLog ?? [];
 
-  const start = (field: ProjectDateField, iso: string | null) => {
+  const start = (
+    field: ProjectDateField,
+    iso: string | null,
+    stageKey: ProjectStageKey | null = null,
+  ) => {
     setPendingField(field);
+    setPendingStage(field === "target" ? (stageKey ?? stage) : null);
     setPendingIso(iso);
     setReason("");
   };
 
   const cancel = () => {
     setPendingField(null);
+    setPendingStage(null);
     setPendingIso(null);
     setReason("");
   };
 
   const save = () => {
     if (!pendingField) return;
-    onCommitDate(pendingField, pendingIso, reason.trim());
+    onCommitDate(pendingField, pendingIso, reason.trim(), pendingStage ?? undefined);
     cancel();
   };
 
-  const inputValue = (field: ProjectDateField, current: string | null | undefined) =>
-    pendingField === field ? toDateInputValue(pendingIso) : toDateInputValue(current);
+  const inputValue = (
+    field: ProjectDateField,
+    current: string | null | undefined,
+    stageKey: ProjectStageKey | null = null,
+  ) =>
+    pendingField === field && (field !== "target" || pendingStage === (stageKey ?? stage))
+      ? toDateInputValue(pendingIso)
+      : toDateInputValue(current);
+
+  const pendingLabel =
+    pendingField === "delivery"
+      ? "delivery"
+      : pendingStage
+        ? `${stageLabel(pendingStage)} target`
+        : "stage due";
 
   return (
     <div className={styles.dates}>
@@ -578,17 +622,38 @@ function DatesPanel({
         </span>
         <input
           type="date"
-          value={inputValue("target", project.targetDate)}
-          onChange={(event) => start("target", fromDateInputValue(event.target.value))}
+          value={inputValue("target", getStageTarget(project, stage))}
+          onChange={(event) => start("target", fromDateInputValue(event.target.value), stage)}
         />
         <span className={`${styles.dchip} ${toneClass(status.tone)}`}>{status.label}</span>
       </div>
+      <div>
+        <button type="button" className={styles.undo} onClick={() => setShowTargets((v) => !v)}>
+          <Calendar size={12} /> Stage targets
+        </button>
+        {showTargets
+          ? STAGES.filter((s) => s.key !== "closed").map((s) => (
+              <div className={styles.drow} key={s.key}>
+                <span className={styles.dk} style={s.key === stage ? undefined : { opacity: 0.7 }}>
+                  {s.label}
+                </span>
+                <input
+                  type="date"
+                  value={inputValue("target", getStageTarget(project, s.key), s.key)}
+                  onChange={(event) =>
+                    start("target", fromDateInputValue(event.target.value), s.key)
+                  }
+                />
+                {s.key === stage ? (
+                  <span className={`${styles.dchip} ${toneClass(status.tone)}`}>current</span>
+                ) : null}
+              </div>
+            ))
+          : null}
+      </div>
       {pendingField ? (
         <div className={styles.datereason}>
-          <label>
-            Reason for changing the {pendingField === "target" ? "stage due" : "delivery"} date —
-            this is recorded
-          </label>
+          <label>Reason for changing the {pendingLabel} date — this is recorded</label>
           <input
             type="text"
             autoFocus
@@ -623,7 +688,11 @@ function DatesPanel({
                 .map((entry, index) => (
                   <div className={styles.logrow} key={index}>
                     <span className={styles.lf}>
-                      {entry.field === "target" ? "Stage due" : "Delivery"}
+                      {entry.field === "target"
+                        ? entry.stage
+                          ? `${stageLabel(entry.stage)} target`
+                          : "Stage due"
+                        : "Delivery"}
                     </span>{" "}
                     {entry.from ? formatDate(entry.from) : "—"} → {formatDate(entry.to)}
                     <div className={styles.lr}>
@@ -635,6 +704,116 @@ function DatesPanel({
             : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function BlockPanel({
+  project,
+  onSetProjectBlocked,
+}: {
+  project: Project;
+  onSetProjectBlocked: (blocked: boolean, reason: string) => void;
+}) {
+  const [form, setForm] = useState(false);
+  const [reason, setReason] = useState("");
+
+  if (isProjectBlocked(project)) {
+    return (
+      <div className={styles.projblock}>
+        <AlertTriangle size={14} style={{ flex: "0 0 auto" }} />
+        <span style={{ flex: 1 }}>
+          Project blocked{project.blockedReason ? ` — ${project.blockedReason}` : ""}
+        </span>
+        <button type="button" className={styles.b} onClick={() => onSetProjectBlocked(false, "")}>
+          <Unlock size={13} /> Unblock
+        </button>
+      </div>
+    );
+  }
+
+  if (!form) {
+    return (
+      <button
+        type="button"
+        className={`${styles.b} ${styles.warn}`}
+        style={{ marginTop: 9 }}
+        onClick={() => setForm(true)}
+      >
+        <Lock size={13} /> Flag project blocked
+      </button>
+    );
+  }
+
+  return (
+    <div className={styles.datereason} style={{ marginTop: 9 }}>
+      <label>Reason the project is blocked — this is recorded</label>
+      <input
+        type="text"
+        autoFocus
+        value={reason}
+        placeholder="e.g. waiting on customer approval / site not ready"
+        onChange={(event) => setReason(event.target.value)}
+      />
+      <div className={styles.formacts}>
+        <button
+          type="button"
+          className={styles.primary}
+          disabled={!reason.trim()}
+          onClick={() => {
+            onSetProjectBlocked(true, reason.trim());
+            setForm(false);
+            setReason("");
+          }}
+        >
+          <Lock size={14} /> Flag blocked
+        </button>
+        <button type="button" className={styles.ghost} onClick={() => setForm(false)}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ActivityPanel({
+  entries,
+  defaultOpen = false,
+}: {
+  entries: ProjectActivityEntry[];
+  defaultOpen?: boolean;
+}) {
+  const [show, setShow] = useState(defaultOpen);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Jump-ins from BaajBoard land with this section open — bring it into view.
+  useEffect(() => {
+    if (defaultOpen) {
+      panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (entries.length === 0) return null;
+
+  return (
+    <div ref={panelRef} className={styles.datelog} style={{ marginTop: 18 }}>
+      <button type="button" className={styles.undo} onClick={() => setShow((v) => !v)}>
+        <History size={12} /> Activity ({entries.length})
+      </button>
+      {show
+        ? entries
+            .slice()
+            .reverse()
+            .map((entry, index) => (
+              <div className={styles.logrow} key={index}>
+                {describeActivity(entry)}
+                <div className={styles.lr}>
+                  {entry.by || "unknown"} · {formatDateTime(entry.at)}
+                </div>
+              </div>
+            ))
+        : null}
     </div>
   );
 }
@@ -720,6 +899,7 @@ export default function ProjectDrawer({
   linkedJobs,
   minutesByJobId,
   currentUserName,
+  initialFocus = null,
   openTrade,
   setOpenTrade,
   onClose,
@@ -734,6 +914,7 @@ export default function ProjectDrawer({
   onSetTradeState,
   onSetBlocked,
   onSetReason,
+  onSetProjectBlocked,
   onCommitDate,
 }: ProjectDrawerProps) {
   const stage = getStage(project);
@@ -751,6 +932,7 @@ export default function ProjectDrawer({
   const nextLabel = STAGES[idx + 1]?.label ?? null;
   const gates = getGates(project);
   const trades = getTrades(project);
+  const blocked = isProjectBlocked(project);
   const totalMinutes = linkedJobs.reduce((sum, job) => sum + (minutesByJobId[job.jobId] ?? 0), 0);
 
   return (
@@ -802,7 +984,12 @@ export default function ProjectDrawer({
               </div>
             ) : null}
           </div>
-          <DatesPanel project={project} onCommitDate={onCommitDate} />
+          <DatesPanel
+            project={project}
+            defaultShowLog={initialFocus === "dates"}
+            onCommitDate={onCommitDate}
+          />
+          <BlockPanel project={project} onSetProjectBlocked={onSetProjectBlocked} />
         </div>
 
         <div className={styles.stepwrap}>
@@ -913,6 +1100,11 @@ export default function ProjectDrawer({
               onEditJob={onEditJob}
             />
           ) : null}
+
+          <ActivityPanel
+            entries={project.activityLog ?? []}
+            defaultOpen={initialFocus === "activity"}
+          />
         </div>
 
         <div className={styles.foota}>
@@ -927,7 +1119,11 @@ export default function ProjectDrawer({
                 <ArrowLeft size={15} /> Send back
               </button>
               <div style={{ flex: 1 }} />
-              {!ready && !terminal ? (
+              {blocked && !terminal ? (
+                <span className={styles.lockmsg}>
+                  <AlertTriangle size={12} /> Project blocked
+                </span>
+              ) : !ready && !terminal ? (
                 <span className={styles.lockmsg}>
                   <Lock size={12} /> Steps not complete
                 </span>
@@ -936,7 +1132,7 @@ export default function ProjectDrawer({
                 <button
                   type="button"
                   className={styles.primary}
-                  disabled={!ready}
+                  disabled={!ready || blocked}
                   onClick={() => onMoveStage(1)}
                 >
                   Advance to {nextLabel} <ArrowRight size={15} />

@@ -8,6 +8,8 @@ import { useProjects } from "@/hooks/useProjects";
 import { WORKER_ROLE_OPTIONS } from "@/types/work";
 import type { Job, PermissionLevel, Project, WorkerRole } from "@/types/work";
 
+import BaajBoard from "./BaajBoard";
+import type { DrawerFocus } from "./BaajBoard";
 import DeliveryBoard from "./DeliveryBoard";
 
 import {
@@ -31,7 +33,7 @@ type JobManagementPanelProps = {
   currentUserName: string;
 };
 
-type PanelView = "board" | "jobs";
+type PanelView = "board" | "jobs" | "dash";
 
 type JobFormState = {
   caseNo: string;
@@ -93,6 +95,10 @@ export default function JobManagementPanel({
   } = useProjects();
 
   const [view, setView] = useState<PanelView>("board");
+  // Set when jumping from BaajBoard so the kanban opens that project's drawer
+  // (optionally with the related history section expanded).
+  const [focusProjectId, setFocusProjectId] = useState<string | null>(null);
+  const [focusSection, setFocusSection] = useState<DrawerFocus | null>(null);
   const [form, setForm] = useState<JobFormState>(EMPTY_FORM);
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
   const [jobDocumentTitle, setJobDocumentTitle] = useState("");
@@ -400,7 +406,7 @@ export default function JobManagementPanel({
 
   return (
     <div className={styles.backdrop}>
-      <section className={`${styles.panel} ${view === "board" ? styles.panelWide : ""}`}>
+      <section className={`${styles.panel} ${view !== "jobs" ? styles.panelWide : ""}`}>
         <div className={styles.header}>
           <div>
             <h2>Project & Job Management</h2>
@@ -410,10 +416,21 @@ export default function JobManagementPanel({
             <div className={styles.viewToggle}>
               <button
                 type="button"
-                className={view === "board" ? styles.viewToggleActive : ""}
-                onClick={() => setView("board")}
+                className={view === "dash" ? styles.viewToggleActive : ""}
+                onClick={() => setView("dash")}
               >
-                Board
+                BaajBoard
+              </button>
+              <button
+                type="button"
+                className={view === "board" ? styles.viewToggleActive : ""}
+                onClick={() => {
+                  setFocusProjectId(null);
+                  setFocusSection(null);
+                  setView("board");
+                }}
+              >
+                KannBoard
               </button>
               <button
                 type="button"
@@ -430,13 +447,25 @@ export default function JobManagementPanel({
           </div>
         </div>
 
-        {view === "board" ? (
+        {view === "dash" ? (
+          <BaajBoard
+            projects={projects}
+            isLoadingProjects={isLoadingProjects}
+            onOpenProject={(project, focus) => {
+              setFocusProjectId(project.id);
+              setFocusSection(focus ?? null);
+              setView("board");
+            }}
+          />
+        ) : view === "board" ? (
           <DeliveryBoard
             projects={projects}
             jobs={visibleJobs}
             isLoadingProjects={isLoadingProjects}
             currentUserName={currentUserName}
             canDeleteProjects={canArchiveOrDeleteJobs}
+            initialSelectedProjectId={focusProjectId}
+            initialDrawerFocus={focusSection}
             onCreateProject={handleCreateProject}
             onUpdateProject={handleUpdateProject}
             onDeleteProject={handleDeleteProject}

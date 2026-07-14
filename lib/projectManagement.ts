@@ -1,8 +1,10 @@
 import type {
   Project,
+  ProjectActivityEntry,
   ProjectDepartment,
   ProjectGates,
   ProjectStageKey,
+  ProjectStageTargets,
   ProjectTrade,
   ProjectTrades,
 } from "@/types/work";
@@ -169,6 +171,22 @@ export function getTrades(project: Project): ProjectTrades {
 
 export const getGates = (project: Project): ProjectGates => project.gates ?? {};
 
+export const isProjectBlocked = (project: Project): boolean => project.blocked === true;
+
+export const getStageTargets = (project: Project): ProjectStageTargets =>
+  project.stageTargets ?? {};
+
+/**
+ * Completion target for a stage. The legacy single `targetDate` acts as the
+ * current stage's target on projects created before per-stage targets.
+ */
+export function getStageTarget(project: Project, stage: ProjectStageKey): string | null {
+  const fromTargets = getStageTargets(project)[stage];
+  if (fromTargets !== undefined) return fromTargets;
+
+  return stage === getStage(project) ? (project.targetDate ?? null) : null;
+}
+
 // --- Gate / progress logic (pure) ------------------------------------------
 
 export const tradeDone = (trade: ProjectTrade): boolean =>
@@ -219,8 +237,61 @@ export function canDropOn(project: Project, targetKey: ProjectStageKey): boolean
 
   if (target === current) return false;
   if (target < current) return true;
+  if (isProjectBlocked(project)) return false;
 
   return target === current + 1 && stageComplete(project);
+}
+
+// --- Activity log (pure) -----------------------------------------------------
+
+export function makeActivityEntry(
+  kind: ProjectActivityEntry["kind"],
+  by: string,
+  detail: Partial<Pick<ProjectActivityEntry, "field" | "from" | "to" | "note">> = {},
+): ProjectActivityEntry {
+  return {
+    kind,
+    field: detail.field ?? "",
+    from: detail.from ?? "",
+    to: detail.to ?? "",
+    at: new Date().toISOString(),
+    by,
+    note: detail.note ?? "",
+  };
+}
+
+/** Project-detail fields whose edits are recorded in the activity log. */
+const AUDITED_FIELDS: ReadonlyArray<{
+  key: "projectRef" | "customerName" | "location" | "department" | "value" | "description";
+  label: string;
+}> = [
+  { key: "projectRef", label: "Reference" },
+  { key: "customerName", label: "Customer / site" },
+  { key: "location", label: "Location" },
+  { key: "department", label: "Department" },
+  { key: "value", label: "Contract value" },
+  { key: "description", label: "Description" },
+];
+
+/** One "field" activity entry per audited detail that actually changed. */
+export function diffProjectFields(
+  project: Project,
+  updates: Partial<Record<string, string | undefined>>,
+  by: string,
+): ProjectActivityEntry[] {
+  const entries: ProjectActivityEntry[] = [];
+
+  for (const { key, label } of AUDITED_FIELDS) {
+    const next = updates[key];
+    if (next === undefined) continue;
+
+    const current = (project[key] ?? "").trim();
+    if (next.trim() === current) continue;
+
+    entries.push(makeActivityEntry("field", by, { field: label, from: current, to: next.trim() }));
+  }
+
+  return entries;
 }
 
 // --- Dates ------------------------------------------------------------------
@@ -239,11 +310,14 @@ export type DueStatus = {
  * delivery date).
  */
 export function dueStatus(project: Project, now: number = Date.now()): DueStatus {
-  if (getStage(project) === "closed") {
+  const stage = getStage(project);
+
+  if (stage === "closed") {
     return { tone: "mute", label: "Delivered", days: null };
   }
 
-  const target = project.targetDate ? Date.parse(project.targetDate) : NaN;
+  const iso = getStageTarget(project, stage);
+  const target = iso ? Date.parse(iso) : NaN;
 
   if (Number.isNaN(target)) {
     return { tone: "mute", label: "no date", days: null };
@@ -282,6 +356,81 @@ export function deliveryStatus(project: Project, now: number = Date.now()): DueS
 
 export function stagePipelinePct(project: Project): number {
   return Math.round((stageIndex(getStage(project)) / (STAGES.length - 1)) * 100);
+}
+
+/**
+ * Days the project has sat in its current stage — from the last stage move in
+ * the activity log, falling back to creation for projects that never moved.
+ */
+export function stageAgeDays(project: Project, now: number = Date.now()): number | null {
+  const log = project.activityLog ?? [];
+  let since = project.createdAt;
+
+  for (let i = log.length - 1; i >= 0; i -= 1) {
+    if (log[i].kind === "stage") {
+      since = log[i].at;
+      break;
+    }
+  }
+
+  const ms = Date.parse(since);
+  if (Number.isNaN(ms)) return null;
+
+  return Math.max(0, Math.floor((now - ms) / 864e5));
+}
+
+/** One-line human description of an activity entry. */
+export function describeActivity(entry: ProjectActivityEntry): string {
+  switch (entry.kind) {
+    case "stage":
+      return `Stage: ${entry.from || "—"} → ${entry.to || "—"}`;
+    case "blocked":
+      return entry.to === "blocked"
+        ? `Blocked${entry.note ? ` — ${entry.note}` : ""}`
+        : "Unblocked";
+    default:
+      return `${entry.field}: ${entry.from || "—"} → ${entry.to || "—"}`;
+  }
+}
+
+// --- Money --------------------------------------------------------------------
+
+/**
+ * Parses a human contract-value string ("$186k", "1.2M", "186,000") into
+ * whole dollars. Returns null when the string isn't a recognisable amount.
+ */
+export function parseMoney(input: string): number | null {
+  const raw = input
+    .trim()
+    .toLowerCase()
+    .replace(/aud/g, "")
+    .replace(/[$,\s]/g, "");
+  if (!raw) return null;
+
+  const match = raw.match(/^(\d+(?:\.\d+)?)(k|m)?$/);
+  if (!match) return null;
+
+  const multiplier = match[2] === "k" ? 1e3 : match[2] === "m" ? 1e6 : 1;
+  return Math.round(parseFloat(match[1]) * multiplier);
+}
+
+/** Whole dollars → compact display ("$186k", "$1.2M"). */
+export function formatMoney(amount: number): string {
+  if (amount >= 1e6) {
+    const millions = amount / 1e6;
+    return `$${millions >= 10 || Number.isInteger(millions) ? Math.round(millions) : millions.toFixed(1)}M`;
+  }
+  if (amount >= 1e3) return `$${Math.round(amount / 1e3)}k`;
+  return `$${amount}`;
+}
+
+/** Summable contract value — the numeric field, else parsed from the legacy string. */
+export function getValueAmount(project: Project): number | null {
+  if (typeof project.valueAmount === "number" && Number.isFinite(project.valueAmount)) {
+    return project.valueAmount;
+  }
+
+  return parseMoney(project.value ?? "");
 }
 
 // --- Formatting -------------------------------------------------------------
