@@ -384,7 +384,6 @@ export default function JobManagementPanel({
         <div className={styles.header}>
           <div>
             <h2>Job Management</h2>
-            
           </div>
 
           <button className={styles.closeButton} type="button" onClick={onClose}>
@@ -483,8 +482,6 @@ export default function JobManagementPanel({
               >
                 + Add drawings
               </button>
-
-         
             </div>
           </div>
 

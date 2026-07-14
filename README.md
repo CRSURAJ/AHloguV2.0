@@ -1,4 +1,4 @@
-# AHlogu
+# AHlogu V2.0
 
 AHlogu is an offline-first work logging web app for Automatic Heating field teams.
 

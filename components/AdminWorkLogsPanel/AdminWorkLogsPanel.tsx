@@ -428,7 +428,7 @@ export default function AdminWorkLogsPanel({
         <div className={styles.header}>
           <div>
             <h2 className={styles.title}>Work Logs</h2>
-            </div>
+          </div>
 
           <div className={styles.headerActions}>
             <button
