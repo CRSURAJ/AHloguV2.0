@@ -74,10 +74,11 @@
 
 .cardTitle {
   margin: 0;
-  font-size: 24px;
-  font-weight: 500;
-  line-height: 1.15;
-  color: #d9cdc7;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--heading);
 }
 
 .secondaryButton,
@@ -205,8 +206,10 @@
 
 .switchHeader h2 {
   margin: 0;
-  color: #d9cdc7;
-  font-size: 22px;
+  color: var(--heading);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .switchHeader p {
@@ -239,7 +242,7 @@
   gap: 9px;
   color: #eef7f3;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .switchInput {
@@ -273,7 +276,7 @@
   background: rgba(8, 34, 32, 0.82);
   color: rgba(238, 247, 243, 0.82);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -295,7 +298,7 @@
   padding: 0 14px;
   border-radius: 14px;
   border: 0;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -360,7 +363,7 @@ select.switchInput option {
 
 select.switchInput optgroup {
   background: #11302d;
-  color: #d9cdc7;
+  color: var(--heading);
 }
 
 .switchField .switchInput + .switchInput {

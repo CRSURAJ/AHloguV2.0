@@ -8,8 +8,11 @@
   --border: rgba(178, 223, 220, 0.18);
   --border-soft: rgba(178, 223, 220, 0.12);
   --text: #eef7f3;
-  --muted: rgba(238, 247, 243, 0.66);
-  --muted-2: rgba(238, 247, 243, 0.52);
+  /* Headings share the ink's cool mint family — never warm tones on the
+     green surfaces (the old tan #d9cdc7 clashed and strained). */
+  --heading: #f4fbf7;
+  --muted: rgba(238, 247, 243, 0.7);
+  --muted-2: rgba(238, 247, 243, 0.6);
   --green: #53bc7b;
   --green-strong: #62d39a;
   --green-deep: #3ea978;

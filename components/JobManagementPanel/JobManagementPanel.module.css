@@ -32,16 +32,18 @@
 
 .header h2 {
   margin: 0;
-  font-size: 24px;
-  line-height: 1.15;
-  color: #d9cdc7;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--heading);
 }
 
 .eyebrow {
   margin: 0 0 6px;
   color: #53bc7b;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -108,6 +110,89 @@
   margin-bottom: 18px;
 }
 
+/* Lower half of the top-strip card in the wide Jobs view — pairs with
+   .panelWide .header (same background, joined edge), mirroring the board
+   toolbar and the BaajBoard KPI cap. */
+.jobsCap {
+  background: rgba(17, 48, 45, 0.96);
+  border: 1px solid rgba(178, 223, 220, 0.14);
+  border-top: 0;
+  border-radius: 0 0 14px 14px;
+  padding: 8px 18px 16px;
+  margin-bottom: 16px;
+}
+
+.jobsCap .statsGrid {
+  margin-bottom: 0;
+}
+
+/* Split workspace: jobs list on the left, docked form on the right. */
+.jobsSplit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(400px, 500px);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1020px) {
+  .jobsSplit {
+    grid-template-columns: 1fr;
+  }
+}
+
+.jobsFormCol {
+  position: sticky;
+  top: 12px;
+  min-width: 0;
+}
+
+@media (max-width: 1020px) {
+  .jobsFormCol {
+    position: static;
+    order: -1; /* form above the list when stacked — matches the old flow */
+  }
+}
+
+.jobsListCol {
+  min-width: 0;
+}
+
+.jobListHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.jobListHead h3 {
+  margin: 0;
+}
+
+.jobSearch {
+  flex: 1;
+  min-width: 180px;
+  max-width: 340px;
+  margin-left: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(178, 223, 220, 0.16);
+  background: rgba(8, 34, 32, 0.6);
+  color: #eef7f3;
+  padding: 9px 13px;
+  font-size: 13px;
+  font: inherit;
+}
+
+.jobSearch::placeholder {
+  color: rgba(238, 247, 243, 0.45);
+}
+
+.jobSearchCount {
+  font-size: 12px;
+  color: rgba(238, 247, 243, 0.6);
+  white-space: nowrap;
+}
+
 .statCard {
   border-radius: 20px;
   padding: 16px;
@@ -144,7 +229,7 @@
 .card h3 {
   margin: 0 0 14px;
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 700;
   color: #eef7f3;
 }
 
@@ -222,7 +307,7 @@
 .roleSection p {
   margin: 0 0 12px;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   color: #eef7f3;
 }
 
@@ -258,7 +343,7 @@
   margin-top: 14px;
   color: #eef7f3;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .emptyText {
@@ -290,7 +375,7 @@
 .jobTopLine h4 {
   margin: 0;
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 700;
   color: #eef7f3;
 }
 
@@ -318,7 +403,7 @@
   padding: 0 10px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -423,7 +508,7 @@
   justify-content: center;
   padding: 0 14px;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -472,7 +557,7 @@
 .docName {
   color: #eef7f3;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -492,7 +577,7 @@
   color: #ffb9b9;
   cursor: pointer;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .removeDocButton:hover {
@@ -510,7 +595,7 @@
   margin: 0 0 8px;
   color: #eef7f3;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .savedDocsList {
@@ -525,7 +610,7 @@
   border: 1px solid rgba(83, 188, 123, 0.18);
   color: #d4fbe3;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -622,7 +707,7 @@
   border-radius: 999px;
   background: #11302d;
   color: #ffffff;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
   padding: 0.75rem 1rem;
   width: fit-content;
@@ -656,8 +741,9 @@
 
 .modalTitle {
   margin: 0 0 12px;
-  color: #d9cdc7;
-  font-size: 22px;
+  color: var(--heading);
+  font-size: 18px;
+  font-weight: 700;
   line-height: 1.2;
 }
 
@@ -683,9 +769,9 @@
 }
 
 .modalLabel {
-  color: #d9cdc7;
+  color: var(--heading);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .modalInput {

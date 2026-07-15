@@ -13,7 +13,7 @@
   --col: #0a2220;
   --ink: #eef7f3;
   --muted: rgba(238, 247, 243, 0.66);
-  --faint: rgba(238, 247, 243, 0.52);
+  --faint: rgba(238, 247, 243, 0.6);
   --border: rgba(178, 223, 220, 0.18);
   --accent: #53bc7b;
   --accent2: #3ea978;
@@ -26,9 +26,6 @@
   --danger-soft: rgba(166, 58, 58, 0.16);
   color: var(--ink);
   font-size: 14px;
-  font-family:
-    ui-monospace, "Cascadia Mono", "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-  letter-spacing: 0.01em;
 }
 
 .root * {
@@ -118,8 +115,9 @@
 
 .card h3 {
   margin: 0 0 3px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
+  color: var(--heading);
   display: flex;
   align-items: center;
   gap: 7px;

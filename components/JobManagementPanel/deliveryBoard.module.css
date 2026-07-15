@@ -7,7 +7,7 @@
   --col: #0a2220;
   --ink: #eef7f3;
   --muted: rgba(238, 247, 243, 0.66);
-  --faint: rgba(238, 247, 243, 0.52);
+  --faint: rgba(238, 247, 243, 0.6);
   --border: rgba(178, 223, 220, 0.18);
   --accent: #53bc7b;
   --accent2: #3ea978;
@@ -24,11 +24,8 @@
   color: var(--ink);
   position: relative;
   font-size: 14px;
-  /* Mono type across the whole board — gives it the ops-console look and
-     makes refs/dates/values read like instrumentation. */
-  font-family:
-    ui-monospace, "Cascadia Mono", "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-  letter-spacing: 0.01em;
+  /* Inherits the app font (Inter) — one typeface across the whole app.
+     The .mono class remains as an accent for reference codes only. */
 }
 
 .root * {

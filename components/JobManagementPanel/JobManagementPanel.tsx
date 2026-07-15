@@ -131,6 +131,19 @@ export default function JobManagementPanel({
     [visibleJobs],
   );
 
+  const [jobSearch, setJobSearch] = useState("");
+
+  const filteredJobs = useMemo(() => {
+    const query = jobSearch.trim().toLowerCase();
+    if (!query) return sortedJobs;
+
+    return sortedJobs.filter((job) =>
+      [job.jobId, job.jobName, job.customerName, job.caseNo, job.orderNo, job.location].some(
+        (value) => value.toLowerCase().includes(query),
+      ),
+    );
+  }, [sortedJobs, jobSearch]);
+
   function getJobInputClass(field: JobFormField): string {
     return [
       jobErrorField === field ? styles.inputError : "",
@@ -407,7 +420,7 @@ export default function JobManagementPanel({
 
   return (
     <div className={styles.backdrop}>
-      <section className={`${styles.panel} ${view !== "jobs" ? styles.panelWide : ""}`}>
+      <section className={`${styles.panel} ${styles.panelWide}`}>
         <div className={styles.header}>
           <div>
             <h2>Project & Job Management</h2>
@@ -445,7 +458,7 @@ export default function JobManagementPanel({
                 className={view === "jobs" ? styles.viewToggleActive : ""}
                 onClick={() => setView("jobs")}
               >
-                Jobs
+                JobsBoard
               </button>
             </div>
 
@@ -505,282 +518,305 @@ export default function JobManagementPanel({
           />
         ) : (
           <>
-            <JobStatsCards
-              totalJobs={visibleJobs.length}
-              activeJobs={activeJobs.length}
-              inactiveJobs={inactiveJobs.length}
-            />
-
-            <div ref={jobFeedbackRef} tabIndex={-1} className={styles.feedbackFocusTarget}>
-              <FeedbackMessage message={jobFormMessage || jobMessage} />
-              <FeedbackMessage message={jobDocumentMessage} />
+            <div className={styles.jobsCap}>
+              <JobStatsCards
+                totalJobs={visibleJobs.length}
+                activeJobs={activeJobs.length}
+                inactiveJobs={inactiveJobs.length}
+              />
             </div>
 
-            <div ref={jobFormCardRef} tabIndex={-1} className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h3>{editingJobId ? "Edit Job" : "Add Job"}</h3>
+            <div className={styles.jobsSplit}>
+              <div className={styles.jobsListCol}>
+                <div className={styles.card}>
+                  <div className={styles.jobListHead}>
+                    <h3>Existing Jobs</h3>
+                    <input
+                      className={styles.jobSearch}
+                      value={jobSearch}
+                      placeholder="Search job ID, name, customer…"
+                      onChange={(event) => setJobSearch(event.target.value)}
+                    />
+                    <span className={styles.jobSearchCount}>
+                      {jobSearch.trim()
+                        ? `${filteredJobs.length} of ${sortedJobs.length}`
+                        : `${sortedJobs.length}`}
+                    </span>
+                  </div>
 
-                {editingJobId ? (
-                  <button className={styles.textButton} type="button" onClick={resetForm}>
-                    Cancel Edit
-                  </button>
-                ) : null}
-              </div>
+                  {isLoadingJobs ? <p className={styles.emptyText}>Loading jobs...</p> : null}
 
-              <div className={styles.formGrid}>
-                <label>
-                  Case No.
-                  <input
-                    ref={caseNoInputRef}
-                    className={getJobInputClass("caseNo")}
-                    value={form.caseNo}
-                    onChange={(event) => updateField("caseNo", event.target.value)}
-                    aria-invalid={jobErrorField === "caseNo"}
-                  />
-                </label>
-
-                <label>
-                  Job ID
-                  <input
-                    ref={jobIdInputRef}
-                    className={getJobInputClass("jobId")}
-                    value={form.jobId}
-                    onChange={(event) => updateField("jobId", event.target.value)}
-                    aria-invalid={jobErrorField === "jobId"}
-                  />
-                </label>
-
-                <label>
-                  Order No.
-                  <input
-                    ref={orderNoInputRef}
-                    className={getJobInputClass("orderNo")}
-                    value={form.orderNo}
-                    onChange={(event) => updateField("orderNo", event.target.value)}
-                    aria-invalid={jobErrorField === "orderNo"}
-                  />
-                </label>
-
-                <label>
-                  Job Name
-                  <input
-                    ref={jobNameInputRef}
-                    className={getJobInputClass("jobName")}
-                    value={form.jobName}
-                    onChange={(event) => updateField("jobName", event.target.value)}
-                    aria-invalid={jobErrorField === "jobName"}
-                  />
-                </label>
-
-                <label>
-                  Customer / Site
-                  <input
-                    ref={customerNameInputRef}
-                    className={getJobInputClass("customerName")}
-                    value={form.customerName}
-                    onChange={(event) => updateField("customerName", event.target.value)}
-                    aria-invalid={jobErrorField === "customerName"}
-                  />
-                </label>
-
-                <label>
-                  Project
-                  <select
-                    value={form.projectId}
-                    onChange={(event) => updateField("projectId", event.target.value)}
-                  >
-                    <option value="">No project (stand-alone job)</option>
-                    {projects.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.customerName || project.projectRef}
-                        {project.projectRef ? ` (${project.projectRef})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <div className={styles.docsField}>
-                  <span className={styles.docsLabel}>Technical Documents</span>
-
-                  <button
-                    className={styles.addDrawingButton}
-                    type="button"
-                    onClick={() => {
-                      setJobDocumentMessage("");
-                      setIsJobDocumentDialogOpen(true);
-                    }}
-                  >
-                    + Add document link
-                  </button>
-                </div>
-              </div>
-
-              {form.jobDocumentLinks.length > 0 ? (
-                <div className={styles.docList}>
-                  {form.jobDocumentLinks.map((doc) => (
-                    <div className={styles.docItem} key={doc.id}>
-                      <div className={styles.docInfo}>
-                        <span className={styles.docName}>{doc.title}</span>
-                        <a href={doc.url} target="_blank" rel="noreferrer">
-                          Open document
-                        </a>
-                      </div>
-
-                      <button
-                        className={styles.removeDocButton}
-                        type="button"
-                        onClick={() => removeJobDocumentLink(doc.id)}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-
-              {isJobDocumentDialogOpen ? (
-                <div className={styles.modalBackdrop}>
-                  <form
-                    className={styles.modalCard}
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      addJobDocumentLink();
-                    }}
-                  >
-                    <h2 className={styles.modalTitle}>Add Technical Document</h2>
-
-                    <p className={styles.modalDescription}>
-                      Add a OneDrive or SharePoint technical-document link. AHlogu stores the link
-                      only; the original file remains in OneDrive or SharePoint.
+                  {!isLoadingJobs && filteredJobs.length === 0 ? (
+                    <p className={styles.emptyText}>
+                      {jobSearch.trim() ? "No jobs match your search." : "No jobs created yet."}
                     </p>
+                  ) : null}
 
-                    <FeedbackMessage message={jobDocumentMessage} />
+                  <div className={styles.jobList}>
+                    {filteredJobs.map((job) => {
+                      const project = job.projectId ? getProjectById(job.projectId) : undefined;
+                      const projectLabel = project
+                        ? `${project.customerName || project.projectRef}${
+                            project.projectRef ? ` (${project.projectRef})` : ""
+                          }`
+                        : undefined;
 
-                    <label className={styles.modalField}>
-                      <span className={styles.modalLabel}>Document Title</span>
+                      return (
+                        <JobCard
+                          canArchiveOrDeleteJobs={canArchiveOrDeleteJobs}
+                          job={job}
+                          key={job.id}
+                          projectLabel={projectLabel}
+                          onArchive={handleArchive}
+                          onDelete={handleDelete}
+                          onEdit={startEdit}
+                          onToggleStatus={handleToggleJobStatus}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.jobsFormCol}>
+                <div ref={jobFeedbackRef} tabIndex={-1} className={styles.feedbackFocusTarget}>
+                  <FeedbackMessage message={jobFormMessage || jobMessage} />
+                  <FeedbackMessage message={jobDocumentMessage} />
+                </div>
+
+                <div ref={jobFormCardRef} tabIndex={-1} className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <h3>{editingJobId ? "Edit Job" : "Add Job"}</h3>
+
+                    {editingJobId ? (
+                      <button className={styles.textButton} type="button" onClick={resetForm}>
+                        Cancel Edit
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className={styles.formGrid}>
+                    <label>
+                      Case No.
                       <input
-                        className={styles.modalInput}
-                        autoFocus
-                        value={jobDocumentTitle}
-                        onChange={(event) => {
-                          setJobDocumentTitle(event.target.value);
-                          if (jobDocumentMessage) setJobDocumentMessage("");
-                        }}
-                        placeholder="e.g. P&ID Rev C, Electrical schematic"
+                        ref={caseNoInputRef}
+                        className={getJobInputClass("caseNo")}
+                        value={form.caseNo}
+                        onChange={(event) => updateField("caseNo", event.target.value)}
+                        aria-invalid={jobErrorField === "caseNo"}
                       />
                     </label>
 
-                    <label className={styles.modalField}>
-                      <span className={styles.modalLabel}>Document Link</span>
+                    <label>
+                      Job ID
                       <input
-                        className={styles.modalInput}
-                        type="url"
-                        value={jobDocumentUrl}
-                        onChange={(event) => {
-                          setJobDocumentUrl(event.target.value);
-                          if (jobDocumentMessage) setJobDocumentMessage("");
-                        }}
-                        placeholder="https://..."
+                        ref={jobIdInputRef}
+                        className={getJobInputClass("jobId")}
+                        value={form.jobId}
+                        onChange={(event) => updateField("jobId", event.target.value)}
+                        aria-invalid={jobErrorField === "jobId"}
                       />
                     </label>
 
-                    <div className={styles.modalActions}>
+                    <label>
+                      Order No.
+                      <input
+                        ref={orderNoInputRef}
+                        className={getJobInputClass("orderNo")}
+                        value={form.orderNo}
+                        onChange={(event) => updateField("orderNo", event.target.value)}
+                        aria-invalid={jobErrorField === "orderNo"}
+                      />
+                    </label>
+
+                    <label>
+                      Job Name
+                      <input
+                        ref={jobNameInputRef}
+                        className={getJobInputClass("jobName")}
+                        value={form.jobName}
+                        onChange={(event) => updateField("jobName", event.target.value)}
+                        aria-invalid={jobErrorField === "jobName"}
+                      />
+                    </label>
+
+                    <label>
+                      Customer / Site
+                      <input
+                        ref={customerNameInputRef}
+                        className={getJobInputClass("customerName")}
+                        value={form.customerName}
+                        onChange={(event) => updateField("customerName", event.target.value)}
+                        aria-invalid={jobErrorField === "customerName"}
+                      />
+                    </label>
+
+                    <label>
+                      Project
+                      <select
+                        value={form.projectId}
+                        onChange={(event) => updateField("projectId", event.target.value)}
+                      >
+                        <option value="">No project (stand-alone job)</option>
+                        {projects.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {project.customerName || project.projectRef}
+                            {project.projectRef ? ` (${project.projectRef})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <div className={styles.docsField}>
+                      <span className={styles.docsLabel}>Technical Documents</span>
+
                       <button
+                        className={styles.addDrawingButton}
                         type="button"
-                        className={styles.secondaryButton}
                         onClick={() => {
                           setJobDocumentMessage("");
-                          setIsJobDocumentDialogOpen(false);
+                          setIsJobDocumentDialogOpen(true);
                         }}
                       >
-                        Cancel
-                      </button>
-
-                      <button type="submit" className={styles.primaryButton}>
-                        Add Technical Document
+                        + Add document link
                       </button>
                     </div>
-                  </form>
-                </div>
-              ) : null}
+                  </div>
 
-              <label className={styles.fullWidthLabel}>
-                Description / Notes
-                <textarea
-                  value={form.description}
-                  onChange={(event) => updateField("description", event.target.value)}
-                  rows={4}
-                />
-              </label>
+                  {form.jobDocumentLinks.length > 0 ? (
+                    <div className={styles.docList}>
+                      {form.jobDocumentLinks.map((doc) => (
+                        <div className={styles.docItem} key={doc.id}>
+                          <div className={styles.docInfo}>
+                            <span className={styles.docName}>{doc.title}</span>
+                            <a href={doc.url} target="_blank" rel="noreferrer">
+                              Open document
+                            </a>
+                          </div>
 
-              <div ref={assignedRolesRef} className={getRoleSectionClass()}>
-                <p>Assign To</p>
+                          <button
+                            className={styles.removeDocButton}
+                            type="button"
+                            onClick={() => removeJobDocumentLink(doc.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
 
-                <div className={styles.roleGrid}>
-                  {WORKER_ROLE_OPTIONS.map((role) => (
-                    <label className={styles.roleOption} key={role.value}>
+                  {isJobDocumentDialogOpen ? (
+                    <div className={styles.modalBackdrop}>
+                      <form
+                        className={styles.modalCard}
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          addJobDocumentLink();
+                        }}
+                      >
+                        <h2 className={styles.modalTitle}>Add Technical Document</h2>
+
+                        <p className={styles.modalDescription}>
+                          Add a OneDrive or SharePoint technical-document link. AHlogu stores the
+                          link only; the original file remains in OneDrive or SharePoint.
+                        </p>
+
+                        <FeedbackMessage message={jobDocumentMessage} />
+
+                        <label className={styles.modalField}>
+                          <span className={styles.modalLabel}>Document Title</span>
+                          <input
+                            className={styles.modalInput}
+                            autoFocus
+                            value={jobDocumentTitle}
+                            onChange={(event) => {
+                              setJobDocumentTitle(event.target.value);
+                              if (jobDocumentMessage) setJobDocumentMessage("");
+                            }}
+                            placeholder="e.g. P&ID Rev C, Electrical schematic"
+                          />
+                        </label>
+
+                        <label className={styles.modalField}>
+                          <span className={styles.modalLabel}>Document Link</span>
+                          <input
+                            className={styles.modalInput}
+                            type="url"
+                            value={jobDocumentUrl}
+                            onChange={(event) => {
+                              setJobDocumentUrl(event.target.value);
+                              if (jobDocumentMessage) setJobDocumentMessage("");
+                            }}
+                            placeholder="https://..."
+                          />
+                        </label>
+
+                        <div className={styles.modalActions}>
+                          <button
+                            type="button"
+                            className={styles.secondaryButton}
+                            onClick={() => {
+                              setJobDocumentMessage("");
+                              setIsJobDocumentDialogOpen(false);
+                            }}
+                          >
+                            Cancel
+                          </button>
+
+                          <button type="submit" className={styles.primaryButton}>
+                            Add Technical Document
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  ) : null}
+
+                  <label className={styles.fullWidthLabel}>
+                    Description / Notes
+                    <textarea
+                      value={form.description}
+                      onChange={(event) => updateField("description", event.target.value)}
+                      rows={4}
+                    />
+                  </label>
+
+                  <div ref={assignedRolesRef} className={getRoleSectionClass()}>
+                    <p>Assign To</p>
+
+                    <div className={styles.roleGrid}>
+                      {WORKER_ROLE_OPTIONS.map((role) => (
+                        <label className={styles.roleOption} key={role.value}>
+                          <input
+                            type="checkbox"
+                            checked={form.assignedRoles.includes(role.value)}
+                            onChange={() => toggleRole(role.value)}
+                          />
+                          <span>{role.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className={styles.formActions}>
+                    <label className={styles.activeToggle}>
                       <input
                         type="checkbox"
-                        checked={form.assignedRoles.includes(role.value)}
-                        onChange={() => toggleRole(role.value)}
+                        checked={form.isActive}
+                        onChange={(event) => updateField("isActive", event.target.checked)}
                       />
-                      <span>{role.label}</span>
+                      Active Job
                     </label>
-                  ))}
+
+                    <button
+                      className={styles.primaryButton}
+                      type="button"
+                      onClick={() => void handleSubmit()}
+                    >
+                      {editingJobId ? "Save Job" : "Create Job"}
+                    </button>
+                  </div>
                 </div>
-              </div>
-
-              <div className={styles.formActions}>
-                <label className={styles.activeToggle}>
-                  <input
-                    type="checkbox"
-                    checked={form.isActive}
-                    onChange={(event) => updateField("isActive", event.target.checked)}
-                  />
-                  Active Job
-                </label>
-
-                <button
-                  className={styles.primaryButton}
-                  type="button"
-                  onClick={() => void handleSubmit()}
-                >
-                  {editingJobId ? "Save Job" : "Create Job"}
-                </button>
-              </div>
-            </div>
-
-            <div className={styles.card}>
-              <h3>Existing Jobs</h3>
-
-              {isLoadingJobs ? <p className={styles.emptyText}>Loading jobs...</p> : null}
-
-              {!isLoadingJobs && sortedJobs.length === 0 ? (
-                <p className={styles.emptyText}>No jobs created yet.</p>
-              ) : null}
-
-              <div className={styles.jobList}>
-                {sortedJobs.map((job) => {
-                  const project = job.projectId ? getProjectById(job.projectId) : undefined;
-                  const projectLabel = project
-                    ? `${project.customerName || project.projectRef}${
-                        project.projectRef ? ` (${project.projectRef})` : ""
-                      }`
-                    : undefined;
-
-                  return (
-                    <JobCard
-                      canArchiveOrDeleteJobs={canArchiveOrDeleteJobs}
-                      job={job}
-                      key={job.id}
-                      projectLabel={projectLabel}
-                      onArchive={handleArchive}
-                      onDelete={handleDelete}
-                      onEdit={startEdit}
-                      onToggleStatus={handleToggleJobStatus}
-                    />
-                  );
-                })}
               </div>
             </div>
           </>

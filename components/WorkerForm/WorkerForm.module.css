@@ -129,7 +129,7 @@ select.input:disabled {
   background: rgba(83, 188, 123, 0.1);
   color: #d4fbe3;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -173,7 +173,7 @@ select.input:disabled {
   background: rgba(83, 188, 123, 0.1);
   color: #d4fbe3;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -325,7 +325,7 @@ select.input:disabled {
   border-radius: 18px;
   border: 1px solid rgba(154, 200, 184, 0.14);
   font-size: 1rem;
-  font-weight: 900;
+  font-weight: 800;
   cursor: pointer;
   transition:
     transform 0.16s ease,
@@ -497,7 +497,7 @@ select.input:disabled {
   min-height: 102px !important;
   border-radius: 18px !important;
   font-size: 1rem !important;
-  font-weight: 900 !important;
+  font-weight: 800 !important;
 }
 
 /* Final correction: normal Start / Break buttons beside Location */
@@ -524,7 +524,7 @@ select.input:disabled {
   padding: 0 12px !important;
   border-radius: 16px !important;
   font-size: 0.95rem !important;
-  font-weight: 900 !important;
+  font-weight: 800 !important;
 }
 
 /* Make Start / Break fill the Location row height */
@@ -549,7 +549,7 @@ select.input:disabled {
   min-height: 102px !important;
   border-radius: 18px !important;
   font-size: 1rem !important;
-  font-weight: 900 !important;
+  font-weight: 800 !important;
 }
 
 /* Match Worker Job ID dropdown with User Management dropdown styling */
@@ -591,7 +591,7 @@ select.input option {
 
 select.input optgroup {
   background: #11302d;
-  color: #d9cdc7;
+  color: var(--heading);
 }
 
 select.input:disabled {
@@ -623,7 +623,7 @@ select.input:disabled {
   background: #11302d;
   color: #ffffff;
   font-size: 0.82rem;
-  font-weight: 800;
+  font-weight: 700;
   text-decoration: none;
   padding: 0.35rem 0.75rem;
 }

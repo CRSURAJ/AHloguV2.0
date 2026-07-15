@@ -100,7 +100,7 @@ DynamoDB is the cloud source of truth for both.
 - **BaajBoard** — `BaajBoard.tsx`, the management dashboard: KPI tiles (open/blocked/overdue projects, deliveries due ≤ 14 days, value in pipeline), projects-per-stage and value-by-stage bar charts, plus action lists — ready-to-advance (`stageComplete` but not moved), stuck-in-stage (≥ 7 days since last stage move, via `stageAgeDays`), upcoming deliveries, blocked projects, blocked trades in Build, overdue stage targets, and a recent-activity feed across all projects. Read-only — derived entirely from the projects list (no work-log fetch; hours reporting lives in the Work Logs panel).
 - **Board** (default) — `DeliveryBoard.tsx`, a drag-and-drop kanban of **projects** across delivery stages. Projects are created/edited/deleted via a dialog on the board (delete is admin-only). `ProjectDrawer.tsx` opens per project for stage sign-offs, trades, dates, and linked jobs.
 - **GanttBoard** — `GanttView.tsx`, a portfolio timeline of open projects. Upper lane per row: planned stage bars from `stageTargets` (each stage spans from the previous stage's target — or `createdAt` for the first — to its own target; same/earlier targets clamp to a half-day sliver), with done/current/overdue/planned states. Lower lane: **actual** spans carved from activity-log stage-move timestamps (projects with no recorded moves show one span since creation). Delivery-date diamonds, today line, week/month ticks. Clicking a row opens a per-project drill-in popup (one row per stage, planned vs actual, delivery line); clicking the popup's chart or its button pushes on to the kanban drawer.
-- **Jobs** — the job create/edit form + list (fields worker time-logging depends on: `jobId`, `assignedRoles`, `jobDocumentLinks`), plus an optional **Project** selector that sets `projectId`.
+- **JobsBoard** — split workspace: searchable job list on the left, create/edit form docked (sticky) in a ~480px right column; stacks form-first under 1020px. Job fields worker time-logging depends on: `jobId`, `assignedRoles`, `jobDocumentLinks`, plus an optional **Project** selector that sets `projectId`. Stats cards form the header card's lower half.
 
 Project fields: `projectRef` (unique, case-insensitive — e.g. "AH-1088"), `customerName`, `location`, `department` (install/service), `value` (display string) + `valueAmount` (whole dollars, auto-parsed from `value` via `parseMoney` — "$186k"/"1.2M"/"186,000" all work; sums on BaajBoard use it), `stage`, `gates`, `trades`, `blocked`/`blockedReason`, `targetDate`, `deliveryDate`, `stageTargets`, `dateLog`, `activityLog`.
 
@@ -195,6 +195,8 @@ npm run zip   # produces ahlogu-api.zip → upload to AWS Lambda console
 
 ## Notes
 
+- App font is **Inter** everywhere, loaded via `next/font` in `app/layout.tsx` (self-hosted — safe offline). The only monospace is the `.mono` accent class in `deliveryBoard.module.css`, reserved for reference codes (projectRef/jobId/values). Don't reintroduce per-view font-family overrides.
+- Typography scale: panel titles 21px/700/-0.01em in `var(--heading)` (a cool mint near-white from `globals.css` — never warm tones like the old `#d9cdc7` tan on the green surfaces); modal titles 18px/700; card headings 16px/700; max font-weight is 800 (micro-labels only). Secondary text floors at 60% ink alpha (`--muted-2`).
 - Timezone is hardcoded to Melbourne in `lib/melbourneTime.ts`.
 - `@/*` path alias maps to the repo root (see `tsconfig.json`).
 - Tailwind CSS v4 uses the PostCSS plugin (`@tailwindcss/postcss`) — no `tailwind.config` file.

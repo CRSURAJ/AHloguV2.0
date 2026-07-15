@@ -21,7 +21,7 @@ export default function PasswordRequirementsNote({
         lineHeight: 1.5,
       }}
     >
-      <strong style={{ color: "#d9cdc7" }}>Password requirements</strong>
+      <strong style={{ color: "var(--heading)" }}>Password requirements</strong>
       <ul
         style={{
           margin: "8px 0 0",

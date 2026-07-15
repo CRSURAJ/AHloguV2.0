@@ -83,7 +83,7 @@
 .actionTitle {
   color: #eef7f3;
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1.1;
 }
 
@@ -110,7 +110,7 @@
   color: #072c29;
   background: #53bc7b;
   font-size: 20px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .badge {
@@ -123,7 +123,7 @@
   background: rgba(226, 173, 63, 0.12);
   border: 1px solid rgba(226, 173, 63, 0.22);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }

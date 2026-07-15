@@ -31,9 +31,11 @@
 
 .title {
   margin: 0;
-  font-size: 24px;
-  line-height: 1.15;
-  color: #d9cdc7;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--heading);
 }
 
 .subtitle {
@@ -101,7 +103,7 @@
 
 .sectionTitle {
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 700;
   margin-bottom: 14px;
   color: #eef7f3;
 }
@@ -176,7 +178,7 @@
 
 .select optgroup {
   background: #11302d;
-  color: #d9cdc7;
+  color: var(--heading);
 }
 
 .select:disabled {
@@ -205,7 +207,7 @@
 
 .userName {
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 700;
   color: #eef7f3;
 }
 
@@ -235,7 +237,7 @@
   padding: 0 10px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .badgeActive {
@@ -270,7 +272,7 @@
 
 .resetTitle {
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   margin-bottom: 12px;
 }
 
@@ -326,7 +328,7 @@
   background: rgba(83, 188, 123, 0.12);
   border: 1px solid rgba(83, 188, 123, 0.24);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
   white-space: nowrap;
 }
 
@@ -353,8 +355,9 @@
 
 .modalTitle {
   margin: 0 0 12px;
-  color: #d9cdc7;
-  font-size: 22px;
+  color: var(--heading);
+  font-size: 18px;
+  font-weight: 700;
   line-height: 1.2;
 }
 
