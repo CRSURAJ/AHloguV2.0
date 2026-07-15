@@ -79,6 +79,43 @@ const EMPTY_PROJECT_FORM: ProjectFormState = {
   targetDate: "",
 };
 
+// GET /work-logs returns the whole table — cache totals for a minute so
+// flipping between panel views doesn't refetch it on every board mount.
+const WORK_LOG_MINUTES_REFRESH_MS = 60_000;
+let cachedMinutesByJobId: Record<string, number> | null = null;
+let cachedMinutesAt = 0;
+let inFlightMinutes: Promise<Record<string, number>> | null = null;
+
+async function loadMinutesByJobId(): Promise<Record<string, number>> {
+  const now = Date.now();
+
+  if (cachedMinutesByJobId && now - cachedMinutesAt < WORK_LOG_MINUTES_REFRESH_MS) {
+    return cachedMinutesByJobId;
+  }
+
+  if (inFlightMinutes) {
+    return inFlightMinutes;
+  }
+
+  inFlightMinutes = getCloudProvider()
+    .workLogs.list()
+    .then((logs) => {
+      const totals: Record<string, number> = {};
+      for (const log of logs) {
+        if (!log.jobId) continue;
+        totals[log.jobId] = (totals[log.jobId] ?? 0) + (log.workedMinutes || 0);
+      }
+      cachedMinutesByJobId = totals;
+      cachedMinutesAt = Date.now();
+      return totals;
+    })
+    .finally(() => {
+      inFlightMinutes = null;
+    });
+
+  return inFlightMinutes;
+}
+
 /** How many stage columns are visible at once — Handover → QA/FAT by default. */
 const VISIBLE_STAGE_COUNT = 5;
 const MAX_STAGE_OFFSET = STAGES.length - VISIBLE_STAGE_COUNT;
@@ -430,23 +467,15 @@ export default function DeliveryBoard({
     jumpStages(dir);
   };
 
-  // Pull synced work logs once so projects can show real labour hours from
-  // the time-tracking side of the app. Failure is fine (offline) — hours
-  // simply show as 0m until the next successful load.
+  // Pull synced work logs (cached across mounts) so projects can show real
+  // labour hours from the time-tracking side of the app. Failure is fine
+  // (offline) — hours simply show as 0m until the next successful load.
   useEffect(() => {
     let cancelled = false;
 
-    getCloudProvider()
-      .workLogs.list()
-      .then((logs) => {
-        if (cancelled) return;
-
-        const totals: Record<string, number> = {};
-        for (const log of logs) {
-          if (!log.jobId) continue;
-          totals[log.jobId] = (totals[log.jobId] ?? 0) + (log.workedMinutes || 0);
-        }
-        setMinutesByJobId(totals);
+    loadMinutesByJobId()
+      .then((totals) => {
+        if (!cancelled) setMinutesByJobId(totals);
       })
       .catch(() => {
         /* offline or unauthorized — hours stay empty */
