@@ -1,0 +1,455 @@
+/* Gantt timeline — planned stage bars per project. Shares the ops-console
+   theme with deliveryBoard.module.css (same variable set). */
+.root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 0 20px;
+  --surface: #11302d;
+  --col: #0a2220;
+  --ink: #eef7f3;
+  --muted: rgba(238, 247, 243, 0.66);
+  --faint: rgba(238, 247, 243, 0.52);
+  --border: rgba(178, 223, 220, 0.18);
+  --accent: #53bc7b;
+  --accent2: #3ea978;
+  --accent-soft: rgba(83, 188, 123, 0.12);
+  --warn: #e2ad3f;
+  --warn-soft: rgba(226, 173, 63, 0.12);
+  --danger: #e05555;
+  --danger-soft: rgba(166, 58, 58, 0.16);
+  color: var(--ink);
+  font-size: 14px;
+  font-family:
+    ui-monospace, "Cascadia Mono", "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  letter-spacing: 0.01em;
+}
+
+.root * {
+  box-sizing: border-box;
+}
+
+/* Lower half of the top-strip card — pairs with .panelWide .header, same as
+   the board toolbar and the BaajBoard KPI cap. */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: rgba(17, 48, 45, 0.96);
+  border: 1px solid rgba(178, 223, 220, 0.14);
+  border-top: 0;
+  border-radius: 0 0 14px 14px;
+  padding: 8px 18px 14px;
+  margin-bottom: 16px;
+}
+
+.seg {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.seg button {
+  border: 0;
+  background: var(--surface);
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.seg button.on {
+  background: var(--accent);
+  color: #0a1f1a;
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* Legend — semantic states, never color alone (each has a text label). */
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.legend .li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sw {
+  width: 14px;
+  height: 9px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.swDone {
+  background: rgba(62, 169, 120, 0.55);
+}
+
+.swCur {
+  background: var(--accent);
+}
+
+.swLate {
+  background: var(--danger);
+}
+
+.swPlan {
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+.swDia {
+  width: 8px;
+  height: 8px;
+  background: var(--warn);
+  transform: rotate(45deg);
+  border-radius: 1px;
+}
+
+.swActual {
+  background: rgba(238, 247, 243, 0.6);
+  height: 7px;
+}
+
+/* --- Chart ---------------------------------------------------------------- */
+.card {
+  background: var(--col);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 6px 14px 14px;
+  overflow-x: auto;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  min-width: 760px;
+}
+
+.labels {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Axis strip is two lanes: marker tags (today/delivery) on top, date ticks
+   below — so they can never overlap. */
+.axisSpacer {
+  height: 42px;
+}
+
+.rowlabel {
+  height: 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-right: 12px;
+  cursor: pointer;
+  min-width: 0;
+  border-top: 1px solid rgba(178, 223, 220, 0.07);
+}
+
+.rowlabel:hover .nm {
+  color: var(--accent);
+}
+
+.rowlabel .nm {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowlabel .sub {
+  font-size: 10.5px;
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timeline {
+  position: relative;
+  /* Absolute labels (ticks, tags) near the right edge must not create
+     phantom horizontal scroll — clip them at the timeline bounds. */
+  overflow: hidden;
+}
+
+.gaxis {
+  position: relative;
+  height: 42px;
+  flex: 0 0 auto;
+}
+
+.tick {
+  position: absolute;
+  top: 24px;
+  transform: translateX(-50%);
+  font-size: 10.5px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.gridline {
+  position: absolute;
+  top: 42px;
+  bottom: 0;
+  width: 1px;
+  background: rgba(178, 223, 220, 0.08);
+}
+
+.todayline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--warn);
+  opacity: 0.8;
+  z-index: 2;
+}
+
+.todaytag {
+  position: absolute;
+  top: 3px;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-radius: 4px;
+  padding: 1px 5px;
+  z-index: 2;
+}
+
+.track {
+  position: relative;
+  height: 36px;
+  cursor: pointer;
+  border-top: 1px solid rgba(178, 223, 220, 0.07);
+}
+
+.track:hover {
+  background: var(--accent-soft);
+}
+
+/* Planned (target) bar — upper lane of the row. */
+.gseg {
+  position: absolute;
+  top: 7px;
+  height: 9px;
+  border-radius: 4px;
+}
+
+/* Actual bar — lower lane, from recorded stage moves. */
+.aseg {
+  position: absolute;
+  top: 20px;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(238, 247, 243, 0.42);
+}
+
+.asegOpen {
+  background: rgba(238, 247, 243, 0.78);
+}
+
+.gsegDone {
+  background: rgba(62, 169, 120, 0.55);
+}
+
+.gsegCur {
+  background: var(--accent);
+}
+
+.gsegLate {
+  background: var(--danger);
+}
+
+.gsegPlan {
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+.diamond {
+  position: absolute;
+  top: 14px;
+  width: 9px;
+  height: 9px;
+  margin-left: -5px;
+  background: var(--warn);
+  transform: rotate(45deg);
+  border-radius: 1px;
+  border: 1px solid rgba(10, 34, 32, 0.9);
+  z-index: 1;
+}
+
+.diamondLate {
+  background: var(--danger);
+}
+
+.nodata {
+  position: absolute;
+  top: 10px;
+  font-size: 10.5px;
+  color: var(--faint);
+}
+
+.empty {
+  font-size: 12px;
+  color: var(--faint);
+  padding: 14px 4px;
+}
+
+/* --- Per-project popup ------------------------------------------------------ */
+.popScrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 31, 30, 0.62);
+  z-index: 70;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 12px;
+}
+
+/* Full-screen takeover — the chart stretches to fill the viewport. */
+.pop {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--col);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  padding: 18px 22px 16px;
+}
+
+.popHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.popHead h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.popHead .sub {
+  font-size: 11.5px;
+  color: var(--faint);
+  margin-top: 3px;
+}
+
+.popClose {
+  margin-left: auto;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.popChart {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  margin-top: 12px;
+  cursor: pointer;
+  flex: 1;
+  min-height: 0;
+}
+
+.popLabels {
+  display: flex;
+  flex-direction: column;
+}
+
+.popLabels .axisSpacer {
+  flex: 0 0 auto;
+}
+
+.popStage {
+  flex: 1;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted);
+  border-top: 1px solid rgba(178, 223, 220, 0.07);
+  padding-right: 10px;
+}
+
+.popStage.cur {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.popTrack {
+  position: relative;
+  flex: 1;
+  min-height: 38px;
+  border-top: 1px solid rgba(178, 223, 220, 0.07);
+}
+
+.popTimeline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.popFoot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.popHint {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.deliveryline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--warn);
+  opacity: 0.65;
+  z-index: 1;
+}
+
+.deliverytag {
+  position: absolute;
+  top: 3px;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-radius: 4px;
+  padding: 1px 5px;
+  z-index: 2;
+}

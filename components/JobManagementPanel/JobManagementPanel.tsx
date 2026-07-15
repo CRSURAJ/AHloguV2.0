@@ -11,6 +11,7 @@ import type { Job, PermissionLevel, Project, WorkerRole } from "@/types/work";
 import BaajBoard from "./BaajBoard";
 import type { DrawerFocus } from "./BaajBoard";
 import DeliveryBoard from "./DeliveryBoard";
+import GanttView from "./GanttView";
 
 import {
   getArchiveJobConfirmationMessage,
@@ -33,7 +34,7 @@ type JobManagementPanelProps = {
   currentUserName: string;
 };
 
-type PanelView = "board" | "jobs" | "dash";
+type PanelView = "board" | "jobs" | "dash" | "gantt";
 
 type JobFormState = {
   caseNo: string;
@@ -434,6 +435,13 @@ export default function JobManagementPanel({
               </button>
               <button
                 type="button"
+                className={view === "gantt" ? styles.viewToggleActive : ""}
+                onClick={() => setView("gantt")}
+              >
+                GanttBoard
+              </button>
+              <button
+                type="button"
                 className={view === "jobs" ? styles.viewToggleActive : ""}
                 onClick={() => setView("jobs")}
               >
@@ -447,7 +455,17 @@ export default function JobManagementPanel({
           </div>
         </div>
 
-        {view === "dash" ? (
+        {view === "gantt" ? (
+          <GanttView
+            projects={projects}
+            isLoadingProjects={isLoadingProjects}
+            onOpenProject={(project) => {
+              setFocusProjectId(project.id);
+              setFocusSection(null);
+              setView("board");
+            }}
+          />
+        ) : view === "dash" ? (
           <BaajBoard
             projects={projects}
             isLoadingProjects={isLoadingProjects}
