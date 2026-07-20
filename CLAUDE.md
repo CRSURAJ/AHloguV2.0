@@ -167,8 +167,8 @@ All endpoints require a Cognito JWT Bearer token except `/health`.
 | `GET` | `/work-logs` | admin/manager |
 | `POST` | `/work-logs` | worker |
 | `POST` | `/work-logs/bulk` | worker |
-| `PUT` | `/work-logs/{id}` | admin/manager |
-| `DELETE` | `/work-logs/{id}` | admin/manager |
+| `PUT` | `/work-logs/{id}` | admin |
+| `DELETE` | `/work-logs/{id}` | admin |
 | `GET` | `/worker-status` | admin/manager |
 | `PUT` | `/worker-status/me` | worker |
 

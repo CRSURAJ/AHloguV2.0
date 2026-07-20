@@ -53,6 +53,15 @@ export function getJobTitle(job: Job): string {
   return job.jobName || job.jobId || job.caseNo || "Untitled Job";
 }
 
+/**
+ * Order numbers are shown next to a "Sales Order" label, so a typed-in
+ * "SO-84121" / "SO 84121" / "SO84121" prefix would read doubled — strip it.
+ * Only strips when digits follow, so words starting with "SO" are untouched.
+ */
+export function formatSalesOrderNo(orderNo: string): string {
+  return orderNo.replace(/^so[\s\-#:]*(?=\d)/i, "").trim();
+}
+
 export function isDuplicateJobIdMessage(message: string): boolean {
   const value = message.toLowerCase();
 

@@ -69,6 +69,7 @@ import type {
   TradeState,
 } from "@/types/work";
 
+import { formatSalesOrderNo } from "./jobManagementHelpers";
 import styles from "./deliveryBoard.module.css";
 
 const TRADE_ICONS: Record<string, typeof Droplets> = {
@@ -960,7 +961,8 @@ function SalesOrdersSection({
   };
 
   const submit = () => {
-    const number = soNumber.trim();
+    // Normalize a typed "SO-84121" to "84121" — labels already say Sales Order.
+    const number = formatSalesOrderNo(soNumber.trim());
     if (!number) return;
 
     if (editingId) {
@@ -1063,7 +1065,9 @@ function SalesOrdersSection({
             <div key={so.id} className={styles.jobrow} style={{ cursor: "default" }}>
               <FileText size={15} style={{ color: "var(--muted)", flex: "0 0 auto" }} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div className={`${styles.jobname} ${styles.mono}`}>{so.soNumber}</div>
+                <div className={`${styles.jobname} ${styles.mono}`}>
+                  {formatSalesOrderNo(so.soNumber)}
+                </div>
                 {so.label ? <div className={styles.jobmeta}>{so.label}</div> : null}
               </div>
               <span

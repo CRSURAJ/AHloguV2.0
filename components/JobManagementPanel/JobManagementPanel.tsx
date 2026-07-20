@@ -15,6 +15,7 @@ import DeliveryBoard from "./DeliveryBoard";
 import GanttView from "./GanttView";
 
 import {
+  formatSalesOrderNo,
   getArchiveJobConfirmationMessage,
   getDeleteJobConfirmationMessage,
   getInvalidJobDocumentLinkMessage,
@@ -52,7 +53,7 @@ type JobFormState = {
   salesOrderId: string;
 };
 
-type JobFormField = "caseNo" | "jobId" | "jobName" | "customerName" | "assignedRoles";
+type JobFormField = "caseNo" | "jobId" | "orderNo" | "jobName" | "customerName" | "assignedRoles";
 
 const EMPTY_FORM: JobFormState = {
   caseNo: "",
@@ -115,6 +116,7 @@ export default function JobManagementPanel({
 
   const caseNoInputRef = useRef<HTMLInputElement>(null);
   const jobIdInputRef = useRef<HTMLInputElement>(null);
+  const orderNoInputRef = useRef<HTMLInputElement>(null);
   const jobNameInputRef = useRef<HTMLInputElement>(null);
   const customerNameInputRef = useRef<HTMLInputElement>(null);
   const assignedRolesRef = useRef<HTMLDivElement>(null);
@@ -137,10 +139,10 @@ export default function JobManagementPanel({
     form.salesOrderId !== "";
 
   const formSalesOrders = form.projectId ? (getProjectById(form.projectId)?.salesOrders ?? []) : [];
+  const selectedSalesOrder = formSalesOrders.find((so) => so.id === form.salesOrderId);
   // An edited job can point at a sales order that was since removed — keep the
   // stale value visible (and clearable) instead of silently dropping it.
-  const staleSalesOrderId =
-    form.salesOrderId !== "" && !formSalesOrders.some((so) => so.id === form.salesOrderId);
+  const staleSalesOrderId = form.salesOrderId !== "" && !selectedSalesOrder;
 
   const sortedJobs = useMemo(
     () =>
@@ -237,17 +239,31 @@ export default function JobManagementPanel({
     setForm((current) => {
       const previous = current.projectId ? getProjectById(current.projectId) : undefined;
       const next = projectId ? getProjectById(projectId) : undefined;
-      // The project's ref IS the case number — auto-fill it, but never
-      // clobber a hand-typed value.
-      const fillCaseNo =
-        next && (current.caseNo.trim() === "" || current.caseNo.trim() === previous?.projectRef);
+      const previousSo = previous?.salesOrders?.find((so) => so.id === current.salesOrderId);
+      // Auto-fill project-derived fields (ref IS the case number) — same as
+      // the drawer's "New job" jump — but never clobber a hand-typed value.
+      const follow = (value: string, prevValue: string | undefined, nextValue: string): string =>
+        next && (value.trim() === "" || value.trim() === (prevValue ?? "").trim())
+          ? nextValue
+          : value;
 
       return {
         ...current,
         projectId,
-        // A sales order belongs to its project — changing project clears it.
+        // A sales order belongs to its project — changing project clears it
+        // (and the order number it auto-filled).
         salesOrderId: "",
-        caseNo: fillCaseNo ? next.projectRef : current.caseNo,
+        orderNo:
+          previousSo && current.orderNo.trim() === formatSalesOrderNo(previousSo.soNumber)
+            ? ""
+            : current.orderNo,
+        caseNo: follow(current.caseNo, previous?.projectRef, next?.projectRef ?? ""),
+        customerName: follow(
+          current.customerName,
+          previous?.customerName,
+          next?.customerName ?? "",
+        ),
+        location: follow(current.location, previous?.location, next?.location ?? ""),
       };
     });
 
@@ -262,14 +278,18 @@ export default function JobManagementPanel({
         : [];
       const previous = orders.find((so) => so.id === current.salesOrderId);
       const next = orders.find((so) => so.id === salesOrderId);
-      // Auto-fill Sales Order No. (job.orderNo) — never clobber a hand-typed value.
-      const fillSoNumber =
-        next && (current.orderNo.trim() === "" || current.orderNo.trim() === previous?.soNumber);
 
       return {
         ...current,
         salesOrderId,
-        orderNo: fillSoNumber ? next.soNumber : current.orderNo,
+        // The picked sales order IS the order number (the manual input is
+        // hidden while one is selected). Deselecting keeps a hand-typed
+        // number but drops one that came from the previous pick.
+        orderNo: next
+          ? formatSalesOrderNo(next.soNumber)
+          : previous && current.orderNo.trim() === formatSalesOrderNo(previous.soNumber)
+            ? ""
+            : current.orderNo,
       };
     });
 
@@ -394,6 +414,11 @@ export default function JobManagementPanel({
 
     if (!form.jobId.trim()) {
       markJobFormError("jobId", "Job ID is required.", jobIdInputRef);
+      return;
+    }
+
+    if (!form.orderNo.trim()) {
+      markJobFormError("orderNo", "Sales Order No. is required.", orderNoInputRef);
       return;
     }
 
@@ -571,7 +596,7 @@ export default function JobManagementPanel({
                 salesOrderId: salesOrder?.id ?? "",
                 // The project's ref IS the case number; job.orderNo holds the SO no.
                 caseNo: project.projectRef,
-                orderNo: salesOrder?.soNumber ?? "",
+                orderNo: salesOrder ? formatSalesOrderNo(salesOrder.soNumber) : "",
               });
               setView("jobs");
               focusJobFormCard();
@@ -707,11 +732,26 @@ export default function JobManagementPanel({
                           ) : null}
                           {formSalesOrders.map((so) => (
                             <option key={so.id} value={so.id}>
-                              {so.soNumber}
+                              {formatSalesOrderNo(so.soNumber)}
                               {so.label ? ` — ${so.label}` : ""}
                             </option>
                           ))}
                         </select>
+                      </label>
+                    ) : null}
+
+                    {/* A picked sales order IS the order number — only ask
+                        for one when no sales order is selected. */}
+                    {!selectedSalesOrder ? (
+                      <label>
+                        Sales Order No.
+                        <input
+                          ref={orderNoInputRef}
+                          className={getJobInputClass("orderNo")}
+                          value={form.orderNo}
+                          onChange={(event) => updateField("orderNo", event.target.value)}
+                          aria-invalid={jobErrorField === "orderNo"}
+                        />
                       </label>
                     ) : null}
 

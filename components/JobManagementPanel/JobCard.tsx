@@ -2,7 +2,7 @@
 
 import type { Job } from "@/types/work";
 
-import { formatRoleList, getJobTitle } from "./jobManagementHelpers";
+import { formatRoleList, formatSalesOrderNo, getJobTitle } from "./jobManagementHelpers";
 import styles from "./JobManagementPanel.module.css";
 
 type JobCardProps = {
@@ -33,7 +33,8 @@ export default function JobCard({
         <div>
           <h4>{getJobTitle(job)}</h4>
           <p>
-            Job ID: {job.jobId || "—"} · Case: {job.caseNo || "—"} · SO: {job.orderNo || "—"}
+            Job ID: {job.jobId || "—"} · Case: {job.caseNo || "—"} · Sales Order:{" "}
+            {formatSalesOrderNo(job.orderNo) || "—"}
           </p>
         </div>
 
