@@ -32,7 +32,7 @@ import {
   stageComplete,
   stageIndex,
   STAGES,
-  TRADES,
+  tradesForProject,
 } from "@/lib/projectManagement";
 import type { DueTone } from "@/lib/projectManagement";
 import type { Project } from "@/types/work";
@@ -228,11 +228,13 @@ export default function BaajBoard({ projects, isLoadingProjects, onOpenProject }
         .filter((project) => getStage(project) === "build")
         .flatMap((project) => {
           const trades = getTrades(project);
-          return TRADES.filter((def) => trades[def.key]?.blocked).map((def) => ({
-            project,
-            def,
-            reason: trades[def.key].reason,
-          }));
+          return tradesForProject(project)
+            .filter((def) => trades[def.key]?.blocked)
+            .map((def) => ({
+              project,
+              def,
+              reason: trades[def.key].reason,
+            }));
         }),
     [open],
   );

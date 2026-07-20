@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, Briefcase, Calendar, Lock, Plus, ShieldCheck, Truck } from "lucide-react";
 
 import { getCloudProvider } from "@/lib/cloud/client";
 import {
   canDropOn,
   deliveryStatus,
-  DEPARTMENT_OPTIONS,
   diffProjectFields,
   dueStatus,
   formatDate,
@@ -20,11 +20,13 @@ import {
   getTrades,
   isProjectBlocked,
   makeActivityEntry,
+  PROJECT_TYPE_OPTIONS,
+  projectTypeLabel,
   stageComplete,
   stageIndex,
   STAGES,
   toDateInputValue,
-  TRADES,
+  tradesForProject,
 } from "@/lib/projectManagement";
 import type { CreateProjectInput, UpdateProjectInput } from "@/lib/projectStorage";
 import type {
@@ -32,10 +34,11 @@ import type {
   Job,
   Project,
   ProjectDateField,
-  ProjectDepartment,
+  ProjectSalesOrder,
   ProjectSignOff,
   ProjectStageKey,
   ProjectTrades,
+  ProjectType,
   TradeState,
 } from "@/types/work";
 
@@ -55,28 +58,33 @@ type DeliveryBoardProps = {
   onCreateProject: (input: CreateProjectInput) => Promise<AuthActionResult>;
   onUpdateProject: (id: string, updates: UpdateProjectInput) => Promise<AuthActionResult>;
   onDeleteProject: (id: string) => Promise<AuthActionResult>;
-  onCreateJobForProject: (project: Project) => void;
+  onCreateJobForProject: (project: Project, salesOrder?: ProjectSalesOrder) => void;
   onEditJob: (job: Job) => void;
 };
 
-type DeptFilter = "all" | ProjectDepartment;
+type TypeFilter = "all" | ProjectType;
 
 type ProjectFormState = {
   projectRef: string;
   customerName: string;
   location: string;
-  department: ProjectDepartment;
+  /** "" only on legacy projects with no stored type. */
+  projectType: ProjectType | "";
+  controlPanel: boolean;
   value: string;
   targetDate: string;
+  deliveryDate: string;
 };
 
 const EMPTY_PROJECT_FORM: ProjectFormState = {
   projectRef: "",
   customerName: "",
   location: "",
-  department: "install",
+  projectType: "supply_loose_install",
+  controlPanel: true,
   value: "",
   targetDate: "",
+  deliveryDate: "",
 };
 
 // GET /work-logs returns the whole table — cache totals for a minute so
@@ -196,7 +204,8 @@ function BoardCard({
   const stageIdx = stageIndex(stage);
   const isBuild = stage === "build";
   const trades = getTrades(project);
-  const anyBlocked = TRADES.some((t) => trades[t.key]?.blocked);
+  const applicableTrades = tradesForProject(project);
+  const anyBlocked = applicableTrades.some((t) => trades[t.key]?.blocked);
   const projectBlocked = isProjectBlocked(project);
   const stageTarget = getStageTarget(project, stage);
   const [gd, gt] = gateProgress(project);
@@ -234,9 +243,9 @@ function BoardCard({
         </div>
       </div>
 
-      {isBuild ? (
+      {isBuild && applicableTrades.length > 0 ? (
         <div className={styles.gauge}>
-          {TRADES.map((t) => {
+          {applicableTrades.map((t) => {
             const trade = trades[t.key];
             const color = trade.blocked
               ? { bg: "var(--danger-soft)", fg: "var(--danger)" }
@@ -292,7 +301,6 @@ function BoardCard({
 
       <div className={styles.foot}>
         <span className={`${styles.val} ${styles.mono}`}>{project.value || "—"}</span>
-        <span className={`${styles.dept} ${styles[project.department]}`}>{project.department}</span>
       </div>
       {/* Segmented stage indicator — one tick per pipeline stage, matching
           the drawer's stepper. Reads clearly even at stage 1 of 8. */}
@@ -313,6 +321,7 @@ function ProjectDialog({
   submitLabel,
   initial,
   canDelete,
+  showDeliveryDate,
   onSubmit,
   onDelete,
   onClose,
@@ -321,6 +330,8 @@ function ProjectDialog({
   submitLabel: string;
   initial: ProjectFormState;
   canDelete: boolean;
+  /** Create only — once a project exists, delivery is edited in the drawer (reason required). */
+  showDeliveryDate: boolean;
   onSubmit: (form: ProjectFormState) => void;
   onDelete?: () => void;
   onClose: () => void;
@@ -331,95 +342,129 @@ function ProjectDialog({
   const set = <K extends keyof ProjectFormState>(key: K, value: ProjectFormState[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
 
-  return (
-    <div className={styles.dialogBackdrop}>
-      <form
-        className={styles.dialog}
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (canSubmit) onSubmit(form);
-        }}
-      >
-        <h3 className={styles.dialogTitle}>{title}</h3>
-
-        <label className={styles.dialogField}>
-          <span>Customer / Site</span>
-          <input
-            autoFocus
-            value={form.customerName}
-            onChange={(event) => set("customerName", event.target.value)}
-            placeholder="e.g. Brunswick Baths"
-          />
-        </label>
-
-        <label className={styles.dialogField}>
-          <span>Project Reference</span>
-          <input
-            value={form.projectRef}
-            onChange={(event) => set("projectRef", event.target.value)}
-            placeholder="e.g. AH-1088"
-          />
-        </label>
-
-        <label className={styles.dialogField}>
-          <span>Location</span>
-          <input
-            value={form.location}
-            onChange={(event) => set("location", event.target.value)}
-            placeholder="Site address / suburb"
-          />
-        </label>
-
-        <div className={styles.dialogRow}>
-          <label className={styles.dialogField}>
-            <span>Department</span>
-            <select
-              value={form.department}
-              onChange={(event) => set("department", event.target.value as ProjectDepartment)}
-            >
-              {DEPARTMENT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+  // Portal to <body> — see ProjectDrawer: an ancestor backdrop-filter breaks
+  // position:fixed inside the panel; `styles.root` re-scopes the CSS variables.
+  return createPortal(
+    <div className={styles.root}>
+      <div className={styles.dialogBackdrop}>
+        <form
+          className={styles.dialog}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (canSubmit) onSubmit(form);
+          }}
+        >
+          <h3 className={styles.dialogTitle}>{title}</h3>
 
           <label className={styles.dialogField}>
-            <span>Contract Value</span>
+            <span>Project Name</span>
             <input
-              value={form.value}
-              onChange={(event) => set("value", event.target.value)}
-              placeholder="e.g. $186k"
+              autoFocus
+              value={form.customerName}
+              onChange={(event) => set("customerName", event.target.value)}
+              placeholder="e.g. Brunswick Baths"
             />
           </label>
-        </div>
 
-        <label className={styles.dialogField}>
-          <span>Stage Due Date (current stage completion)</span>
-          <input
-            type="date"
-            value={form.targetDate}
-            onChange={(event) => set("targetDate", event.target.value)}
-          />
-        </label>
+          <label className={styles.dialogField}>
+            <span>Case No.</span>
+            <input
+              value={form.projectRef}
+              onChange={(event) => set("projectRef", event.target.value)}
+              placeholder="e.g. 1088"
+            />
+          </label>
 
-        <div className={styles.dialogActions}>
-          {canDelete && onDelete ? (
-            <button type="button" className={`${styles.b} ${styles.warn}`} onClick={onDelete}>
-              Delete project
+          <label className={styles.dialogField}>
+            <span>Location</span>
+            <input
+              value={form.location}
+              onChange={(event) => set("location", event.target.value)}
+              placeholder="Site address / suburb"
+            />
+          </label>
+
+          <div className={styles.dialogRow}>
+            <label className={styles.dialogField}>
+              <span>Project Type</span>
+              <select
+                value={form.projectType}
+                onChange={(event) => set("projectType", event.target.value as ProjectType | "")}
+              >
+                {initial.projectType === "" ? (
+                  <option value="">Not set (legacy — all trades)</option>
+                ) : null}
+                {PROJECT_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className={styles.dialogField}>
+              <span>Control Panel</span>
+              <select
+                value={form.controlPanel ? "yes" : "no"}
+                onChange={(event) => set("controlPanel", event.target.value === "yes")}
+              >
+                <option value="yes">In scope</option>
+                <option value="no">Not supplied</option>
+              </select>
+            </label>
+          </div>
+
+          <div className={styles.dialogRow}>
+            <label className={styles.dialogField}>
+              <span>Contract Value</span>
+              <input
+                value={form.value}
+                onChange={(event) => set("value", event.target.value)}
+                placeholder="e.g. $186k"
+              />
+            </label>
+
+            {showDeliveryDate ? (
+              <label className={styles.dialogField}>
+                <span>Delivery Date</span>
+                <input
+                  type="date"
+                  value={form.deliveryDate}
+                  onChange={(event) => set("deliveryDate", event.target.value)}
+                />
+              </label>
+            ) : (
+              <span />
+            )}
+          </div>
+
+          <label className={styles.dialogField}>
+            <span>Stage Due Date (current stage completion)</span>
+            <input
+              type="date"
+              value={form.targetDate}
+              onChange={(event) => set("targetDate", event.target.value)}
+            />
+          </label>
+
+          <div className={styles.dialogActions}>
+            {canDelete && onDelete ? (
+              <button type="button" className={`${styles.b} ${styles.warn}`} onClick={onDelete}>
+                Delete project
+              </button>
+            ) : null}
+            <div style={{ flex: 1 }} />
+            <button type="button" className={styles.ghost} onClick={onClose}>
+              Cancel
             </button>
-          ) : null}
-          <div style={{ flex: 1 }} />
-          <button type="button" className={styles.ghost} onClick={onClose}>
-            Cancel
-          </button>
-          <button type="submit" className={styles.primary} disabled={!canSubmit}>
-            {submitLabel}
-          </button>
-        </div>
-      </form>
-    </div>
+            <button type="submit" className={styles.primary} disabled={!canSubmit}>
+              {submitLabel}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -437,7 +482,7 @@ export default function DeliveryBoard({
   onCreateJobForProject,
   onEditJob,
 }: DeliveryBoardProps) {
-  const [filter, setFilter] = useState<DeptFilter>("all");
+  const [filter, setFilter] = useState<TypeFilter>("all");
   const [dragId, setDragId] = useState<string | null>(null);
   const [selId, setSelId] = useState<string | null>(initialSelectedProjectId);
   // Applies only to the jump-in selection; cleared when a card is opened by hand.
@@ -486,8 +531,9 @@ export default function DeliveryBoard({
     };
   }, []);
 
+  // Legacy projects with no type only appear under "All".
   const shown = useMemo(
-    () => projects.filter((project) => filter === "all" || project.department === filter),
+    () => projects.filter((project) => filter === "all" || project.projectType === filter),
     [projects, filter],
   );
 
@@ -623,6 +669,24 @@ export default function DeliveryBoard({
     applyStageMove(project, STAGES[next].key);
   };
 
+  const setSalesOrders = (
+    project: Project,
+    next: ProjectSalesOrder[],
+    change: { from: string; to: string },
+  ) => {
+    void persist(project.id, {
+      salesOrders: next,
+      activityLog: withActivity(
+        project,
+        makeActivityEntry("field", currentUserName, {
+          field: "Sales orders",
+          from: change.from,
+          to: change.to,
+        }),
+      ),
+    });
+  };
+
   const setProjectBlocked = (project: Project, blocked: boolean, reason: string) => {
     void persist(project.id, {
       blocked,
@@ -705,9 +769,11 @@ export default function DeliveryBoard({
       projectRef: form.projectRef,
       customerName: form.customerName,
       location: form.location,
-      department: form.department,
+      projectType: form.projectType || null,
+      controlPanel: form.controlPanel,
       value: form.value,
       targetDate: fromDateInputValue(form.targetDate),
+      deliveryDate: fromDateInputValue(form.deliveryDate),
     });
 
     if (!result.ok) {
@@ -725,10 +791,20 @@ export default function DeliveryBoard({
       projectRef: form.projectRef,
       customerName: form.customerName,
       location: form.location,
-      department: form.department,
+      projectType: form.projectType || null,
+      controlPanel: form.controlPanel,
       value: form.value,
     };
-    const activityEntries = diffProjectFields(sel, details, currentUserName);
+    // The diff compares display strings, so non-string fields go in as labels.
+    const activityEntries = diffProjectFields(
+      sel,
+      {
+        ...details,
+        projectType: projectTypeLabel(form.projectType || null),
+        controlPanel: form.controlPanel ? "Yes" : "No",
+      },
+      currentUserName,
+    );
     const targetIso = fromDateInputValue(form.targetDate);
 
     const result = await onUpdateProject(sel.id, {
@@ -774,14 +850,21 @@ export default function DeliveryBoard({
     <div className={styles.root}>
       <div className={styles.toolbar}>
         <div className={styles.seg}>
-          {(["all", "install", "service"] as const).map((value) => (
+          <button
+            type="button"
+            className={filter === "all" ? styles.on : ""}
+            onClick={() => setFilter("all")}
+          >
+            All
+          </button>
+          {PROJECT_TYPE_OPTIONS.map((option) => (
             <button
-              key={value}
+              key={option.value}
               type="button"
-              className={filter === value ? styles.on : ""}
-              onClick={() => setFilter(value)}
+              className={filter === option.value ? styles.on : ""}
+              onClick={() => setFilter(option.value)}
             >
-              {value === "all" ? "All" : value[0].toUpperCase() + value.slice(1)}
+              {option.label}
             </button>
           ))}
         </div>
@@ -866,7 +949,7 @@ export default function DeliveryBoard({
                           onOpen={() => {
                             setSelId(project.id);
                             setDrawerFocus(null);
-                            setOpenTrade("plumbing");
+                            setOpenTrade(tradesForProject(project)[0]?.key ?? "");
                           }}
                           onDragStart={() => setDragId(project.id)}
                           onDragEnd={() => setDragId(null)}
@@ -909,8 +992,9 @@ export default function DeliveryBoard({
           setOpenTrade={setOpenTrade}
           onClose={() => setSelId(null)}
           onEditDetails={() => setDialog("edit")}
-          onCreateJob={() => onCreateJobForProject(sel)}
+          onCreateJob={(salesOrder) => onCreateJobForProject(sel, salesOrder)}
           onEditJob={onEditJob}
+          onSalesOrdersChange={(next, change) => setSalesOrders(sel, next, change)}
           onMoveStage={(dir) => moveStage(sel, dir)}
           onSignCriterion={(stage, criterionId, signoff) =>
             signCriterion(sel, stage, criterionId, signoff)
@@ -934,6 +1018,7 @@ export default function DeliveryBoard({
           submitLabel="Create project"
           initial={EMPTY_PROJECT_FORM}
           canDelete={false}
+          showDeliveryDate
           onSubmit={(form) => void submitCreate(form)}
           onClose={() => setDialog(null)}
         />
@@ -947,22 +1032,30 @@ export default function DeliveryBoard({
             projectRef: sel.projectRef,
             customerName: sel.customerName,
             location: sel.location,
-            department: sel.department,
+            projectType: sel.projectType ?? "",
+            controlPanel: sel.controlPanel !== false,
             value: sel.value,
             targetDate: toDateInputValue(getStageTarget(sel, getStage(sel))),
+            deliveryDate: "",
           }}
           canDelete={canDeleteProjects}
+          showDeliveryDate={false}
           onSubmit={(form) => void submitEdit(form)}
           onDelete={() => void submitDelete()}
           onClose={() => setDialog(null)}
         />
       ) : null}
 
-      {flashMsg ? (
-        <div className={styles.flash}>
-          <Lock size={14} /> {flashMsg}
-        </div>
-      ) : null}
+      {flashMsg
+        ? createPortal(
+            <div className={styles.root}>
+              <div className={styles.flash}>
+                <Lock size={14} /> {flashMsg}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -31,10 +32,11 @@ import {
 import {
   checklistDone,
   checklistPct,
+  criteriaForProject,
   criterionMet,
+  deliveryStatus,
   describeActivity,
   dueStatus,
-  EXIT_CRITERIA,
   formatDate,
   formatDateTime,
   formatMinutes,
@@ -44,12 +46,14 @@ import {
   getStage,
   getStageTarget,
   getTrades,
+  hasControlPanel,
   isProjectBlocked,
+  projectTypeLabel,
   stageComplete,
   stageIndex,
   STAGES,
   toDateInputValue,
-  TRADES,
+  tradesForProject,
 } from "@/lib/projectManagement";
 import type { ExitCriterion, TradeDef } from "@/lib/projectManagement";
 import type {
@@ -57,6 +61,7 @@ import type {
   Project,
   ProjectActivityEntry,
   ProjectDateField,
+  ProjectSalesOrder,
   ProjectSignOff,
   ProjectStageKey,
   ProjectTrade,
@@ -96,8 +101,10 @@ export type ProjectDrawerProps = {
   setOpenTrade: (key: string) => void;
   onClose: () => void;
   onEditDetails: () => void;
-  onCreateJob: () => void;
+  onCreateJob: (salesOrder?: ProjectSalesOrder) => void;
   onEditJob: (job: Job) => void;
+  /** `change` carries display strings for the "Sales orders" activity entry. */
+  onSalesOrdersChange: (next: ProjectSalesOrder[], change: { from: string; to: string }) => void;
   onMoveStage: (dir: -1 | 1) => void;
   onSignCriterion: (stage: ProjectStageKey, criterionId: string, signoff: ProjectSignOff) => void;
   onUnsignCriterion: (stage: ProjectStageKey, criterionId: string) => void;
@@ -558,6 +565,7 @@ function DatesPanel({
   const [showTargets, setShowTargets] = useState(false);
   const stage = getStage(project);
   const status = dueStatus(project);
+  const delivery = deliveryStatus(project);
   const log = project.dateLog ?? [];
 
   const start = (
@@ -612,7 +620,9 @@ function DatesPanel({
           value={inputValue("delivery", project.deliveryDate)}
           onChange={(event) => start("delivery", fromDateInputValue(event.target.value))}
         />
-        {!project.deliveryDate && pendingField !== "delivery" ? (
+        {project.deliveryDate ? (
+          <span className={`${styles.dchip} ${toneClass(delivery.tone)}`}>{delivery.label}</span>
+        ) : pendingField !== "delivery" ? (
           <span className={styles.mutedHint}>not set</span>
         ) : null}
       </div>
@@ -886,9 +896,263 @@ function LinkedJobsSection({
         })
       )}
       {!readOnly ? (
-        <button type="button" className={styles.b} style={{ marginTop: 4 }} onClick={onCreateJob}>
+        <button
+          type="button"
+          className={styles.b}
+          style={{ marginTop: 4 }}
+          onClick={() => onCreateJob()}
+        >
           <Plus size={13} /> New job for this project
         </button>
+      ) : null}
+    </>
+  );
+}
+
+const describeSalesOrder = (so: Pick<ProjectSalesOrder, "soNumber" | "label">): string =>
+  so.label ? `${so.soNumber} — ${so.label}` : so.soNumber;
+
+function makeSalesOrderId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `so-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function SalesOrdersSection({
+  salesOrders,
+  linkedJobs,
+  readOnly,
+  allowNewJob,
+  showBuildWarning,
+  onChange,
+  onCreateJob,
+}: {
+  salesOrders: ProjectSalesOrder[];
+  linkedJobs: Job[];
+  readOnly: boolean;
+  /** Jobs are created from Build onward. */
+  allowNewJob: boolean;
+  /** Current stage is Build — nudge about sales orders still missing a job. */
+  showBuildWarning: boolean;
+  onChange: (next: ProjectSalesOrder[], change: { from: string; to: string }) => void;
+  onCreateJob: (salesOrder: ProjectSalesOrder) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [soNumber, setSoNumber] = useState("");
+  const [label, setLabel] = useState("");
+
+  // One sales order can have several jobs (e.g. split across crews).
+  const jobsFor = (so: ProjectSalesOrder) => linkedJobs.filter((job) => job.salesOrderId === so.id);
+
+  const openForm = (so?: ProjectSalesOrder) => {
+    setAdding(!so);
+    setEditingId(so?.id ?? null);
+    setSoNumber(so?.soNumber ?? "");
+    setLabel(so?.label ?? "");
+  };
+
+  const closeForm = () => {
+    setAdding(false);
+    setEditingId(null);
+  };
+
+  const submit = () => {
+    const number = soNumber.trim();
+    if (!number) return;
+
+    if (editingId) {
+      const prev = salesOrders.find((so) => so.id === editingId);
+      if (prev) {
+        const next = { ...prev, soNumber: number, label: label.trim() };
+        onChange(
+          salesOrders.map((so) => (so.id === editingId ? next : so)),
+          { from: describeSalesOrder(prev), to: describeSalesOrder(next) },
+        );
+      }
+    } else {
+      const so: ProjectSalesOrder = {
+        id: makeSalesOrderId(),
+        soNumber: number,
+        label: label.trim(),
+      };
+      onChange([...salesOrders, so], { from: "", to: describeSalesOrder(so) });
+    }
+
+    closeForm();
+  };
+
+  const remove = (so: ProjectSalesOrder) => {
+    const linked = jobsFor(so);
+    const confirmed = window.confirm(
+      linked.length > 0
+        ? `${linked.length} job${linked.length === 1 ? " is" : "s are"} linked to ${so.soNumber} — the jobs keep their link but will show as unmatched. Remove the sales order?`
+        : `Remove sales order ${so.soNumber}?`,
+    );
+    if (!confirmed) return;
+
+    onChange(
+      salesOrders.filter((item) => item.id !== so.id),
+      { from: describeSalesOrder(so), to: "" },
+    );
+  };
+
+  const missingJobs = salesOrders.filter((so) => jobsFor(so).length === 0).length;
+
+  return (
+    <>
+      <div className={styles.sectitle} style={{ marginTop: 18 }}>
+        <span>Sales orders</span>
+        <span style={{ color: "var(--faint)" }}>{salesOrders.length}</span>
+      </div>
+      <div className={styles.sectip}>
+        One per building / plant, recorded at Handover. From Build, each sales order gets its own
+        job for workers to log time against.
+      </div>
+
+      {showBuildWarning && missingJobs > 0 ? (
+        <div className={styles.mutedHint} style={{ color: "var(--warn)", marginBottom: 8 }}>
+          <AlertTriangle size={12} /> {missingJobs} sales order{missingJobs === 1 ? "" : "s"} have
+          no job yet.
+        </div>
+      ) : null}
+
+      {salesOrders.length === 0 ? (
+        <div className={styles.mutedHint} style={{ marginBottom: 8 }}>
+          No sales orders recorded yet.
+        </div>
+      ) : (
+        salesOrders.map((so) => {
+          const linked = jobsFor(so);
+
+          if (editingId === so.id) {
+            return (
+              <div key={so.id} className={styles.signform}>
+                <label>Sales order no.</label>
+                <input
+                  type="text"
+                  value={soNumber}
+                  onChange={(event) => setSoNumber(event.target.value)}
+                />
+                <label style={{ marginTop: 8 }}>Building / plant (optional)</label>
+                <input
+                  type="text"
+                  value={label}
+                  onChange={(event) => setLabel(event.target.value)}
+                />
+                <div className={styles.formacts}>
+                  <button
+                    type="button"
+                    className={styles.primary}
+                    disabled={soNumber.trim() === ""}
+                    onClick={submit}
+                  >
+                    <Check size={14} /> Save
+                  </button>
+                  <button type="button" className={styles.ghost} onClick={closeForm}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div key={so.id} className={styles.jobrow} style={{ cursor: "default" }}>
+              <FileText size={15} style={{ color: "var(--muted)", flex: "0 0 auto" }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className={`${styles.jobname} ${styles.mono}`}>{so.soNumber}</div>
+                {so.label ? <div className={styles.jobmeta}>{so.label}</div> : null}
+              </div>
+              <span
+                className={styles.pill}
+                style={{
+                  background: linked.length > 0 ? "var(--ok-soft)" : "var(--col)",
+                  color: linked.length > 0 ? "var(--ok)" : "var(--faint)",
+                }}
+                title={linked.map((job) => job.jobId).join(", ") || undefined}
+              >
+                <Briefcase size={11} />{" "}
+                {linked.length === 0
+                  ? "no job"
+                  : linked.length === 1
+                    ? linked[0].jobId
+                    : `${linked.length} jobs`}
+              </span>
+              {!readOnly ? (
+                <>
+                  {allowNewJob ? (
+                    <button type="button" className={styles.undo} onClick={() => onCreateJob(so)}>
+                      <Plus size={12} /> New job
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={styles.undo}
+                    aria-label={`Edit sales order ${so.soNumber}`}
+                    onClick={() => openForm(so)}
+                  >
+                    <Pencil size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.undo}
+                    aria-label={`Remove sales order ${so.soNumber}`}
+                    onClick={() => remove(so)}
+                  >
+                    <X size={12} />
+                  </button>
+                </>
+              ) : null}
+            </div>
+          );
+        })
+      )}
+
+      {!readOnly ? (
+        adding ? (
+          <div className={styles.signform}>
+            <label>Sales order no.</label>
+            <input
+              type="text"
+              autoFocus
+              value={soNumber}
+              placeholder="e.g. 84121"
+              onChange={(event) => setSoNumber(event.target.value)}
+            />
+            <label style={{ marginTop: 8 }}>Building / plant (optional)</label>
+            <input
+              type="text"
+              value={label}
+              placeholder="e.g. Plant room B"
+              onChange={(event) => setLabel(event.target.value)}
+            />
+            <div className={styles.formacts}>
+              <button
+                type="button"
+                className={styles.primary}
+                disabled={soNumber.trim() === ""}
+                onClick={submit}
+              >
+                <Check size={14} /> Add sales order
+              </button>
+              <button type="button" className={styles.ghost} onClick={closeForm}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className={styles.b}
+            style={{ marginTop: 4 }}
+            onClick={() => openForm()}
+          >
+            <Plus size={13} /> Add sales order
+          </button>
+        )
       ) : null}
     </>
   );
@@ -906,6 +1170,7 @@ export default function ProjectDrawer({
   onEditDetails,
   onCreateJob,
   onEditJob,
+  onSalesOrdersChange,
   onMoveStage,
   onSignCriterion,
   onUnsignCriterion,
@@ -926,17 +1191,22 @@ export default function ProjectDrawer({
   const isBuild = viewKey === "build";
   const showJobs = viewIdx >= stageIndex("build");
   const terminal = idx === STAGES.length - 1;
-  const criteria = EXIT_CRITERIA[viewKey] ?? [];
+  const criteria = criteriaForProject(project, viewKey);
   const [gd, gt] = gateProgress(project, viewKey);
   const ready = stageComplete(project);
   const nextLabel = STAGES[idx + 1]?.label ?? null;
   const gates = getGates(project);
   const trades = getTrades(project);
+  const applicableTrades = tradesForProject(project);
   const blocked = isProjectBlocked(project);
   const totalMinutes = linkedJobs.reduce((sum, job) => sum + (minutesByJobId[job.jobId] ?? 0), 0);
 
-  return (
-    <>
+  // Portal to <body>: the panel backdrop's `backdrop-filter` creates a
+  // containing block that would re-anchor position:fixed to its scrolled
+  // content instead of the viewport. The `styles.root` wrapper re-scopes the
+  // board's CSS variables and control styles, which don't reach <body>.
+  return createPortal(
+    <div className={styles.root}>
       <div className={styles.scrim} onClick={onClose} />
       <div className={styles.drawer}>
         <div className={styles.dhead}>
@@ -968,9 +1238,10 @@ export default function ProjectDrawer({
               <div className={`${styles.v} ${styles.mono}`}>{project.value || "—"}</div>
             </div>
             <div className={styles.fact}>
-              <div className={styles.k}>Dept</div>
-              <div className={styles.v} style={{ textTransform: "capitalize" }}>
-                {project.department}
+              <div className={styles.k}>Type</div>
+              <div className={styles.v}>
+                {projectTypeLabel(project.projectType)}
+                {hasControlPanel(project) ? " · panel" : ""}
               </div>
             </div>
             <div className={styles.fact}>
@@ -1030,7 +1301,9 @@ export default function ProjectDrawer({
 
           {criteria.length === 0 ? (
             <div style={{ color: "var(--muted)", fontSize: 13, lineHeight: 1.6 }}>
-              Project closed. All stage gates cleared and signed off.
+              {viewKey === "closed"
+                ? "Project closed. All stage gates cleared and signed off."
+                : "No sign-offs required at this stage for this project type — advance when ready."}
             </div>
           ) : (
             <>
@@ -1068,28 +1341,46 @@ export default function ProjectDrawer({
                     <span>Trades &amp; sub-steps</span>
                   </div>
                   <div className={styles.sectip}>
-                    Each sub-step is verified and signed by the trade&apos;s responsible person.
+                    Trades shown match this project&apos;s type and control-panel scope. Each
+                    sub-step is verified and signed by the trade&apos;s responsible person.
                   </div>
-                  {TRADES.map((def) => (
-                    <TradeRow
-                      key={def.key}
-                      def={def}
-                      trade={trades[def.key]}
-                      defaultBy={currentUserName}
-                      readOnly={readOnly}
-                      open={openTrade === def.key}
-                      onToggle={() => setOpenTrade(openTrade === def.key ? "" : def.key)}
-                      onSignSub={(index, signoff) => onSignSub(def.key, index, signoff)}
-                      onUnsignSub={(index) => onUnsignSub(def.key, index)}
-                      onState={(state) => onSetTradeState(def.key, state)}
-                      onBlock={(blocked) => onSetBlocked(def.key, blocked)}
-                      onReason={(reason) => onSetReason(def.key, reason)}
-                    />
-                  ))}
+                  {applicableTrades.length === 0 ? (
+                    <div className={styles.mutedHint} style={{ marginBottom: 8 }}>
+                      No workshop trades apply to this project type — the trades gate clears
+                      automatically.
+                    </div>
+                  ) : (
+                    applicableTrades.map((def) => (
+                      <TradeRow
+                        key={def.key}
+                        def={def}
+                        trade={trades[def.key]}
+                        defaultBy={currentUserName}
+                        readOnly={readOnly}
+                        open={openTrade === def.key}
+                        onToggle={() => setOpenTrade(openTrade === def.key ? "" : def.key)}
+                        onSignSub={(index, signoff) => onSignSub(def.key, index, signoff)}
+                        onUnsignSub={(index) => onUnsignSub(def.key, index)}
+                        onState={(state) => onSetTradeState(def.key, state)}
+                        onBlock={(blocked) => onSetBlocked(def.key, blocked)}
+                        onReason={(reason) => onSetReason(def.key, reason)}
+                      />
+                    ))
+                  )}
                 </>
               ) : null}
             </>
           )}
+
+          <SalesOrdersSection
+            salesOrders={project.salesOrders ?? []}
+            linkedJobs={linkedJobs}
+            readOnly={readOnly}
+            allowNewJob={showJobs}
+            showBuildWarning={stage === "build"}
+            onChange={onSalesOrdersChange}
+            onCreateJob={onCreateJob}
+          />
 
           {showJobs ? (
             <LinkedJobsSection
@@ -1151,6 +1442,7 @@ export default function ProjectDrawer({
           )}
         </div>
       </div>
-    </>
+    </div>,
+    document.body,
   );
 }

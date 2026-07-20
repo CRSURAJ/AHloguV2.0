@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import FeedbackMessage from "@/components/FeedbackMessage";
 import { useJobs } from "@/hooks/useJobs";
 import { useProjects } from "@/hooks/useProjects";
 import { WORKER_ROLE_OPTIONS } from "@/types/work";
-import type { Job, PermissionLevel, Project, WorkerRole } from "@/types/work";
+import type { Job, PermissionLevel, Project, ProjectSalesOrder, WorkerRole } from "@/types/work";
 
 import BaajBoard from "./BaajBoard";
 import type { DrawerFocus } from "./BaajBoard";
@@ -48,9 +49,10 @@ type JobFormState = {
   jobDocumentLinks: Job["jobDocumentLinks"];
   isActive: boolean;
   projectId: string;
+  salesOrderId: string;
 };
 
-type JobFormField = "caseNo" | "jobId" | "orderNo" | "jobName" | "customerName" | "assignedRoles";
+type JobFormField = "caseNo" | "jobId" | "jobName" | "customerName" | "assignedRoles";
 
 const EMPTY_FORM: JobFormState = {
   caseNo: "",
@@ -64,6 +66,7 @@ const EMPTY_FORM: JobFormState = {
   jobDocumentLinks: [],
   isActive: true,
   projectId: "",
+  salesOrderId: "",
 };
 
 export default function JobManagementPanel({
@@ -95,7 +98,7 @@ export default function JobManagementPanel({
     getProjectById,
   } = useProjects();
 
-  const [view, setView] = useState<PanelView>("board");
+  const [view, setView] = useState<PanelView>("dash");
   // Set when jumping from BaajBoard so the kanban opens that project's drawer
   // (optionally with the related history section expanded).
   const [focusProjectId, setFocusProjectId] = useState<string | null>(null);
@@ -112,7 +115,6 @@ export default function JobManagementPanel({
 
   const caseNoInputRef = useRef<HTMLInputElement>(null);
   const jobIdInputRef = useRef<HTMLInputElement>(null);
-  const orderNoInputRef = useRef<HTMLInputElement>(null);
   const jobNameInputRef = useRef<HTMLInputElement>(null);
   const customerNameInputRef = useRef<HTMLInputElement>(null);
   const assignedRolesRef = useRef<HTMLDivElement>(null);
@@ -120,6 +122,25 @@ export default function JobManagementPanel({
   const jobFormCardRef = useRef<HTMLDivElement>(null);
 
   const visibleJobs = useMemo(() => jobs.filter((job) => job.isArchived !== true), [jobs]);
+
+  const isFormDirty =
+    form.caseNo.trim() !== "" ||
+    form.jobId.trim() !== "" ||
+    form.orderNo.trim() !== "" ||
+    form.jobName.trim() !== "" ||
+    form.customerName.trim() !== "" ||
+    form.location.trim() !== "" ||
+    form.description.trim() !== "" ||
+    form.assignedRoles.length > 0 ||
+    form.jobDocumentLinks.length > 0 ||
+    form.projectId !== "" ||
+    form.salesOrderId !== "";
+
+  const formSalesOrders = form.projectId ? (getProjectById(form.projectId)?.salesOrders ?? []) : [];
+  // An edited job can point at a sales order that was since removed — keep the
+  // stale value visible (and clearable) instead of silently dropping it.
+  const staleSalesOrderId =
+    form.salesOrderId !== "" && !formSalesOrders.some((so) => so.id === form.salesOrderId);
 
   const sortedJobs = useMemo(
     () =>
@@ -212,6 +233,50 @@ export default function JobManagementPanel({
     clearJobFormError(field as JobFormField);
   }
 
+  function selectProject(projectId: string): void {
+    setForm((current) => {
+      const previous = current.projectId ? getProjectById(current.projectId) : undefined;
+      const next = projectId ? getProjectById(projectId) : undefined;
+      // The project's ref IS the case number — auto-fill it, but never
+      // clobber a hand-typed value.
+      const fillCaseNo =
+        next && (current.caseNo.trim() === "" || current.caseNo.trim() === previous?.projectRef);
+
+      return {
+        ...current,
+        projectId,
+        // A sales order belongs to its project — changing project clears it.
+        salesOrderId: "",
+        caseNo: fillCaseNo ? next.projectRef : current.caseNo,
+      };
+    });
+
+    if (jobMessage) clearJobMessage();
+    if (jobDocumentMessage) setJobDocumentMessage("");
+  }
+
+  function selectSalesOrder(salesOrderId: string): void {
+    setForm((current) => {
+      const orders = current.projectId
+        ? (getProjectById(current.projectId)?.salesOrders ?? [])
+        : [];
+      const previous = orders.find((so) => so.id === current.salesOrderId);
+      const next = orders.find((so) => so.id === salesOrderId);
+      // Auto-fill Sales Order No. (job.orderNo) — never clobber a hand-typed value.
+      const fillSoNumber =
+        next && (current.orderNo.trim() === "" || current.orderNo.trim() === previous?.soNumber);
+
+      return {
+        ...current,
+        salesOrderId,
+        orderNo: fillSoNumber ? next.soNumber : current.orderNo,
+      };
+    });
+
+    if (jobMessage) clearJobMessage();
+    if (jobDocumentMessage) setJobDocumentMessage("");
+  }
+
   function toggleRole(role: WorkerRole): void {
     setForm((current) => {
       const hasRole = current.assignedRoles.includes(role);
@@ -265,6 +330,7 @@ export default function JobManagementPanel({
       jobDocumentLinks: job.jobDocumentLinks ?? [],
       isActive: job.isActive,
       projectId: job.projectId ?? "",
+      salesOrderId: job.salesOrderId ?? "",
     });
 
     if (jobMessage) clearJobMessage();
@@ -328,11 +394,6 @@ export default function JobManagementPanel({
 
     if (!form.jobId.trim()) {
       markJobFormError("jobId", "Job ID is required.", jobIdInputRef);
-      return;
-    }
-
-    if (!form.orderNo.trim()) {
-      markJobFormError("orderNo", "Order No. is required.", orderNoInputRef);
       return;
     }
 
@@ -500,13 +561,17 @@ export default function JobManagementPanel({
             onCreateProject={handleCreateProject}
             onUpdateProject={handleUpdateProject}
             onDeleteProject={handleDeleteProject}
-            onCreateJobForProject={(project: Project) => {
+            onCreateJobForProject={(project: Project, salesOrder?: ProjectSalesOrder) => {
               resetForm();
               setForm({
                 ...EMPTY_FORM,
                 projectId: project.id,
                 customerName: project.customerName,
                 location: project.location,
+                salesOrderId: salesOrder?.id ?? "",
+                // The project's ref IS the case number; job.orderNo holds the SO no.
+                caseNo: project.projectRef,
+                orderNo: salesOrder?.soNumber ?? "",
               });
               setView("jobs");
               focusJobFormCard();
@@ -592,10 +657,30 @@ export default function JobManagementPanel({
                       <button className={styles.textButton} type="button" onClick={resetForm}>
                         Cancel Edit
                       </button>
+                    ) : isFormDirty ? (
+                      <button className={styles.textButton} type="button" onClick={resetForm}>
+                        Clear form
+                      </button>
                     ) : null}
                   </div>
 
                   <div className={styles.formGrid}>
+                    <label className={styles.spanRow}>
+                      Project
+                      <select
+                        value={form.projectId}
+                        onChange={(event) => selectProject(event.target.value)}
+                      >
+                        <option value="">No project (stand-alone job)</option>
+                        {projects.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {project.customerName || project.projectRef}
+                            {project.projectRef ? ` (${project.projectRef})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
                     <label>
                       Case No.
                       <input
@@ -607,6 +692,29 @@ export default function JobManagementPanel({
                       />
                     </label>
 
+                    {formSalesOrders.length > 0 || staleSalesOrderId ? (
+                      <label>
+                        Sales Order
+                        <select
+                          value={form.salesOrderId}
+                          onChange={(event) => selectSalesOrder(event.target.value)}
+                        >
+                          <option value="">No sales order</option>
+                          {staleSalesOrderId ? (
+                            <option value={form.salesOrderId} disabled>
+                              (deleted sales order)
+                            </option>
+                          ) : null}
+                          {formSalesOrders.map((so) => (
+                            <option key={so.id} value={so.id}>
+                              {so.soNumber}
+                              {so.label ? ` — ${so.label}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+
                     <label>
                       Job ID
                       <input
@@ -615,17 +723,6 @@ export default function JobManagementPanel({
                         value={form.jobId}
                         onChange={(event) => updateField("jobId", event.target.value)}
                         aria-invalid={jobErrorField === "jobId"}
-                      />
-                    </label>
-
-                    <label>
-                      Order No.
-                      <input
-                        ref={orderNoInputRef}
-                        className={getJobInputClass("orderNo")}
-                        value={form.orderNo}
-                        onChange={(event) => updateField("orderNo", event.target.value)}
-                        aria-invalid={jobErrorField === "orderNo"}
                       />
                     </label>
 
@@ -649,22 +746,6 @@ export default function JobManagementPanel({
                         onChange={(event) => updateField("customerName", event.target.value)}
                         aria-invalid={jobErrorField === "customerName"}
                       />
-                    </label>
-
-                    <label>
-                      Project
-                      <select
-                        value={form.projectId}
-                        onChange={(event) => updateField("projectId", event.target.value)}
-                      >
-                        <option value="">No project (stand-alone job)</option>
-                        {projects.map((project) => (
-                          <option key={project.id} value={project.id}>
-                            {project.customerName || project.projectRef}
-                            {project.projectRef ? ` (${project.projectRef})` : ""}
-                          </option>
-                        ))}
-                      </select>
                     </label>
 
                     <div className={styles.docsField}>
@@ -706,71 +787,76 @@ export default function JobManagementPanel({
                     </div>
                   ) : null}
 
-                  {isJobDocumentDialogOpen ? (
-                    <div className={styles.modalBackdrop}>
-                      <form
-                        className={styles.modalCard}
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          addJobDocumentLink();
-                        }}
-                      >
-                        <h2 className={styles.modalTitle}>Add Technical Document</h2>
-
-                        <p className={styles.modalDescription}>
-                          Add a OneDrive or SharePoint technical-document link. AHlogu stores the
-                          link only; the original file remains in OneDrive or SharePoint.
-                        </p>
-
-                        <FeedbackMessage message={jobDocumentMessage} />
-
-                        <label className={styles.modalField}>
-                          <span className={styles.modalLabel}>Document Title</span>
-                          <input
-                            className={styles.modalInput}
-                            autoFocus
-                            value={jobDocumentTitle}
-                            onChange={(event) => {
-                              setJobDocumentTitle(event.target.value);
-                              if (jobDocumentMessage) setJobDocumentMessage("");
-                            }}
-                            placeholder="e.g. P&ID Rev C, Electrical schematic"
-                          />
-                        </label>
-
-                        <label className={styles.modalField}>
-                          <span className={styles.modalLabel}>Document Link</span>
-                          <input
-                            className={styles.modalInput}
-                            type="url"
-                            value={jobDocumentUrl}
-                            onChange={(event) => {
-                              setJobDocumentUrl(event.target.value);
-                              if (jobDocumentMessage) setJobDocumentMessage("");
-                            }}
-                            placeholder="https://..."
-                          />
-                        </label>
-
-                        <div className={styles.modalActions}>
-                          <button
-                            type="button"
-                            className={styles.secondaryButton}
-                            onClick={() => {
-                              setJobDocumentMessage("");
-                              setIsJobDocumentDialogOpen(false);
+                  {isJobDocumentDialogOpen
+                    ? // Portal to <body> — the backdrop's `backdrop-filter`
+                      // re-anchors position:fixed to its scrolled content.
+                      createPortal(
+                        <div className={styles.modalBackdrop}>
+                          <form
+                            className={styles.modalCard}
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              addJobDocumentLink();
                             }}
                           >
-                            Cancel
-                          </button>
+                            <h2 className={styles.modalTitle}>Add Technical Document</h2>
 
-                          <button type="submit" className={styles.primaryButton}>
-                            Add Technical Document
-                          </button>
-                        </div>
-                      </form>
-                    </div>
-                  ) : null}
+                            <p className={styles.modalDescription}>
+                              Add a OneDrive or SharePoint technical-document link. AHlogu stores
+                              the link only; the original file remains in OneDrive or SharePoint.
+                            </p>
+
+                            <FeedbackMessage message={jobDocumentMessage} />
+
+                            <label className={styles.modalField}>
+                              <span className={styles.modalLabel}>Document Title</span>
+                              <input
+                                className={styles.modalInput}
+                                autoFocus
+                                value={jobDocumentTitle}
+                                onChange={(event) => {
+                                  setJobDocumentTitle(event.target.value);
+                                  if (jobDocumentMessage) setJobDocumentMessage("");
+                                }}
+                                placeholder="e.g. P&ID Rev C, Electrical schematic"
+                              />
+                            </label>
+
+                            <label className={styles.modalField}>
+                              <span className={styles.modalLabel}>Document Link</span>
+                              <input
+                                className={styles.modalInput}
+                                type="url"
+                                value={jobDocumentUrl}
+                                onChange={(event) => {
+                                  setJobDocumentUrl(event.target.value);
+                                  if (jobDocumentMessage) setJobDocumentMessage("");
+                                }}
+                                placeholder="https://..."
+                              />
+                            </label>
+
+                            <div className={styles.modalActions}>
+                              <button
+                                type="button"
+                                className={styles.secondaryButton}
+                                onClick={() => {
+                                  setJobDocumentMessage("");
+                                  setIsJobDocumentDialogOpen(false);
+                                }}
+                              >
+                                Cancel
+                              </button>
+
+                              <button type="submit" className={styles.primaryButton}>
+                                Add Technical Document
+                              </button>
+                            </div>
+                          </form>
+                        </div>,
+                        document.body,
+                      )
+                    : null}
 
                   <label className={styles.fullWidthLabel}>
                     Description / Notes

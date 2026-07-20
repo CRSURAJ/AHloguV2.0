@@ -51,6 +51,16 @@
   background: var(--surface);
 }
 
+.root select {
+  /* Native dropdown list renders in the browser's light theme without this. */
+  color-scheme: dark;
+}
+
+.root select option {
+  background: var(--surface);
+  color: var(--ink);
+}
+
 .root input:focus,
 .root textarea:focus,
 .root select:focus {
@@ -82,7 +92,7 @@
 .seg {
   display: flex;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
 }
 
@@ -91,6 +101,7 @@
   background: var(--surface);
   padding: 6px 12px;
   font-size: 13px;
+  font-weight: 600;
   color: var(--muted);
   cursor: pointer;
 }
@@ -377,8 +388,9 @@
 }
 
 .dhead h2 {
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--heading);
   margin: 0;
   letter-spacing: -0.01em;
 }
@@ -405,9 +417,10 @@
 
 .fact .k {
   font-size: 11px;
+  font-weight: 600;
   color: var(--faint);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
 
 .fact .v {
@@ -432,9 +445,10 @@
 
 .dk {
   font-size: 11px;
+  font-weight: 600;
   color: var(--faint);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -1041,8 +1055,9 @@ button.b.warn {
 
 .dialogTitle {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--heading);
   letter-spacing: -0.01em;
 }
 
@@ -1055,7 +1070,7 @@ button.b.warn {
   font-size: 11px;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   font-weight: 600;
 }
 
@@ -1130,10 +1145,13 @@ button.b.warn {
   min-height: 0;
 }
 
-/* Floating brand "jet arrow" — vertically centered over the board edge. */
+/* Floating brand "jet arrow" — sticky, so it rides mid-viewport while the
+   page scrolls through a tall board instead of sitting at the board's
+   geometric middle (which can be below the fold). */
 .navArrow {
-  position: absolute;
-  top: 50%;
+  position: sticky;
+  top: 42vh;
+  align-self: flex-start;
   z-index: 5;
   border: 0;
   background: transparent;
@@ -1144,26 +1162,29 @@ button.b.warn {
   transition:
     transform 0.12s,
     filter 0.12s;
-  transform: translateY(-50%);
 }
 
 .navArrow:hover {
-  transform: translateY(-50%) scale(1.12);
+  transform: scale(1.12);
   filter: drop-shadow(0 0 14px rgba(83, 188, 123, 0.55));
 }
 
 .navArrow:active {
-  transform: translateY(-50%) scale(1.02);
+  transform: scale(1.02);
 }
 
+/* Negative margins cancel the buttons' layout width so the board keeps its
+   full width — the arrows hang over the edges like before. */
 .navArrowLeft {
-  left: -42px;
+  margin-left: -46px;
+  margin-right: -32px;
   /* Grow inward on hover — outer edge stays put so nothing overflows. */
   transform-origin: left center;
 }
 
 .navArrowRight {
-  right: -42px;
+  margin-right: -46px;
+  margin-left: -32px;
   transform-origin: right center;
 }
 
@@ -1193,10 +1214,10 @@ button.b.warn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 9px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   color: var(--faint);
 }
 

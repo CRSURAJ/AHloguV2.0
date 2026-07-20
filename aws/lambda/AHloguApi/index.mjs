@@ -443,6 +443,33 @@ function cleanProjectDepartment(value) {
   return value === "install" || value === "service" ? value : "install";
 }
 
+const PROJECT_TYPES = new Set(["supply_loose", "prefab", "prefab_install", "supply_loose_install"]);
+
+// Legacy projects have no type — null means "all trades apply" on the client.
+function cleanProjectType(value) {
+  return PROJECT_TYPES.has(value) ? value : null;
+}
+
+function cleanProjectSalesOrders(value) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .slice(0, 100)
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+
+      const soNumber = cleanText(entry.soNumber, 60);
+      if (!soNumber) return null;
+
+      return {
+        id: cleanText(entry.id, 120) || randomUUID(),
+        soNumber,
+        label: cleanText(entry.label, 300),
+      };
+    })
+    .filter(Boolean);
+}
+
 function cleanIsoDateOrNull(value) {
   const str = cleanString(value);
   if (!str) return null;
@@ -1202,6 +1229,7 @@ async function createJob(event) {
     jobDocumentLinks: Array.isArray(body.jobDocumentLinks) ? body.jobDocumentLinks : [],
     isActive: typeof body.isActive === "boolean" ? body.isActive : true,
     projectId: cleanText(body.projectId, 120),
+    salesOrderId: cleanText(body.salesOrderId, 120),
     createdAt: now,
     updatedAt: now,
     createdBy: profile.user.id,
@@ -1324,6 +1352,10 @@ async function updateJob(event, path) {
       body.projectId !== undefined
         ? cleanText(body.projectId, 120)
         : cleanText(existing.projectId, 120),
+    salesOrderId:
+      body.salesOrderId !== undefined
+        ? cleanText(body.salesOrderId, 120)
+        : cleanText(existing.salesOrderId, 120),
     isArchived: false,
     createdAt: cleanString(existing.createdAt),
     createdBy: cleanString(existing.createdBy),
@@ -1527,6 +1559,18 @@ function buildProjectItem(body, existing = {}) {
       body.department !== undefined
         ? cleanProjectDepartment(body.department)
         : cleanProjectDepartment(existing.department),
+    projectType:
+      body.projectType !== undefined
+        ? cleanProjectType(body.projectType)
+        : cleanProjectType(existing.projectType),
+    controlPanel:
+      body.controlPanel !== undefined
+        ? body.controlPanel === true
+        : existing.controlPanel !== false,
+    salesOrders:
+      body.salesOrders !== undefined
+        ? cleanProjectSalesOrders(body.salesOrders)
+        : cleanProjectSalesOrders(existing.salesOrders),
     value: body.value !== undefined ? cleanText(body.value, 60) : cleanText(existing.value, 60),
     valueAmount:
       body.valueAmount !== undefined

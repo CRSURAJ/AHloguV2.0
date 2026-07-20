@@ -1,17 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 import {
   formatDate,
   getStage,
   getStageTarget,
   isProjectBlocked,
+  PROJECT_TYPE_OPTIONS,
   stageAgeDays,
   stageIndex,
   STAGES,
 } from "@/lib/projectManagement";
-import type { Project, ProjectDepartment } from "@/types/work";
+import type { Project, ProjectType } from "@/types/work";
 
 import styles from "./gantt.module.css";
 
@@ -22,7 +24,7 @@ type GanttViewProps = {
   onOpenProject: (project: Project) => void;
 };
 
-type DeptFilter = "all" | ProjectDepartment;
+type TypeFilter = "all" | ProjectType;
 
 type SegmentState = "done" | "current" | "late" | "plan";
 
@@ -227,118 +229,125 @@ function ProjectGanttDialog({
     actual: actuals.filter((span) => span.key === stage.key),
   }));
 
-  return (
-    <div className={styles.popScrim} onClick={onClose}>
-      <div className={styles.pop} onClick={(event) => event.stopPropagation()}>
-        <div className={styles.popHead}>
-          <div>
-            <h3>{projectTitle(project)}</h3>
-            <div className={styles.sub}>
-              {project.projectRef || "—"} · {STAGES[stageIndex(currentKey)].label}
-              {isProjectBlocked(project) ? " · blocked" : ""}
-              {project.deliveryDate ? ` · delivery ${formatDate(project.deliveryDate)}` : ""}
-            </div>
-          </div>
-          <button type="button" className={styles.popClose} onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </div>
-
-        <div className={styles.popChart} onClick={onOpenBoard} title="Open in KannBoard">
-          <div className={styles.popLabels}>
-            <div className={styles.axisSpacer} />
-            {stageRows.map(({ def }) => (
-              <div
-                className={`${styles.popStage} ${def.key === currentKey ? styles.cur : ""}`}
-                key={def.key}
-              >
-                {def.label}
+  // Portal to <body> — the panel backdrop's `backdrop-filter` re-anchors
+  // position:fixed to its scrolled content instead of the viewport. The
+  // `styles.root` wrapper re-scopes the Gantt CSS variables for the popup.
+  return createPortal(
+    <div className={styles.root}>
+      <div className={styles.popScrim} onClick={onClose}>
+        <div className={styles.pop} onClick={(event) => event.stopPropagation()}>
+          <div className={styles.popHead}>
+            <div>
+              <h3>{projectTitle(project)}</h3>
+              <div className={styles.sub}>
+                {project.projectRef || "—"} · {STAGES[stageIndex(currentKey)].label}
+                {isProjectBlocked(project) ? " · blocked" : ""}
+                {project.deliveryDate ? ` · delivery ${formatDate(project.deliveryDate)}` : ""}
               </div>
-            ))}
+            </div>
+            <button type="button" className={styles.popClose} onClick={onClose} aria-label="Close">
+              ✕
+            </button>
           </div>
 
-          <div className={styles.popTimeline}>
-            <div className={styles.gaxis}>
-              {ticks.map((tick) => (
-                <span className={styles.tick} key={tick.ms} style={{ left: `${pct(tick.ms)}%` }}>
-                  {tick.label}
-                </span>
+          <div className={styles.popChart} onClick={onOpenBoard} title="Open in KannBoard">
+            <div className={styles.popLabels}>
+              <div className={styles.axisSpacer} />
+              {stageRows.map(({ def }) => (
+                <div
+                  className={`${styles.popStage} ${def.key === currentKey ? styles.cur : ""}`}
+                  key={def.key}
+                >
+                  {def.label}
+                </div>
               ))}
             </div>
-            {ticks.map((tick) => (
-              <div
-                className={styles.gridline}
-                key={`l-${tick.ms}`}
-                style={{ left: `${pct(tick.ms)}%` }}
-              />
-            ))}
-            <div className={styles.todayline} style={{ left: `${pct(now)}%` }} />
-            <span className={styles.todaytag} style={{ left: `${pct(now)}%` }}>
-              today
-            </span>
-            {!Number.isNaN(deliveryMs) ? (
-              <>
-                <div className={styles.deliveryline} style={{ left: `${pct(deliveryMs)}%` }} />
-                <span className={styles.deliverytag} style={{ left: `${pct(deliveryMs)}%` }}>
-                  delivery
-                </span>
-              </>
-            ) : null}
 
-            {stageRows.map(({ def, planned, actual }) => (
-              <div className={styles.popTrack} key={def.key}>
-                {planned ? (
-                  <div
-                    className={`${styles.gseg} ${
-                      planned.state === "done"
-                        ? styles.gsegDone
-                        : planned.state === "current"
-                          ? styles.gsegCur
-                          : planned.state === "late"
-                            ? styles.gsegLate
-                            : styles.gsegPlan
-                    }`}
-                    style={{
-                      top: "22%",
-                      height: "28%",
-                      left: `${pct(planned.startMs)}%`,
-                      width: `max(calc(${pct(planned.endMs) - pct(planned.startMs)}% - 2px), 4px)`,
-                    }}
-                    title={`${def.label} · target ${formatDate(new Date(planned.endMs).toISOString())}`}
-                  />
-                ) : null}
-                {actual.map((span, index) => (
-                  <div
-                    className={`${styles.aseg} ${span.open ? styles.asegOpen : ""}`}
-                    key={index}
-                    style={{
-                      top: "58%",
-                      height: "20%",
-                      left: `${pct(span.startMs)}%`,
-                      width: `max(calc(${pct(span.endMs) - pct(span.startMs)}% - 2px), 4px)`,
-                    }}
-                    title={`Actual · ${span.label} · ${formatDate(
-                      new Date(span.realStartMs).toISOString(),
-                    )} → ${span.open ? "now" : formatDate(new Date(span.realEndMs).toISOString())}`}
-                  />
+            <div className={styles.popTimeline}>
+              <div className={styles.gaxis}>
+                {ticks.map((tick) => (
+                  <span className={styles.tick} key={tick.ms} style={{ left: `${pct(tick.ms)}%` }}>
+                    {tick.label}
+                  </span>
                 ))}
               </div>
-            ))}
+              {ticks.map((tick) => (
+                <div
+                  className={styles.gridline}
+                  key={`l-${tick.ms}`}
+                  style={{ left: `${pct(tick.ms)}%` }}
+                />
+              ))}
+              <div className={styles.todayline} style={{ left: `${pct(now)}%` }} />
+              <span className={styles.todaytag} style={{ left: `${pct(now)}%` }}>
+                today
+              </span>
+              {!Number.isNaN(deliveryMs) ? (
+                <>
+                  <div className={styles.deliveryline} style={{ left: `${pct(deliveryMs)}%` }} />
+                  <span className={styles.deliverytag} style={{ left: `${pct(deliveryMs)}%` }}>
+                    delivery
+                  </span>
+                </>
+              ) : null}
+
+              {stageRows.map(({ def, planned, actual }) => (
+                <div className={styles.popTrack} key={def.key}>
+                  {planned ? (
+                    <div
+                      className={`${styles.gseg} ${
+                        planned.state === "done"
+                          ? styles.gsegDone
+                          : planned.state === "current"
+                            ? styles.gsegCur
+                            : planned.state === "late"
+                              ? styles.gsegLate
+                              : styles.gsegPlan
+                      }`}
+                      style={{
+                        top: "22%",
+                        height: "28%",
+                        left: `${pct(planned.startMs)}%`,
+                        width: `max(calc(${pct(planned.endMs) - pct(planned.startMs)}% - 2px), 4px)`,
+                      }}
+                      title={`${def.label} · target ${formatDate(new Date(planned.endMs).toISOString())}`}
+                    />
+                  ) : null}
+                  {actual.map((span, index) => (
+                    <div
+                      className={`${styles.aseg} ${span.open ? styles.asegOpen : ""}`}
+                      key={index}
+                      style={{
+                        top: "58%",
+                        height: "20%",
+                        left: `${pct(span.startMs)}%`,
+                        width: `max(calc(${pct(span.endMs) - pct(span.startMs)}% - 2px), 4px)`,
+                      }}
+                      title={`Actual · ${span.label} · ${formatDate(
+                        new Date(span.realStartMs).toISOString(),
+                      )} → ${span.open ? "now" : formatDate(new Date(span.realEndMs).toISOString())}`}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.popFoot}>
+            <span className={styles.popHint}>
+              Top bar = target, bottom bar = actual. Click the chart to open the project in
+              KannBoard.
+            </span>
           </div>
         </div>
-
-        <div className={styles.popFoot}>
-          <span className={styles.popHint}>
-            Top bar = target, bottom bar = actual. Click the chart to open the project in KannBoard.
-          </span>
-        </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
 export default function GanttView({ projects, isLoadingProjects, onOpenProject }: GanttViewProps) {
-  const [filter, setFilter] = useState<DeptFilter>("all");
+  const [filter, setFilter] = useState<TypeFilter>("all");
   // First click opens the drill-in popup; from there on to the kanban drawer.
   const [selProject, setSelProject] = useState<Project | null>(null);
   // Captured once on mount — the "today" anchor for the whole chart.
@@ -348,7 +357,7 @@ export default function GanttView({ projects, isLoadingProjects, onOpenProject }
     () =>
       projects
         .filter((p) => getStage(p) !== "closed")
-        .filter((p) => filter === "all" || p.department === filter)
+        .filter((p) => filter === "all" || p.projectType === filter)
         .map((project) => ({
           project,
           segments: buildSegments(project, now),
@@ -397,14 +406,21 @@ export default function GanttView({ projects, isLoadingProjects, onOpenProject }
     <div className={styles.root}>
       <div className={styles.toolbar}>
         <div className={styles.seg}>
-          {(["all", "install", "service"] as const).map((value) => (
+          <button
+            type="button"
+            className={filter === "all" ? styles.on : ""}
+            onClick={() => setFilter("all")}
+          >
+            All
+          </button>
+          {PROJECT_TYPE_OPTIONS.map((option) => (
             <button
-              key={value}
+              key={option.value}
               type="button"
-              className={filter === value ? styles.on : ""}
-              onClick={() => setFilter(value)}
+              className={filter === option.value ? styles.on : ""}
+              onClick={() => setFilter(option.value)}
             >
-              {value === "all" ? "All" : value[0].toUpperCase() + value.slice(1)}
+              {option.label}
             </button>
           ))}
         </div>

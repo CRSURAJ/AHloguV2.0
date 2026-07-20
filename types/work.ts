@@ -111,6 +111,23 @@ export type ProjectStageKey =
 export type ProjectDepartment = "install" | "service";
 
 /**
+ * Scope-of-work variant agreed at handover. Drives which Build-stage trades
+ * apply. `null` on legacy projects — treated as "all trades apply".
+ */
+export type ProjectType = "supply_loose" | "prefab" | "prefab_install" | "supply_loose_install";
+
+/**
+ * A sales order recorded at Handover — one per building/plant in the project.
+ * At Build, each sales order gets a worker Job (linked via `Job.salesOrderId`).
+ */
+export type ProjectSalesOrder = {
+  id: string;
+  soNumber: string;
+  /** Building / plant name this sales order covers. */
+  label: string;
+};
+
+/**
  * A recorded approval on an exit-criterion or trade sub-step. The record is
  * kept for audit — a comment is required when no document link is attached.
  */
@@ -190,6 +207,12 @@ export type Project = {
   location: string;
   description: string;
   department: ProjectDepartment;
+  /** Scope variant; `null` on legacy projects (all trades apply). */
+  projectType: ProjectType | null;
+  /** Whether a control panel is in scope — gates the controller trade. */
+  controlPanel: boolean;
+  /** Sales orders recorded at Handover; each gets a Job at Build. */
+  salesOrders: ProjectSalesOrder[];
   /** Contract value as typed, e.g. "$186k" — kept for display. */
   value: string;
   /** Contract value in whole dollars for sums; null when not parseable/set. */
@@ -231,6 +254,8 @@ export type Job = {
   updatedAt: string;
   /** Record id of the Project this job was created under (Build phase). */
   projectId?: string;
+  /** `ProjectSalesOrder.id` this job was created from. */
+  salesOrderId?: string;
 };
 
 export type WorkerLiveStatusValue =

@@ -7,12 +7,14 @@ import type {
   ProjectDateLogEntry,
   ProjectDepartment,
   ProjectGates,
+  ProjectSalesOrder,
   ProjectSignOff,
   ProjectStageKey,
   ProjectStageTargets,
   ProjectTrade,
   ProjectTradeChecklistItem,
   ProjectTrades,
+  ProjectType,
   TradeState,
 } from "@/types/work";
 
@@ -26,6 +28,9 @@ export type CreateProjectInput = {
   location?: string;
   description?: string;
   department?: ProjectDepartment;
+  projectType?: ProjectType | null;
+  controlPanel?: boolean;
+  salesOrders?: ProjectSalesOrder[];
   value?: string;
   valueAmount?: number | null;
   stage?: ProjectStageKey;
@@ -125,6 +130,40 @@ function cleanStage(value: unknown): ProjectStageKey {
 
 function cleanDepartment(value: unknown): ProjectDepartment {
   return value === "install" || value === "service" ? value : "install";
+}
+
+const PROJECT_TYPES = new Set<ProjectType>([
+  "supply_loose",
+  "prefab",
+  "prefab_install",
+  "supply_loose_install",
+]);
+
+function cleanProjectType(value: unknown): ProjectType | null {
+  return typeof value === "string" && PROJECT_TYPES.has(value as ProjectType)
+    ? (value as ProjectType)
+    : null;
+}
+
+function cleanSalesOrders(value: unknown): ProjectSalesOrder[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((entry, index): ProjectSalesOrder | null => {
+      if (!entry || typeof entry !== "object") return null;
+
+      const item = entry as Partial<ProjectSalesOrder>;
+      const soNumber = cleanString(item.soNumber);
+
+      if (!soNumber) return null;
+
+      return {
+        id: cleanString(item.id) || makeId(`so-${index}`),
+        soNumber,
+        label: cleanString(item.label),
+      };
+    })
+    .filter((entry): entry is ProjectSalesOrder => entry !== null);
 }
 
 function cleanValueAmount(value: unknown): number | null {
@@ -315,6 +354,9 @@ function normalizeProject(value: unknown, index: number): Project | null {
     location: cleanString(item.location),
     description: cleanString(item.description),
     department: cleanDepartment(item.department),
+    projectType: cleanProjectType(item.projectType),
+    controlPanel: item.controlPanel !== false,
+    salesOrders: cleanSalesOrders(item.salesOrders),
     value: cleanString(item.value),
     valueAmount: cleanValueAmount(item.valueAmount) ?? parseMoney(cleanString(item.value)),
     stage: cleanStage(item.stage),
@@ -397,6 +439,9 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
     location: input.location?.trim() ?? "",
     description: input.description?.trim() ?? "",
     department: input.department ?? "install",
+    projectType: input.projectType ?? null,
+    controlPanel: input.controlPanel !== false,
+    salesOrders: input.salesOrders ?? [],
     value: input.value?.trim() ?? "",
     valueAmount:
       input.valueAmount !== undefined ? input.valueAmount : parseMoney(input.value ?? ""),
@@ -449,6 +494,12 @@ export async function updateProject(
     location: updates.location?.trim() ?? existingProject.location,
     description: updates.description?.trim() ?? existingProject.description,
     department: updates.department ?? existingProject.department,
+    projectType:
+      updates.projectType !== undefined ? updates.projectType : existingProject.projectType,
+    controlPanel:
+      updates.controlPanel !== undefined ? updates.controlPanel : existingProject.controlPanel,
+    salesOrders:
+      updates.salesOrders !== undefined ? updates.salesOrders : existingProject.salesOrders,
     value: updates.value?.trim() ?? existingProject.value,
     valueAmount:
       updates.valueAmount !== undefined

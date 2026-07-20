@@ -7,6 +7,7 @@ import type {
   ProjectStageTargets,
   ProjectTrade,
   ProjectTrades,
+  ProjectType,
 } from "@/types/work";
 
 /**
@@ -35,6 +36,16 @@ export const DEPARTMENT_OPTIONS: ReadonlyArray<{ value: ProjectDepartment; label
   { value: "service", label: "Service" },
 ];
 
+export const PROJECT_TYPE_OPTIONS: ReadonlyArray<{ value: ProjectType; label: string }> = [
+  { value: "supply_loose", label: "Supply Loose" },
+  { value: "prefab", label: "Pre-Fab" },
+  { value: "prefab_install", label: "Pre-Fab + Install" },
+  { value: "supply_loose_install", label: "Supply Loose + Install" },
+];
+
+export const projectTypeLabel = (type: ProjectType | null | undefined): string =>
+  PROJECT_TYPE_OPTIONS.find((option) => option.value === type)?.label ?? "Not set";
+
 export type TradeDef = {
   key: string;
   label: string;
@@ -57,6 +68,34 @@ export const CHECKLISTS: Record<string, string[]> = {
   controller: ["Wire & program", "Bench test", "Commission params"],
 };
 
+/**
+ * Non-controller trade keys per project type. Legacy projects (`null` type)
+ * keep all three so pre-existing Build gates behave exactly as before.
+ */
+const BASE_TRADE_KEYS: Record<ProjectType | "unset", ReadonlyArray<string>> = {
+  supply_loose: [],
+  prefab: ["plumbing", "electrical", "prefab"],
+  prefab_install: ["plumbing", "electrical", "prefab"],
+  supply_loose_install: ["plumbing", "electrical"],
+  unset: ["plumbing", "electrical", "prefab"],
+};
+
+export const getProjectType = (project: Project): ProjectType | null => project.projectType ?? null;
+
+/** Absent on legacy records — treated as "panel in scope". */
+export const hasControlPanel = (project: Project): boolean => project.controlPanel !== false;
+
+/**
+ * Trades applicable to this project given its type and control-panel flag.
+ * Stored trade progress is never deleted — non-applicable trades are simply
+ * hidden and ignored by the Build gate.
+ */
+export function tradesForProject(project: Project): TradeDef[] {
+  const keys = new Set(BASE_TRADE_KEYS[getProjectType(project) ?? "unset"]);
+  if (hasControlPanel(project)) keys.add("controller");
+  return TRADES.filter((trade) => keys.has(trade.key));
+}
+
 export type ExitCriterion = {
   id: string;
   label: string;
@@ -64,7 +103,12 @@ export type ExitCriterion = {
   owner: string;
   /** When set to "trades", the criterion clears automatically once all trades are done. */
   auto?: "trades";
+  /** Restricts the criterion to projects where it's relevant; absent = always applies. */
+  appliesWhen?: (project: Project) => boolean;
 };
+
+/** Loose-supplied equipment needs no engineering package of its own. */
+const notSupplyLoose = (project: Project): boolean => getProjectType(project) !== "supply_loose";
 
 export const EXIT_CRITERIA: Record<ProjectStageKey, ExitCriterion[]> = {
   handover: [
@@ -81,11 +125,37 @@ export const EXIT_CRITERIA: Record<ProjectStageKey, ExitCriterion[]> = {
     { id: "recv", label: "Materials to start build received", owner: "Stores" },
   ],
   engineering: [
-    { id: "draw", label: "Shop drawings issued", owner: "Engineering" },
-    { id: "bom", label: "Bill of materials finalised", owner: "Engineering" },
-    { id: "ctrl", label: "Controller spec confirmed", owner: "Controls" },
-    { id: "approve", label: "Customer approved drawings", owner: "Project manager" },
-    { id: "eta", label: "Delivery dates confirmed", owner: "Procurement" },
+    {
+      id: "draw",
+      label: "Shop drawings issued",
+      owner: "Engineering",
+      appliesWhen: notSupplyLoose,
+    },
+    {
+      id: "bom",
+      label: "Bill of materials finalised",
+      owner: "Engineering",
+      appliesWhen: notSupplyLoose,
+    },
+    // A controller spec only exists when a panel is in scope — any project type.
+    {
+      id: "ctrl",
+      label: "Controller spec confirmed",
+      owner: "Controls",
+      appliesWhen: hasControlPanel,
+    },
+    {
+      id: "approve",
+      label: "Customer approved drawings",
+      owner: "Project manager",
+      appliesWhen: notSupplyLoose,
+    },
+    {
+      id: "eta",
+      label: "Delivery dates confirmed",
+      owner: "Procurement",
+      appliesWhen: notSupplyLoose,
+    },
   ],
   build: [
     {
@@ -119,6 +189,16 @@ export const EXIT_CRITERIA: Record<ProjectStageKey, ExitCriterion[]> = {
 };
 
 export const stageIndex = (key: ProjectStageKey): number => STAGE_KEYS.indexOf(key);
+
+/**
+ * Exit criteria applicable to this project at a stage. A stage left with no
+ * criteria (e.g. Engineering on a panel-less Supply Loose) auto-completes.
+ */
+export function criteriaForProject(project: Project, stage: ProjectStageKey): ExitCriterion[] {
+  return (EXIT_CRITERIA[stage] ?? []).filter(
+    (criterion) => !criterion.appliesWhen || criterion.appliesWhen(project),
+  );
+}
 
 /** Builds the default trade structure (all not-started, nothing signed off). */
 export function makeInitialTrades(): ProjectTrades {
@@ -194,7 +274,7 @@ export const tradeDone = (trade: ProjectTrade): boolean =>
 
 export function allTradesDone(project: Project): boolean {
   const trades = getTrades(project);
-  return TRADES.every((trade) => tradeDone(trades[trade.key]));
+  return tradesForProject(project).every((trade) => tradeDone(trades[trade.key]));
 }
 
 export const checklistDone = (trade: ProjectTrade): number =>
@@ -222,13 +302,13 @@ export function gateProgress(
   project: Project,
   stage: ProjectStageKey = getStage(project),
 ): [number, number] {
-  const criteria = EXIT_CRITERIA[stage] ?? [];
+  const criteria = criteriaForProject(project, stage);
   return [criteria.filter((c) => criterionMet(project, stage, c)).length, criteria.length];
 }
 
 export function stageComplete(project: Project): boolean {
   const stage = getStage(project);
-  return (EXIT_CRITERIA[stage] ?? []).every((c) => criterionMet(project, stage, c));
+  return criteriaForProject(project, stage).every((c) => criterionMet(project, stage, c));
 }
 
 export function canDropOn(project: Project, targetKey: ProjectStageKey): boolean {
@@ -260,17 +340,27 @@ export function makeActivityEntry(
   };
 }
 
-/** Project-detail fields whose edits are recorded in the activity log. */
+/**
+ * Project-detail fields whose edits are recorded in the activity log.
+ * `current` renders the stored value as a display string so non-string fields
+ * (type, panel flag) diff cleanly — callers pass display strings in `updates`.
+ */
 const AUDITED_FIELDS: ReadonlyArray<{
-  key: "projectRef" | "customerName" | "location" | "department" | "value" | "description";
+  key: string;
   label: string;
+  current: (project: Project) => string;
 }> = [
-  { key: "projectRef", label: "Reference" },
-  { key: "customerName", label: "Customer / site" },
-  { key: "location", label: "Location" },
-  { key: "department", label: "Department" },
-  { key: "value", label: "Contract value" },
-  { key: "description", label: "Description" },
+  { key: "projectRef", label: "Case No.", current: (p) => p.projectRef ?? "" },
+  { key: "customerName", label: "Customer / site", current: (p) => p.customerName ?? "" },
+  { key: "location", label: "Location", current: (p) => p.location ?? "" },
+  { key: "value", label: "Contract value", current: (p) => p.value ?? "" },
+  { key: "description", label: "Description", current: (p) => p.description ?? "" },
+  { key: "projectType", label: "Project type", current: (p) => projectTypeLabel(p.projectType) },
+  {
+    key: "controlPanel",
+    label: "Control panel",
+    current: (p) => (hasControlPanel(p) ? "Yes" : "No"),
+  },
 ];
 
 /** One "field" activity entry per audited detail that actually changed. */
@@ -281,14 +371,14 @@ export function diffProjectFields(
 ): ProjectActivityEntry[] {
   const entries: ProjectActivityEntry[] = [];
 
-  for (const { key, label } of AUDITED_FIELDS) {
+  for (const { key, label, current } of AUDITED_FIELDS) {
     const next = updates[key];
     if (next === undefined) continue;
 
-    const current = (project[key] ?? "").trim();
-    if (next.trim() === current) continue;
+    const stored = current(project).trim();
+    if (next.trim() === stored) continue;
 
-    entries.push(makeActivityEntry("field", by, { field: label, from: current, to: next.trim() }));
+    entries.push(makeActivityEntry("field", by, { field: label, from: stored, to: next.trim() }));
   }
 
   return entries;

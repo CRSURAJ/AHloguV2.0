@@ -33,7 +33,7 @@ export default function JobCard({
         <div>
           <h4>{getJobTitle(job)}</h4>
           <p>
-            Job ID: {job.jobId || "—"} · Case: {job.caseNo || "—"} · Order: {job.orderNo || "—"}
+            Job ID: {job.jobId || "—"} · Case: {job.caseNo || "—"} · SO: {job.orderNo || "—"}
           </p>
         </div>
 

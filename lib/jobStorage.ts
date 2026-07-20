@@ -19,6 +19,8 @@ export type CreateJobInput = {
   isActive?: boolean;
   /** Record id of the Project this job belongs to (created in Build phase). */
   projectId?: string;
+  /** `ProjectSalesOrder.id` this job was created from. */
+  salesOrderId?: string;
 };
 
 export type UpdateJobInput = Partial<CreateJobInput>;
@@ -172,6 +174,7 @@ function normalizeJob(value: unknown, index: number): Job | null {
     createdAt,
     updatedAt,
     projectId: cleanString(item.projectId) || undefined,
+    salesOrderId: cleanString(item.salesOrderId) || undefined,
   };
 }
 
@@ -227,6 +230,7 @@ export async function createJob(input: CreateJobInput): Promise<Job> {
     createdAt: now,
     updatedAt: now,
     projectId: input.projectId?.trim() || undefined,
+    salesOrderId: input.salesOrderId?.trim() || undefined,
   };
 
   if (shouldUseAwsJobs()) {
@@ -269,6 +273,10 @@ export async function updateJob(id: string, updates: UpdateJobInput): Promise<Jo
       updates.projectId !== undefined
         ? updates.projectId.trim() || undefined
         : existingJob.projectId,
+    salesOrderId:
+      updates.salesOrderId !== undefined
+        ? updates.salesOrderId.trim() || undefined
+        : existingJob.salesOrderId,
   };
 
   if (shouldUseAwsJobs()) {
